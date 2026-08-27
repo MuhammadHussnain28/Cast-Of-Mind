@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 import { ToastProvider } from './components/ui'
 import PublicLayout from './components/layout/PublicLayout'
+import AuthBootstrap from './components/auth/AuthBootstrap'
+import ProtectedRoute from './components/auth/ProtectedRoute'
 
 import Home from './pages/Home'
 import About from './pages/About'
@@ -9,7 +11,11 @@ import HowItWorks from './pages/HowItWorks'
 import JoinAsTherapist from './pages/JoinAsTherapist'
 import Contact from './pages/Contact'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import Questionnaire from './pages/Questionnaire'
+import Portal from './pages/portal/Portal'
+import Admin from './pages/admin/Admin'
 import Privacy from './pages/legal/Privacy'
 import Terms from './pages/legal/Terms'
 import Refund from './pages/legal/Refund'
@@ -21,25 +27,53 @@ export default function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Every public page shares the navbar and footer. */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/join-as-therapist" element={<JoinAsTherapist />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/questionnaire" element={<Questionnaire />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/refund" element={<Refund />} />
-            <Route path="*" element={<NotFound />} />
-          </Route>
+        {/* Restores the session from the refresh cookie before any route
+            decides whether the visitor is signed in. Inside BrowserRouter so
+            everything below can navigate. */}
+        <AuthBootstrap>
+          <Routes>
+            {/* Every public page shares the navbar and footer. */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/join-as-therapist" element={<JoinAsTherapist />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/questionnaire" element={<Questionnaire />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/refund" element={<Refund />} />
 
-          {/* TODO: REMOVE BEFORE LAUNCH - development only, no layout. */}
-          <Route path="/styleguide" element={<Styleguide />} />
-        </Routes>
+              {/* Signed-in only. The guard decides what to RENDER; the real
+                  protection is the server-side role checks from chunk 1.4,
+                  which run on every request whatever the browser shows. */}
+              <Route
+                path="/portal"
+                element={
+                  <ProtectedRoute roles={['client', 'therapist']}>
+                    <Portal />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute roles={['admin']}>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route path="*" element={<NotFound />} />
+            </Route>
+
+            {/* TODO: REMOVE BEFORE LAUNCH - development only, no layout. */}
+            <Route path="/styleguide" element={<Styleguide />} />
+          </Routes>
+        </AuthBootstrap>
       </BrowserRouter>
     </ToastProvider>
   )

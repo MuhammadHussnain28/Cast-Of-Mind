@@ -11,7 +11,19 @@ export function errorHandler(err, req, res, next) {
     : 'Something went wrong. Please try again.';
 
   // Full detail stays server-side only — never in the client response.
-  console.error(err);
+  //
+  // Known (operational) errors are logged as ONE line. A wrong password is an
+  // expected event, not a fault, and a stack trace for it points only at our own
+  // throw statement. Dumping one per failed login would flood the logs during a
+  // brute-force attempt and bury the real errors underneath.
+  //
+  // Unknown errors still get the complete dump — those are genuine bugs and the
+  // stack is the whole point.
+  if (isKnownError) {
+    console.error(`${code} ${statusCode} ${req.method} ${req.path} — ${err.message}`);
+  } else {
+    console.error(err);
+  }
 
   const body = { error: { message, code } };
   if (err.details) {

@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { apiClient } from '../lib/api/client'
+import { useApi } from '../lib/useApi'
+import { LoadingState, ErrorState } from '../components/states'
 import {
   Badge, Button, Card, Checkbox, Heading, Input, Modal,
   RadioGroup, Select, Spinner, Text, Textarea, useToast,
@@ -18,6 +21,28 @@ function Row({ title, children }) {
       <Heading level={2} size="subsection">{title}</Heading>
       <div className="mt-6 flex flex-wrap items-start gap-4">{children}</div>
     </section>
+  )
+}
+
+/**
+ * Chunk 0.6 verification helper — calls the real health endpoint through the
+ * full stack (axios client -> useApi -> LoadingState/ErrorState) so success
+ * and failure can both be watched here. Stop the server and click "Try
+ * again" to see the failure path.
+ */
+function ApiCheck() {
+  const { data, error, loading, run } = useApi(
+    () => apiClient.get('/health').then((res) => res.data),
+    { immediate: true },
+  )
+
+  if (loading) return <LoadingState label="Calling /api/v1/health..." />
+  if (error) return <ErrorState message={error.message} onRetry={run} />
+
+  return (
+    <Text size="ui" tone="success">
+      Success: <code data-numeric>{JSON.stringify(data)}</code>
+    </Text>
   )
 }
 
@@ -177,6 +202,10 @@ export default function Styleguide() {
         >
           <Input label="Tell us why (optional)" placeholder="Anything you want us to know" />
         </Modal>
+      </Row>
+
+      <Row title="API check">
+        <ApiCheck />
       </Row>
 
       <Row title="Type scale">
