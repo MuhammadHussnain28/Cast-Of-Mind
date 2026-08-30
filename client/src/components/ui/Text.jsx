@@ -1,6 +1,15 @@
 import { cx } from '../../lib/cx'
 
 const SIZES = {
+  // 26px. The type scale's subsection step, added in chunk 2.2 for body copy
+  // that has to carry a section on its own — a statement the reader is meant to
+  // find themselves in, not a heading.
+  //
+  // It belongs here rather than being passed as className: both would be
+  // font-size utilities, so which one won would be decided by their order in
+  // the generated stylesheet rather than by the author. Same trap that made
+  // Heading take a tone prop.
+  subsection: 'text-subsection',
   body: 'text-body',
   ui: 'text-ui',
   caption: 'text-caption',

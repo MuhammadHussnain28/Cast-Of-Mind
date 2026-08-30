@@ -29,7 +29,11 @@ Visual direction, colour palette, typography, motion language, and page-by-page 
 - **Premium** — the quality signals professionalism and justifies the €200/month price
 - **Warm** — clinical coldness alienates; this should feel human
 
-**Anti-goals:** SaaS-template look, aggressive gradients, floating 3D blobs, generic stock photography of smiling people, "Book a demo" energy, dark-pattern urgency.
+**Anti-goals:** SaaS-template look, harsh or neon gradients, floating 3D blobs, generic stock photography of smiling people, "Book a demo" energy, dark-pattern urgency.
+
+> **Relaxed 2026-08-29 — approved by the developer.** This previously read "aggressive gradients", which was being applied as a ban on gradients altogether. Soft atmospheric gradients are now explicitly permitted — see §24.9. The anti-goal is *harshness*, never visual ambition.
+>
+> **Read this list as a register, not a fence.** Nothing here forbids depth, colour, movement or craft. A page that is calm because it is empty has failed the brief as surely as one that shouts.
 
 ### 24.2 Colour Palette
 
@@ -57,9 +61,9 @@ Neither addition changes any existing token.
 
 **Usage rules:**
 
-- **The accent is an accent, not a theme.** If more than roughly 5% of a screen is yellow, reduce it. Its power comes from scarcity.
+- **The accent is an accent, not a theme.** Yellow still leads nothing and shouts nothing — but the rigid "roughly 5% of a screen" cap is **lifted (2026-08-29)**. Gold may now appear in borders, icon strokes, rules, small fills and card highlights as well as on CTAs. The test: does the eye still land on the primary action first? See §24.9.
 - **`--mist` prevents the flat-white problem.** Alternate white and mist sections to create rhythm without hard dividers.
-- **Sage is optional.** Use it in illustration, iconography, and success states — never as a competing CTA colour.
+- **Sage is encouraged, not merely optional (relaxed 2026-08-29).** Use it freely in illustration, iconography, borders, ambient washes, growth motifs and success states — it is the warmth in a palette that is otherwise aubergine and paper. Standing limit: **never a competing CTA colour**, because two colours both reading as "press this" is a usability problem, not a taste one.
 - **Never place yellow text on white** at any size; contrast fails. `#F5C518` on white is **1.63:1** — worse than the old gold's 1.96:1, so this rule is now stricter, not looser. Yellow is for fills, borders, and large display text on dark surfaces.
 - **Yellow is never a focus ring on light surfaces.** It fails the 3:1 WCAG floor for focus indicators. Focus rings are `ink` on light surfaces and yellow only on dark ones.
 - **Measured contrast:** `#F5C518` on `ink` `#19122B` = **9.5:1** (passes comfortably). On `paper` `#FFFFFF` = **1.63:1** (fails — fills and borders only).
@@ -107,7 +111,7 @@ Where most sites animate in 200–300ms snaps, Cast of Mind's ambient and reveal
 
 - **Functional interactions stay fast.** Only ambient and reveal motion is slowed. A button that responds in 4 seconds is broken, not calm.
 - **`prefers-reduced-motion` must be fully respected.** All ambient and reveal motion disables; content appears immediately. This is an accessibility requirement, not a nicety — vestibular disorders are common and this audience is health-sensitive.
-- **No parallax on text.** Decorative parallax on background layers only.
+- **Gentle scroll-linked motion is permitted (added 2026-08-29).** Layered parallax drifts of roughly **10-20px**, and reveals that unfold across a scroll rather than firing once. Slow and organic. The old rule read "no parallax on text" and had the effect of removing scroll-linked motion from the site entirely; the real constraint is **displacement, not element type** — 10-20px is a drift, 200px is a ride, and body copy a reader is mid-sentence in should never move under them.
 - **No autoplay video with sound. Ever.**
 
 **Recommended library:** Framer Motion (works cleanly with React, has built-in reduced-motion support).
@@ -116,6 +120,8 @@ Where most sites animate in 200–300ms snaps, Cast of Mind's ambient and reveal
 
 - **Avoid generic stock photography of smiling people.** It reads as inauthentic and every competitor uses it.
 - **Preferred direction:** abstract organic forms, soft gradients, botanical/growth motifs (aligning with the logo's brain-and-root form), and calm textural backgrounds.
+- **Custom SVG, delicate line icons and authored visual accents are encouraged (2026-08-29)** wherever they clarify a concept or add human warmth. One consistent stroke weight; icons are drawn, never emoji or unicode glyphs.
+- **Use good, relevant photography** where a real image serves the reader better than an abstraction. Human portraits are permitted as development placeholders (2026-08-29 decision, `docs/ongoing.md`) and must be replaced before launch.
 - **Logo asset supplied 2026-08-22:** `client/src/assets/cast_of_mind logo.png` — 1764×1446, RGBA. A brain outline whose lower contour resolves into a trunk/root form, with the wordmark set across the middle.
   - **It is white artwork on transparency, so it is only usable on dark surfaces.** It disappears entirely on `paper` and `mist`. A dark (ink) version is required before the logo can appear on any light background — navbar, light footer, email headers, favicon. **Not yet supplied.**
   - The logo's lettering is a high-contrast Didone-style serif plus a script "of" — deliberately different from Fraunces. That is normal for a lockup; do not try to reset the logo in Fraunces.
@@ -231,3 +237,66 @@ The three portals ([Sections 7](#7-client-portal), [8](#8-therapist-portal), [9]
 - The client portal skews warmer; the admin portal skews denser and more utilitarian
 
 ---
+
+### 24.9 Visual Latitude — What Is Explicitly Permitted
+
+**Added 2026-08-29, approved by the developer.**
+
+**Why this section exists.** The first build of the home page was correct against every rule in §24 and still landed flat — a stack of horizontal bands, each a rectangle of solid colour holding a heading, a paragraph and a grid. Nothing overlapped, nothing had depth, almost every animation was the same fade-and-rise. It read as premium but inert.
+
+The cause was not the rules individually. It was that §24 was written almost entirely as prohibitions, so it was read defensively: an eight-token palette where two tokens were capped or discouraged, a motion section whose memorable line was "no parallax", and an anti-goals list nine items long. Following it literally produced restraint without character.
+
+This section is the counterweight. **Everything below is permitted, and using it is expected rather than merely tolerated.**
+
+#### The line that governs all of it
+
+> **Natural, not decorated.** Every effect below has to look like a property of the material — light falling on a surface, a page settling, something growing. If it looks like an effect that was *applied*, it is wrong for this brand, however tasteful it is in isolation.
+
+Nothing here overrides §24.1's audience. The reader is still often anxious, often new to therapy, sometimes in distress. The permissions below exist to make the site feel **alive and cared-for**, never busy, clever, or attention-seeking.
+
+#### 1. Soft atmospheric gradients — permitted
+
+- Smooth transitions within the palette: `ink-deep` into `ink`, `mist` into `paper`, a soft `sage` ambient wash, a warm low-opacity glow behind a focal element.
+- Large, slow, low-contrast. A gradient should be felt before it is noticed.
+- **Not permitted:** harsh stops, neon, multi-hue rainbows, gradients used as a button face, gradient text.
+
+#### 2. Richer colour presence — `sage` and `gold`
+
+- The rigid ~5% cap on gold is lifted. Gold may sit in borders, rules, icon strokes, small fills and card highlights.
+- Sage moves from "optional" to encouraged: illustration, icons, borders, ambient washes, growth motifs.
+- **The two standing limits are unchanged, because both are accessibility rather than taste:** gold is never text or a focus ring on a light surface (1.63:1), and `sage-deep` is the token for success *text* (plain `sage` is 3.44:1 on paper).
+- The test is no longer a percentage. It is: **does the eye still land on the primary action first?**
+
+#### 3. Gentle scroll depth and motion — permitted
+
+- Layered parallax drifts of roughly **10–20px**.
+- Scroll-linked reveals that unfold progressively, not only entrance animations that fire once.
+- Depth cues that respond to scroll position: a background layer moving slower than its foreground.
+- **Guardrails:** slow and organic. No displacement large enough to read as a ride. Nothing that moves body copy under a reader mid-sentence. `prefers-reduced-motion` still disables all of it, without exception.
+
+#### 4. Meaningful SVG, icons and imagery — encouraged
+
+- Custom SVG, delicate line icons, drawn diagrams and authored accents wherever they clarify a concept or add human warmth.
+- One consistent stroke weight across the whole icon set. Icons are **drawn** — never emoji or unicode glyphs standing in for an icon system.
+- Good, relevant photography where a real image serves the reader better than an abstraction.
+
+#### 5. Spatial layering — permitted
+
+- Break the flat rectangle. Gentle card offsets, elements that overlap or bleed past their container, content sitting at more than one visual depth.
+- Soft shadows with a real offset and blur; `backdrop-blur` where something genuinely sits over something else.
+- **Guardrails:** depth is declared once per element — a border *or* a shadow, not both. Blur is a material property of an overlapping surface, never decoration sprayed on a flat one. Nothing tilts or floats far enough to look unstable; this is a mental health platform, and the ground should feel solid.
+
+#### What has NOT changed
+
+Non-negotiable, and none of the above touches them:
+
+- Every contrast floor in §24.2 and §24.6. WCAG AA everywhere, measured rather than assumed.
+- `prefers-reduced-motion` fully respected.
+- Responsive to 360px, visible keyboard focus, 44×44px touch targets, semantic HTML.
+- Functional interactions stay at 150–250ms. Only ambient and reveal motion is slow.
+- Sentence case. No ALL-CAPS headings.
+- No dark patterns, no urgency, no gamification.
+- The palette itself. These are permissions to use the eight tokens **more fully**, not permission to add a ninth.
+
+---
+

@@ -28,10 +28,20 @@ export function baseTemplate({ title, bodyHtml, buttonLabel, buttonUrl, footerNo
   // image would otherwise render as a broken-image icon, which looks worse than
   // plain type. Many clients also block images by default, so the alt text
   // carries the brand name regardless.
+  // const header = env.emailLogoUrl
+  //   ? `<img src="${env.emailLogoUrl}" width="200" alt="${BRAND.name}"
+  //          style="display:block;border:0;outline:none;text-decoration:none;width:200px;max-width:200px;height:auto;">`
+  //   : `<span style="font-size:24px;font-weight:600;color:${BRAND.ink};letter-spacing:0.02em;">${BRAND.name}</span>`;
+
+    // Around lines 31-34:
   const header = env.emailLogoUrl
     ? `<img src="${env.emailLogoUrl}" width="200" alt="${BRAND.name}"
-           style="display:block;border:0;outline:none;text-decoration:none;width:200px;max-width:200px;height:auto;">`
+          style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:200px;max-width:200px;height:auto;">`
     : `<span style="font-size:24px;font-weight:600;color:${BRAND.ink};letter-spacing:0.02em;">${BRAND.name}</span>`;
+
+
+
+
 
   // A "bulletproof button": a table cell with a background colour, not a styled
   // div or an <a> with padding. This is the only construction Outlook renders
@@ -43,7 +53,7 @@ export function baseTemplate({ title, bodyHtml, buttonLabel, buttonUrl, footerNo
     ? `
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0;">
         <tr>
-          <td align="center" bgcolor="${BRAND.gold}" style="background-color:${BRAND.gold};padding:16px 32px;">
+          <td align="center" bgcolor="${BRAND.gold}" style="background-color:${BRAND.gold};padding:16px 16px;">
             <a href="${buttonUrl}"
                style="display:inline-block;color:${BRAND.ink};font-size:16px;font-weight:600;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
               ${buttonLabel}
@@ -90,14 +100,14 @@ export function baseTemplate({ title, bodyHtml, buttonLabel, buttonUrl, footerNo
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                style="max-width:560px;background-color:${BRAND.paper};">
           <tr>
-            <td style="padding:40px 40px 24px;text-align:center;">
+            <td align="center" style="padding:40px 40px 24px;text-align:center;">
               ${header}
             </td>
           </tr>
 
           <tr>
             <td style="padding:0 40px 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-              <h1 style="margin:0 0 20px;font-size:24px;font-weight:600;line-height:1.3;color:${BRAND.ink};">
+              <h1 style="margin:0 0 20px;font-size:32px;font-weight:600;font-family:'Times New Roman',Fraunces, Georgia, Cambria, serif;line-height:1.3;color:${BRAND.ink};">
                 ${title}
               </h1>
 

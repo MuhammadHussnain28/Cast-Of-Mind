@@ -26,7 +26,25 @@ const SIZES = {
   lg: 'min-h-12 px-8 text-body',
 }
 
+/**
+ * `as` lets a navigation link wear the button's clothes:
+ *
+ *   <Button as={Link} to="/questionnaire">Get started</Button>
+ *
+ * Added in chunk 2.1. Without it the "Get started" styling had to be copied by
+ * hand onto a <Link> everywhere it appears - already twice in the layout, and
+ * once more per marketing page. Four hand-copies of one control is how a design
+ * system quietly stops being one.
+ *
+ * The distinction is real, not cosmetic: something that NAVIGATES must be an
+ * <a>, so it opens in a new tab on middle-click, shows its target in the status
+ * bar, and is announced as a link. A <button> that navigates breaks all three.
+ * The button-only attributes below are therefore withheld when `as` is set -
+ * `type` and `disabled` are meaningless on an anchor, and a disabled anchor is
+ * not a thing the platform has.
+ */
 export default function Button({
+  as: Tag = 'button',
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -37,10 +55,11 @@ export default function Button({
   ...rest
 }) {
   const isDisabled = disabled || loading
+  const isNativeButton = Tag === 'button'
+
   return (
-    <button
-      type={type}
-      disabled={isDisabled}
+    <Tag
+      {...(isNativeButton ? { type, disabled: isDisabled } : {})}
       aria-busy={loading || undefined}
       className={cx(
         'inline-flex items-center justify-center gap-2 rounded-full font-body font-medium',
@@ -54,6 +73,6 @@ export default function Button({
     >
       {loading && <Spinner size={size === 'lg' ? 'md' : 'sm'} />}
       {children}
-    </button>
+    </Tag>
   )
 }

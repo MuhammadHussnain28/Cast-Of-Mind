@@ -776,3 +776,375 @@ The strongest guarantee is not "do not persist Redux". It is that **the token ne
 - No 2FA - admin 2FA is chunk 10.5.
 
 ---
+
+## Chunk 2.1 - Home: hero and services
+
+**Status: Complete.** Nothing skipped. **Not seen in a browser - see "Yours to check" below.**
+
+Built:
+- `client/src/components/home/Hero.jsx` - full-bleed photograph, two-layer ink scrim, Fraunces headline, gold Get started, and a quiet link out to How it works.
+- `client/src/components/home/Services.jsx` - the five concern themes as full-width rows on a lightening ground, a wide photograph at the brightest point, then an anchored dark panel carrying the price.
+- `client/src/data/homeContent.js` - all copy, the five themes, and the photo credits.
+- `client/src/pages/Home.jsx` - composes the two, and carries the direction contract as its opening comment.
+- Two photographs in `client/src/assets/`.
+
+**The composition was chosen by the developer, not by me.** Three structures were put up - "Threshold" (lopsided split with a tall photo breaking the top edge), "Horizon", and "The words you already use" (the 27 concern words drifting at display scale on ink). The developer locked **Horizon**. The other two are recorded here because they were real options, and either could be revived without touching the visual system: the world is fixed, only the arrangement differed.
+
+**Horizon, in one line: the page inhales.** The ground lightens as the reader descends - ink-deep, ink, mist, a photograph of an open window at the lightest point - and then closes on a dark panel. That descent *is* the structure.
+
+**No cards, deliberately.** Same-size cards of icon plus heading plus text are what every therapy site ships as "services", and they turn five different kinds of human difficulty into five identical rectangles. Each theme is a full-width row instead.
+
+**The 27 tags are grouped into 5 themes** - developer's decision, chosen over showing all 27 flat. The concern words themselves still appear, set as reading text inside each row rather than as pills: someone scanning for their own word finds it faster in a sentence-like list, and pills would read as filter controls that do nothing when clicked. **All 27 appear exactly once**, verified programmatically against `server/constants/specialtyTags.js`, not by counting them by eye.
+
+**The display labels are deliberately not byte-identical to the canonical tags** - sentence case, and "and" where the canonical uses an ampersand, because an ampersand in running prose reads as an abbreviation. Safe *only* because this page never sends a tag anywhere; the values the matching engine compares are untouched. One of those rewordings was caught and reverted during verification: "Trauma and abuse" became **"Trauma and/or abuse"**, because the two mean different things and someone who experienced abuse but would not use the word trauma about themselves still belongs in that row.
+
+**Price is in the services section, not the hero** - developer's decision. 200 EUR/month, what is included, and the fact that **sessions do not roll over** are all stated plainly. That last one is a term people should read before paying, not after, and the spec bans retention dark patterns.
+
+**Decisions made:**
+- **Code-led, not comp-led.** No image generation is available on this machine (no harness image tool, no `OPENAI_API_KEY`), so no mockup was generated and the ambition lives in the written direction contract instead. Stated rather than quietly skipped.
+- **Photographs are real and sourced, not generated.** Both from Pexels under the Pexels License (commercial use, no attribution required). **I opened and looked at every candidate before choosing** - six were downloaded, two kept. Rejected: murky amber curtains (dingy, off-palette) and a dark bedroom-at-dawn shot (beautiful, but reads melancholy and a bed is too private for a first viewport). Credits are recorded in `homeContent.js` so Asad can swap either for his own photography without hunting through components.
+- **The hero scrim is two layers, and heavier than it looks like it needs to be.** Text over a photograph is where accessibility usually fails quietly, because contrast depends on which part of the image happens to sit behind the words. Measured against the *brightest* region of this particular photograph, paper text lands at **17.0:1** at the baseline and **9.9:1** at the top of the text block - so the check does not depend on the photograph never being replaced. The flat ink layer does a second job: the photograph is blue and the brand is aubergine, and without it a cool blue rectangle sits in a warm ink site.
+- **One ambient motion on the whole page** - the hero photograph breathing, 20s, ease-in-out, infinite. Section 24.4 sets a 4s floor; at hero scale a 4s cycle reads as a zoom rather than a breath, so it is far slower. Its first and last frames are identical, so the reduced-motion rule (which collapses duration and forces one iteration) lands the image where it started instead of snapping it to a different size.
+- **Scroll reveals are per row, not one stagger container.** The obvious build looks right and behaves wrong: the theme list is well over a screen tall, so a container would trigger while only the first row is visible and rows three to five would finish animating far below the fold - three of the five reveals spent on an empty room.
+- **No mid-tone was invented to smooth the lightening.** Only palette tokens are used as grounds. A derived tint nobody approved is how a fixed palette quietly stops being fixed, and every step used has measured contrast.
+- **Gold appears three times on the page** - two Get started buttons and the price. The price is set in the accent at display size on a dark ground, which is the only place section 24.2 permits it: gold on paper is 1.63:1 and is never text anywhere.
+- **The tick icon is drawn SVG**, one stroke weight matching the navbar's, not a unicode glyph.
+
+**Two pieces of pre-existing code were touched. Both are flagged rather than slipped in:**
+
+1. **`components/ui/Button.jsx` gained an `as` prop.** The "Get started" styling was already hand-copied onto a `<Link>` in the navbar and mobile menu; the hero and the price panel would have made it four copies of one control, which is how a design system quietly stops being one. `<Button as={Link}>` now renders a real anchor - so middle-click opens a tab, the status bar shows the target, and screen readers announce a link. `type` and `disabled` are withheld when `as` is set, because neither is meaningful on an anchor.
+
+2. **`index.css` display type is now `clamp()`, not fixed.** **This was a real bug, found by reading rather than by any tool:** `--text-hero` was a flat 72px, and "Somewhere to begin." at 72px overflows a 360px screen. Section 24.3's sizes are the *desktop* values and section 24.6 requires 360px support - the two only reconcile if the type is fluid. Measured: hero **44px at 360px**, and **exactly 72px from 1024px up**, so every desktop value the spec specifies is still hit precisely. Section and subsection got the same treatment. This affects every page, including the login page from chunk 1.6 and `/styleguide`.
+
+**Verified:**
+- `npm run build` - passes; both photographs emitted to `dist/assets/`.
+- `oxlint` - exit 0, no findings.
+- **Impeccable design detector - 0 findings** across all changed targets.
+- All 27 canonical tags present exactly once, checked in code against the server constant.
+- **Contrast computed, not eyeballed**, on every pair used: paper on ink-deep 19.7:1 - paper/75 on ink-deep 11.0:1 - paper/75 on ink 10.4:1 - ink on mist 16.2:1 - ink/70 on mist 6.4:1 - gold on ink-deep 12.1:1 - sage icon on ink-deep 5.8:1 - hero text through the scrim 17.0:1 and 9.9:1. All pass AA.
+- Fluid type computed at 360 / 390 / 768 / 1024 / 1280 / 1920px.
+- **Provenance embedded in every shipped raster** (`embed-prompt.mjs`), including the four logo variants from chunk 0.5, which had none. Each now carries its real origin - supplied by the client, or derived and how.
+
+**Yours to check - I have not seen this page:**
+There is still no browser on this machine and Playwright stays uninstalled, per the standing decision from 2026-08-27. Everything above is structural. Please run `npm run dev` in `/client` and confirm by eye:
+1. **Desktop** - the hero photograph reads as calm atmosphere and the headline is comfortably legible over it.
+2. **360px** - no sideways scrolling anywhere; the headline wraps without overflowing; the theme rows stack cleanly.
+3. **Reduced motion on** (Windows: Settings, Accessibility, Visual effects, Animation effects **off**) - the hero photograph stops breathing, the rows appear immediately, and **nothing is invisible or missing**.
+4. **Keyboard** - tab through: skip link, navbar, hero Get started, "Or read what happens first", the price panel's Get started. Focus visible on every one.
+5. The two photographs are stand-ins in the sense that Asad may prefer his own. Worth showing him.
+
+**Pre-launch blockers (running list) - one added:**
+1. **`/styleguide` must be deleted** - development only.
+2. **LinkedIn URL in `lib/siteConfig.js`** - swap for the real profile.
+3. **Legal pages need real content** - Privacy, Terms, Refund.
+4. **Favicon still missing** - client to supply.
+5. **Footer tagline copy is mine, not the client's**.
+6. **Delete `server/routes/dev.routes.js` and its mount**.
+7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`.
+8. **Create `support@castofmind.com`** and forward it.
+9. **NEW - delete `client/src/assets/hero.png`.** A generic purple 3D isometric slab, 343x361, from some template - wrong colour family, far too small, and unrelated to therapy. **Nothing references it** and it is the only raster in the project with no recorded provenance, because I do not know where it came from. I did not delete it: it is not my file to remove.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts.**
+2. **Confirm the photography with Asad** before launch, or swap it - the credits and licence terms are in `client/src/data/homeContent.js`.
+3. The client bundle is now 537 kB (170 kB gzipped), mostly Framer Motion. Not new to this chunk and not a problem yet, but worth code-splitting before launch.
+
+**Not done (out of scope, by design):**
+- **The other five home sections.** Testimonials, how it works, who we help, the comparison table, and the FAQ are chunks 2.2 and 2.3, along with the second Get started CTA. They compose beneath `<Services />` in `Home.jsx`; nothing above needs to change to accept them.
+- No placeholder testimonials or invented client counts were created. None were needed for this chunk, and the running blocker list is unchanged on that front.
+- Every other public page is still a `PagePlaceholder`.
+
+---
+
+### Chunk 2.1 - finish review and fix round
+
+A finish review ran against the direction contract and the craft floor. It returned **`disposition: fix`** with 8 material findings. All 8 were applied. Recorded here because several changed shipped assets, not just code.
+
+**The review was run inline, not by a subagent, and it had no screenshots.** There is no browser on this machine, so every check that needs a render - what the photographs actually look like, whether the scrim reads as calm rather than muddy, real reflow at 360px, focus-ring visibility - **was not run by anyone**. The review covered source only. That limit is the reason the developer check below still matters.
+
+**1. The hero photograph was replaced, on rights grounds.**
+The original (Pexels 15957181, blurred water) carried embedded XMP metadata reading `dc:rights`: *"This photos are not for sale. Contact the owner for more info"*, and `dc:creator`: "Nai Jose". That contradicts the Pexels licence recorded beside it. It is very probably a stale camera or upload string rather than a real reservation - but a commercial mental-health platform should not ship an asset whose own metadata asserts a restriction, and arguing the point is not worth the exposure.
+
+Replaced with **Pexels 12088034** - a hillside under fog, verified to carry no `dc:rights`, `dc:creator`, or copyright metadata at all. Three further candidates were downloaded and two of those were rejected for the same metadata problem, so the check is not theoretical. **Every image is now metadata-screened before it ships**, and that rule is written into `homeContent.js` for whoever adds the next one.
+
+The replacement is also the better photograph for this composition: its luminous fog fills the upper frame where the scrim is lightest and the image is meant to be seen, and its dark plant silhouettes run along the bottom where the words sit and the scrim is heaviest. The silhouettes answer the brain-and-root form in the logo. Hero contrast was **re-measured against the new image** - 16.8:1 at the text baseline, 9.2:1 at the top of the text block, against near-white fog. Both still clear AA comfortably.
+
+**2. The window photograph shipped raw, contradicting the page's own contract.**
+OWN-WORLD says photographs sit *under an ink wash*. The hero honoured that; the closing band did not - which put an off-palette red window frame at full strength at the brightest moment of the page. It now carries a 14% ink wash: enough to pull it toward the palette, not enough to dim the arrival, which is that band's entire job.
+
+**3. The window band was cropping badly.** The asset was 2:1 in a box that is over 6:1 at desktop, so `object-cover` was showing roughly the middle third of the photograph and whatever composition it had was being thrown away. Re-downloaded at **2400x900** to match the band, band height raised (`h-64 / sm:h-80 / lg:h-112`), and `object-center` set explicitly rather than left to the default.
+
+**4. The reveal was one stock fade-up, eight times over.** Hero and all five rows used the same opacity-plus-y-translate. The craft floor names this directly, and names blur, clip-path and mask as the under-used alternatives. The hero still rises into place; the theme rows now **come into focus** - blur(10px) to 0 over 800ms, no translate. Two gestures for two jobs.
+
+**A real bug was introduced fixing this, and caught before it shipped:** the blur was first applied to the `<li>` itself. `filter` blurs an element's background box along with its text, so each band's own top and bottom edges would have gone soft and bled the neighbouring grounds through the seam for the full 800ms. The blur now sits on the content div; the ground stays solid.
+
+**5. Five rows were still one template.** The card was genuinely refused, but every row had the same column split, the same padding and the same arrangement - so the sameness the card is a symptom of survived anyway. The rhythm now **opens as the ground lightens**: padding grows from `py-12` to `py-24`, and the column split widens from 4/8 to 6/6, across the descent. The spacing carries the lightening, not just the colour.
+
+**6. Coverage gap against the chunk brief.** The brief asks the services section to say *what Cast of Mind offers*. Areas and inclusions were unmistakable; there was no plain statement of what the service actually **is**. Added as the section's opening line: online therapy with one therapist you keep, an hour over Zoom each week, unlimited chat in between.
+
+**7. A copy claim was overstated.** *"We match where those overlap, and nothing else decides it"* is not quite true - master spec §15 makes gender preference a soft sort that reorders results. Rewritten to *"Where you live and what time zone you are in never narrow the list"*, which is exactly what §15 says.
+
+**8. Two latent CSS fragilities, both fixed at the root:**
+- **`[data-surface='light']` did not exist.** The mist rows emit it, but no rule matched, so it never reset `--focus-ring`. It was correct today only because no dark ancestor happens to wrap those rows - and gold on mist is ~1.55:1, far under the 3:1 floor for a focus indicator. Now defined.
+- **Dark-section text was relying on CSS source order.** `className="text-paper"` overrode `Heading`'s built-in `text-ink` only because `.text-paper` is emitted after `.text-ink`, and that ordering is decided by the order the palette happens to be declared in `@theme`. Reordering two lines in `index.css` would have silently turned every dark section into ink-on-ink. `Heading` gained a `tone` prop matching `Text`'s, and both now pick exactly one colour class instead of two fighting.
+
+**9. Font flash on the largest text on the site.** Fraunces loaded `display=swap` with no preload, so the 72px hero headline paints in Georgia and reflows. Both font stylesheets are now preloaded. **This shortens the chain, it does not delete it** - removing the swap entirely means self-hosting the woff2 files, which is a larger change than this chunk owns. Worth doing before launch.
+
+**10. The hero image was unoptimised on the one screen that matters most.** A 2400px file was served to 360px phones. Now `srcset` at 900 / 1400 / 2400 with `sizes="100vw"` - a phone fetches **28 kB instead of 214 kB**.
+
+**A correction to this entry's own verification claims.** The impeccable detector reports itself **DEGRADED** on this machine: `htmlparser2`, `css-select`, `css-tree` and `domutils` are not installed, so it falls back to regex and evaluates neither custom properties, selector matching, nor computed contrast. Its own output says findings are "an undercount, not a clean bill of health". **The "0 findings" recorded earlier in this entry was a degraded 0**, and should be read as such. The compensation is that every colour pair on this page was computed by hand rather than trusted to the tool - which is the check the degraded detector is specifically missing. When `index.html` was finally included in the target list the detector did produce a finding: **Fraunces flagged as an overused font**. Not acted on, and it should not be: Fraunces is fixed by master spec §24.3 and confirmed by the client, and a pinned brief outranks a generic slop heuristic. Recorded so nobody later reads it as an unnoticed warning.
+
+**Re-verified after all fixes:** build passes, `oxlint` exit 0, all 27 tags still present exactly once, provenance re-embedded on all four new/replaced rasters. `hero.png` remains the only raster without provenance, because its origin is unknown - see blocker 9.
+
+---
+
+### Chunk 2.1 - hero restructured (2026-08-29, developer request)
+
+The hero moved from a full-bleed background photograph to a **split: words left, one photograph right**. Everything below the fold is untouched, so the services descent and the page thesis are unchanged.
+
+**The text and both calls to action are byte-identical.** Only the arrangement and the image changed, as asked.
+
+**New photograph: a quiet corner - armchair, plant, afternoon light** (Pexels 31893675, licence-clean, metadata-screened like everything else here).
+
+Two candidates were rejected before it:
+- **Hands cradling a seedling** hit the brief's words exactly - warmth, growth - and is also the single most-used image in the therapy and wellness category. Using it would have put the page's most prominent frame on the one shot every competitor already has.
+- **A warm amber interior** was genuinely calming but amber-dominant, and would have needed a heavy wash to sit next to an aubergine brand.
+
+The corner was chosen because it is **already built from the palette**: the cushion is close to `gold`, the plant to `sage`, the chair and shelving to `ink`. It carries human warmth with no face in frame, which §24.5 requires and which also asks less of an anxious visitor than a stranger's expression does.
+
+**The two-layer scrim is gone, and that is a simplification, not a loss.** It existed because every word sat on top of the photograph and contrast depended on which part of the image was behind them. The text now sits on flat `ink-deep` at **19.7:1**, so nothing is being compensated for. The 12% wash left on the image is the OWN-WORLD rule - photographs on this page sit under an ink wash - not an accessibility measure.
+
+**Motion:** Framer Motion, as requested, replacing the CSS keyframe. The panel drifts `y: 0 → -14 → 0` over 9s, ease-in-out, infinite. Past §24.4's 4s floor on purpose: at this size a faster cycle reads as a bob rather than a breath. `useReducedMotion()` means the `animate` prop is never mounted when the visitor has asked for less motion, so the image sits still rather than animating to a halt.
+
+**Responsive:** `lg:grid-cols-12` with a 6/6 split; below `lg` it stacks in DOM order, words first. The frame changes shape with the layout - `3/2` on phones, `16/10` from `sm`, `4/5` on desktop - because a portrait frame stacked under the copy would push the whole page down. `min-h` applies at `lg` only.
+
+**`srcset` added:** a phone fetches 96 kB instead of 349 kB.
+
+**Housekeeping:** the three `home-hero-mist*.jpg` files added yesterday are now unimported, so they were **deleted** rather than left as 310 kB of dead weight in the repo. Say the word if the previous hero should come back - the Pexels ID (12088034) is recorded in this log and the asset is one command away.
+
+**The direction contract in `pages/Home.jsx` was updated to match.** Its FIRST VIEWPORT block described the full-bleed composition, and a contract that describes a page which no longer exists is worse than no contract, because the next reader trusts it. The revision is dated and says what it replaced.
+
+**Files touched, and nothing else:** `components/home/Hero.jsx`, the contract block in `pages/Home.jsx`, the hero's own entry in `data/homeContent.js`, and the asset folder.
+
+**Verified:** build passes, `oxlint` exit 0, impeccable detector 0 findings on the changed files, provenance embedded on both new rasters. **Still unseen in a browser** - the split layout at 360px, the drift, and the reduced-motion state all need the developer's eyes.
+
+---
+
+### Decision log — human portraits as placeholders (2026-08-29, Asad)
+
+**Asad has approved using realistic human portraits as temporary placeholders across the whole project**, to be replaced with real client and therapist photographs before launch.
+
+This is recorded here because it sits against master spec §24.5, which says to avoid generic stock photography of smiling people. The two are reconcilable, and the distinction matters:
+
+- §24.5's objection is to the **register** — grinning stock faces that read as inauthentic and appear on every competitor's site. It is a design-quality rule.
+- Asad's decision permits **human faces as development stand-ins**. It does not turn generic smiling stock into good design, and it is not a licence to stop caring which photograph is used.
+
+So the rule this project now works to: human portraits are allowed, chosen in the register §24.5 actually asks for — natural light, looking away or in profile, contemplative rather than beaming. Every portrait used in chunk 2.2 follows that.
+
+**What the approval does not cover: shipping them.** See blocker 10 below.
+
+---
+
+## Chunk 2.2 — Home: testimonials and who we help
+
+**Status: Complete.** Nothing skipped.
+
+Built:
+- `client/src/data/homePlaceholders.js` — **the single placeholder file**, `// TODO: PLACEHOLDER — REPLACE BEFORE LAUNCH` on line 1. Holds all four testimonials, all four portrait imports, the five audience lines and the three figures. Neither component contains a word of its own copy, so there is one file to empty and not three.
+- `client/src/components/home/Testimonials.jsx` — section 3.
+- `client/src/components/home/WhoWeHelp.jsx` — section 5.
+- `client/src/pages/Home.jsx` — composition only, with the gap for chunk 2.3 marked.
+- Four portraits in `client/src/assets/`, provenance embedded in each.
+
+**Section order is honoured, including the gap.** Master spec §24.7 puts "How it works" (section 4) *between* testimonials and who-we-help. They are therefore not adjacent in `Home.jsx`; a comment marks where 2.3 inserts, so that chunk is an insertion rather than a reshuffle.
+
+**Decisions made:**
+
+- **Testimonials are attributed as first name · what they came for · how long**, never a surname. §24.7 requires real testimonials to be anonymised with consent, so the placeholder is already in the shape the real ones must take rather than setting a precedent that has to be walked back.
+- **Each quote is two sentences naming something that changed in an ordinary day** — sleeping through the night, catching an argument mid-sentence, writing something down while it was still happening. Developer's explicit requirement, and it is also the harder thing to mistake for marketing: "life changing" is a slogan, "I have slept through most nights since February" is a report.
+- **One quote is a couple** (Marta and Joris), because couples share one account (§6) and the home page should show that path exists.
+- **"Who we help" is NOT a row of big-number stat tiles.** That is the default build for "supporting figures and a client count", it is a named anti-pattern in the project's craft rules, and it is the wrong register — a wall of metrics aimed at someone deciding whether to ask for help is a company talking about itself at the moment the reader needs to be talked to. The five audience lines lead and take the width; the figures sit underneath at reading size on a sage rule, present and checkable but not shouted.
+- **Audiences are written as situations, not segments.** "People who have never spoken to a therapist before and are quietly unsure whether what they are dealing with counts" is something a reader recognises themselves in; "first-time therapy seekers" is something a pitch deck recognises them in.
+- **Two of the three figures are invented; one is not, and the file says which.** The 27 areas of concern is true (§15, `server/constants/specialtyTags.js`). It is flagged `invented: false` so whoever clears this file does not delete a true statement along with the false ones.
+- **Cards are mist on paper, not paper on mist.** The first build had it the other way round and the cards would have been close to invisible — paper and mist are only **1.11:1** apart, so a white card on a mist ground has no edge of its own and a hairline border ends up doing all the work. Inverting it means the card is defined by its own ground, needs no border at all, and matches §24.2, which assigns mist to "alternating section backgrounds, cards" in as many words.
+- **Ground rhythm:** the plan panel closes on `ink-deep`, testimonials open on `paper`, who-we-help returns to `mist`. Alternating per §24.2 rather than hard dividers.
+- **Motion:** scroll reveals, 700ms, ease-out, **100ms stagger** — inside §24.4's 80–120ms band. `whileInView` with `once: true` per item, so nothing animates below the fold. The testimonial stagger is taken **modulo the column count** and the audience stagger is **capped at four steps**, because an uncapped index delay makes the last item sit visibly waiting after the ones above it have already arrived — that reads as lag, not rhythm. Everything gated on `useReducedMotion()`.
+
+**Two primitives were extended rather than worked around:**
+- `Text` gained a `subsection` size (26px). The audience lines needed it, and passing `className="text-subsection"` instead would have put two font-size utilities on one element, where the winner is decided by their order in the generated stylesheet rather than by the author.
+- `Heading` gained a `tone` prop in chunk 2.1 for the same underlying reason. Both are recorded here so the pattern is visible: when a primitive is missing a step, add the step.
+
+**A false claim was caught in my own draft and removed.** The testimonials intro originally opened "Names and details are shared with permission." That would have been a false statement sitting directly above four invented quotes, and a claim someone would then have to make true at launch. Replaced with a line that makes no claim about consent, verification, or collection, and which stays true whoever is eventually quoted.
+
+**Contrast computed by hand, not eyeballed** (the detector cannot do it — see below). All pass AA:
+
+| Pair | Ratio |
+|---|---|
+| `ink-deep` on `mist` (quote text) | 17.7:1 |
+| `ink` on `mist` (name, headings) | 16.2:1 |
+| `ink/70` on `mist` (captions) | 6.4:1 |
+| `ink` on `paper` (heading) | 18.1:1 |
+| `ink/70` on `paper` (intro) | 6.7:1 |
+| `sage` rule on `mist` | 3.1:1 — non-text; clears the 3:1 floor and only just, so it must not be thinned |
+
+**A correction to my own figures during the build:** I first wrote 16.6:1 for `ink` on `paper`, having carried over the `ink`-on-`mist` number. The real figure is **18.1:1**. Both component files carry the corrected table.
+
+**Verified:**
+- `npm run build` passes; 649 modules; all four portraits emitted to `dist/assets/`.
+- `oxlint` — clean on every file this chunk touched.
+- Impeccable detector — **0 findings, but read that as a degraded 0.** `htmlparser2`, `css-select`, `css-tree` and `domutils` are still not installed on this machine, exactly as recorded in the 2.1 entry, so the detector falls back to regex and evaluates neither custom properties nor computed contrast. The hand-computed table above is the compensation, since contrast is precisely the check it cannot run.
+- Both `[data-surface=dark]` and `[data-surface=light]` focus-ring rules confirmed present in the built stylesheet.
+- All four portraits metadata-screened before use; two candidates were **rejected outright** for carrying `dc:rights` / `dc:creator` strings — the same screen that rejected the original 2.1 hero photograph.
+
+**Not verified — developer check needed:**
+- **Nothing here has been seen rendered.** No browser on this machine, per the standing decision of 2026-08-27. Please check: the offset two-column arrangement at desktop width, the single-column stack at 360px, the 100ms stagger reading as rhythm rather than lag, and the whole page with reduced motion switched on in Windows settings.
+
+**Not done (out of scope, by design):**
+- Sections 4, 6 and 7 — how it works, comparison table, FAQ — and the second Get started CTA. All chunk 2.3.
+- **The hero was not touched**, on explicit instruction. Three items raised there on 2026-08-29 are therefore still open: `data-surface=""` leaves the focus ring invisible on the dark hero ground, so a keyboard user cannot see focus on Get started; five unused imports; and three comments describing code that is no longer in the file.
+- **The chunk 2.1 entry above no longer matches the code.** It records the hero photograph as Pexels 31893675, the armchair corner; the hero now renders `img3.jpg`. Flagged rather than edited, because the log is a record of what was done at the time and the hero is the developer's to change.
+
+**PRE-LAUNCH BLOCKERS (running list) — one added:**
+1. **`/styleguide` must be deleted** — development only.
+2. **LinkedIn URL in `lib/siteConfig.js` is a placeholder** — swap for the real profile.
+3. **Legal pages need real content** — Privacy, Terms, Refund.
+4. **Favicon still missing** — client to supply.
+5. **Footer tagline copy is mine, not the client's.**
+6. **Delete `server/routes/dev.routes.js` and its mount** — guard-testing routes.
+7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`.
+8. **Create `support@castofmind.com`** and forward it — printed in every email footer and it does not exist yet.
+9. **`client/src/assets/hero.png` has unknown provenance** — a 343×361 purple isometric graphic referenced by nothing. Delete it or record where it came from.
+10. **NEW — replace or remove everything in `client/src/data/homePlaceholders.js`.** Two stacked risks, and the second is the sharp one:
+    - Fabricated reviews and invented user counts on a live mental-health platform are a consumer-protection problem in most jurisdictions and a serious trust problem if discovered. §24.7 records this explicitly.
+    - **The four portraits are photographs of real, identifiable people, and the file attaches each of them to an invented statement about their own mental health** — grief, anger, insomnia, a failing relationship. The Pexels licence permits commercial use of the image; it does not make it acceptable to publish a claim that a named real person was treated for depression. That is a different kind of wrong from fake body copy, and a clean licence does not cure it.
+
+    Before launch, one of: real testimonials with **written consent and anonymisation** plus real figures, or **delete both sections**. Keep the `27` figure either way — it is true.
+
+---
+
+## Chunk 2.3 — Home: how it works, comparison, FAQ
+
+**Status: Complete.** Nothing skipped. **The home page is now assembled in full.**
+
+Built:
+- `client/src/components/home/HowItWorks.jsx` — section 4, plus the second Get started CTA.
+- `client/src/components/home/Comparison.jsx` — section 6.
+- `client/src/components/home/Faq.jsx` — section 7, accordion built inline.
+- `client/src/data/homeContent.js` — extended with `processSteps`, `comparisonIntro`, `comparisonRows`, `faqItems`. **All real content, every claim cited inline to the spec.** Nothing invented went into this file; fabricated material stays in `homePlaceholders.js`.
+- `client/src/pages/Home.jsx` — all seven sections in §24.7 order.
+
+**Final ground rhythm**, recorded because it is now fixed and later chunks should not disturb it:
+
+```
+hero .......... ink-deep      testimonials ... paper
+services ...... ink-deep → ink → mist → paper → ink-deep
+how it works .. ink           <- mid-page anchor, carries the 2nd CTA
+who we help ... mist          comparison ..... paper
+FAQ ........... mist          footer ......... ink  (from PublicLayout)
+```
+
+Putting "how it works" on ink is not decoration: yellow on paper is 1.63:1 and is never a button face on a light ground, so a dark section is what lets the second Get started look like the first one.
+
+**Decisions made:**
+
+- **The connector line is this chunk's one authored motion moment.** A line runs through the four steps and draws itself as the section arrives — left to right on desktop, top to bottom on mobile — with the markers landing behind its leading edge at a 100ms stagger and the copy settling under them. It is the process made visible: a path with a beginning and an end, drawn in the order the reader will walk it. Everything else in the chunk is deliberately quiet so this lands; a page where every section performs has no signature, only noise.
+- **The line draw runs 1.1s, past §24.4's 600–800ms reveal band, on purpose.** It sits closer to ambient than to a section entrance, and a line that crosses the viewport in 700ms reads as a swipe rather than as a path being traced.
+- **The steps are numbered, which is a default worth refusing almost everywhere else.** The project's craft rules ban section numbering unless the sequence itself carries information — and §24.7 names this section as exactly that exception. Recorded so nobody removes them thinking it is slop.
+- **Two lines, not one, because the axis changes with the layout.** Each is hidden at the other breakpoint, and both animate by `scale` on the compositor, so a full-width line costs nothing.
+- **The lines are siblings of the `<ol>`, not children.** An `<ol>` may only contain `<li>`; a decorative `<div>` inside it breaks the list semantics a screen reader uses to announce "4 items". Caught during the build.
+- **The comparison uses no ticks and no crosses, and no red anything.** A column of green ticks beside red crosses is an argument, not a comparison, and `clay` is the error colour — using it to mark someone else's option as wrong would be the palette telling a lie. Both columns are set identically, with no highlight, tint, border, or "recommended" flag on ours.
+- **No invented numbers about in-person therapy.** Session rates vary by city and practitioner and this project has no source for them, so the cost row describes how the charging works instead of quoting a figure it cannot stand behind.
+- **The comparison states a real limitation of ours.** Under scheduling: *your therapist schedules each session and you join by link; you cannot book or move a session yourself.* True per §7.4, and someone who found that out after paying would be entitled to be annoyed. A comparison table that concedes nothing is the kind nobody believes.
+- **The comparison ships two layouts, one set of facts.** A real `<table>` from `md` up, cards below it. Exactly one is displayed — `hidden` resolves to `display:none`, which removes the other from the accessibility tree, so nothing is announced twice. Reflowing a single table with `display:block` would have kept one DOM tree but stripped the row and column relationships that are the entire reason to use a table.
+- **The FAQ accordion opens in 200ms, not 700ms.** §24.4 slows ambient and reveal motion but holds functional interactions at 150–250ms. Opening a panel is functional — the reader asked a question and is waiting. A 700ms accordion is the standard misreading of "calm": it is not calm, it is slow, and the spec says outright that a control taking that long is broken rather than serene. The section entrance around it still reveals at 700ms.
+- **More than one panel can be open at a time.** Single-open accordions close the answer someone was reading when they open the next one, which is hostile if they were comparing two — cost against cancellation, say.
+- **The FAQ panel unmounts when closed rather than being clamped to zero height.** Collapsed content left in the DOM stays in the accessibility tree, so a screen reader would read every answer whether open or not, which defeats the control. The cost is that `aria-controls` briefly points at an absent id, which ARIA tolerates; `aria-expanded` is the attribute doing the real work.
+- **Arrow-key movement between FAQ headers is deliberately not implemented**, and is flagged in the file. It is optional in the ARIA authoring practices, and a half-built roving tabindex is worse than none — it would capture Tab without delivering the Home/End behaviour people who rely on it expect.
+
+**The crisis question is in the FAQ, at the developer's decision.** It was not in the chunk brief; it was proposed, approved, and it matters more than the other five. A mental-health site with no word about emergencies has a duty-of-care gap, and someone at 2am is a realistic visitor to this page. It is written to three rules: say plainly this is not an emergency service, point to services that are, and **invent no phone numbers** — a wrong helpline number on a crisis answer is worse than no answer, which is why it names no specific line and defers to local emergency numbers. It gives no clinical advice of any kind.
+
+**Contrast computed by script this time, not by hand.** Chunk 2.2 shipped a wrong figure (16.6:1 for ink on paper, which is actually 18.1:1) because it was carried over from another pair by eye. Every value below came out of a calculator run against the real hex values:
+
+| Pair | Ratio | |
+|---|---|---|
+| `paper` on `ink` | 18.06:1 | pass |
+| `paper/75` on `ink` | 10.42:1 | pass |
+| `sage` on `ink` (step labels) | 5.31:1 | pass |
+| `gold` on `ink` (button face) | 11.08:1 | pass |
+| `ink` on `paper` | 18.06:1 | pass |
+| `ink/70` on `paper` | 6.73:1 | pass |
+| `ink` on `mist` | 16.25:1 | pass |
+| `ink/70` on `mist` | 6.41:1 | pass |
+| `paper/25` on `ink` (connector line) | 2.24:1 | decorative, exempt |
+| `ink/20` on `mist` (rules) | 1.53:1 | decorative, exempt |
+
+**A discrepancy found in the spec itself, recorded rather than silently patched:** §24.2 states gold on ink as **9.5:1**. Computed from the two hex values it is **11.08:1**. Nothing is broken — both clear every threshold that applies, and the spec's figure is conservative rather than dangerous — but the two do not agree, and 11.08:1 is what the palette actually produces. Worth correcting in the spec at some point; not changed here, because the spec is the client's document.
+
+**Verified:**
+- `npm run build` passes; 652 modules.
+- `oxlint` — **0 findings** on every file this chunk touched.
+- Impeccable detector — 0 findings, and as in 2.1 and 2.2 **read that as a degraded 0**: `htmlparser2`, `css-select`, `css-tree` and `domutils` are still not installed, so it runs on regex and evaluates neither custom properties nor computed contrast. The table above is the compensation.
+- Responsive utilities confirmed present in the built stylesheet. Note for anyone checking this in future: Tailwind v4 emits `@media (width>=48rem)`, **not** `min-width` — grepping for `min-width` returns one hit across the whole file and proves nothing.
+
+**Not verified — developer check needed:**
+- **Nothing has been seen rendered.** No browser here, per the standing decision of 2026-08-27. Worth your time on this chunk specifically:
+  1. **The connector line drawing** — does it read as a path being traced, or as a bar sliding in?
+  2. **The full page scroll**, desktop and 360px, top to bottom, now that all seven sections are in.
+  3. **Keyboard through the accordion** — Tab to a question, Enter and Space both toggle it, focus ring visible on `mist`, and the chevron rotation matches the panel.
+  4. **The comparison at exactly 768px**, where it swaps from table to cards.
+  5. **Reduced motion on** — the connector line should be present and full-length immediately, not absent.
+  6. **All CTAs route** — two Get started to `/questionnaire`, and the two links to `/how-it-works`.
+
+**Not done (out of scope, by design):**
+- The dedicated `/how-it-works` page is chunk 2.5. This section links to it; that route still renders a placeholder.
+- **The hero was not touched**, on explicit instruction for the third time. The three items raised on 2026-08-29 remain open: `data-surface=""` leaves the focus ring invisible on the dark hero ground, so a keyboard user cannot see focus on Get started; five unused imports (the only lint warnings in the client); and three comments describing code no longer in the file.
+- No new pre-launch blockers. The list stands at 10.
+
+---
+
+### Decision log — design guidelines relaxed (2026-08-29, developer)
+
+**What prompted it.** The developer reviewed the finished home page and said it felt premium but flat and static — good, but short of what they expected. That judgement was correct, and the diagnosis is worth recording because the cause was not a single bad decision.
+
+**The honest cause.** The page was a stack of horizontal bands: each section a rectangle of solid colour containing a heading, a paragraph and a grid. Nothing overlapped, nothing sat at a second depth, nothing bled past its container, and almost every animation was the same fade-and-rise. It was correct against every rule in §24 and still inert.
+
+The rules were not individually wrong. The problem was that §24 was written almost entirely as prohibitions and was therefore read defensively:
+
+- an eight-token palette in which one token was capped at ~5% of a screen and another was described as "optional" and barred from CTAs, leaving aubergine and paper to do nearly all the work;
+- a motion section whose most memorable line was "no parallax on text", which in practice removed scroll-linked motion from the site altogether;
+- an anti-goals list nine items long, opening with "aggressive gradients", which was being applied as a ban on gradients of any kind.
+
+Following that literally produces restraint without character. **Calm and inert are not the same thing**, and the first build collapsed them.
+
+**What was granted.** Five permissions, approved by the developer:
+
+1. **Soft atmospheric gradients** — `ink-deep` into `ink`, `sage` ambient washes, warm low-opacity glows. Harsh, neon and multi-hue gradients remain out.
+2. **Richer `sage` and `gold`** — the rigid ~5% cap lifted; both usable in borders, icon strokes, rules, small fills, card highlights and washes.
+3. **Gentle scroll depth and motion** — layered parallax drifts of roughly 10–20px, and reveals that unfold across a scroll rather than firing once.
+4. **Custom SVG, delicate line icons, authored accents, and good relevant photography.**
+5. **Spatial layering** — card offsets, overlap, elements bleeding past their container, `backdrop-blur`, soft shadows.
+
+**The governing line, and the reason this is not a licence to redecorate:**
+
+> **Natural, not decorated.** Every effect must look like a property of the material — light falling on a surface, a page settling, something growing. If it looks like an effect that was *applied*, it is wrong for this brand however tasteful it is in isolation.
+
+The developer was explicit that this must stay inside the brand identity and must not be pushed too far, because it is a mental health platform. The permissions exist to make the site feel **alive and cared-for**, never busy or attention-seeking. §24.1's audience is unchanged: often anxious, often new to therapy, sometimes in distress.
+
+**What did NOT change**, and none of the above touches it: every contrast floor, `prefers-reduced-motion`, 360px responsiveness, visible keyboard focus, 44×44px targets, semantic HTML, 150–250ms functional interactions, sentence case with no ALL-CAPS, no dark patterns — and the palette itself. These are permissions to use the eight existing tokens more fully, **not** permission to add a ninth.
+
+**Files updated:**
+
+| File | Change |
+|---|---|
+| `Cast_of_Mind_Master_Spec.md` | §24.1 anti-goals reframed; §24.2 gold cap lifted and sage promoted; §24.4 scroll-linked motion permitted; §24.5 SVG/icons/photography encouraged; **new §24.9 "Visual Latitude"** |
+| `docs/05-design-system.md` | Same five changes, re-synced from the master spec |
+| `.claude/rules/frontend.md` | Same relaxations, plus a new "Visual Latitude" block — and a **stale-data fix**, below |
+| `docs/ongoing.md` | This entry |
+
+**A stale file was found and corrected while doing this.** `.claude/rules/frontend.md` still listed the accent as `#E3B23C` and omitted `clay` and `sage-deep` — all three superseded on 2026-08-22 and never synced into that file. The code has been correct since then; this rules file was the only place still disagreeing, and it is the file that loads into context every session, so it was actively teaching the wrong palette. Now matches the spec.
+
+**Also recorded while updating §24.2:** the spec states gold on ink as 9.5:1. Computed from the hex values it is **11.08:1**. Both clear every threshold, so nothing is broken and nothing was changed — noted in the chunk 2.3 entry above and repeated here so it is not lost.
+
+**No code was touched.** This entry is documentation only. The existing home page still reflects the old, tighter reading of the guidelines; applying the new latitude to it is separate work and has not been done or authorised yet.
+
+---

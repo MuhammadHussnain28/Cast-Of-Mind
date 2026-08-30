@@ -23,18 +23,23 @@
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
   --font-body: 'Satoshi', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 
-  /* Type scale — §24.3. Display sizes are Fraunces, the rest Satoshi. */
-  --text-hero: 4.5rem; /* 72px */
-  --text-hero--line-height: 1.04;
+  /* Type scale — §24.3. Display sizes are Fraunces, the rest Satoshi.
+     The sizes in §24.3 are the DESKTOP values, so each display step is a clamp
+     whose maximum is the specified size. A fixed 72px headline overflows a
+     360px screen, and 360px is the responsive floor the same spec sets in
+     §24.6 — the two rules only reconcile if the type is fluid.
+     Measured: hero 44px at 360px, 72px from 1024px up. */
+  --text-hero: clamp(2.75rem, 1.6rem + 5.1vw, 4.5rem); /* 44px → 72px */
+  --text-hero--line-height: 1.06;
   --text-hero--letter-spacing: -0.03em;
   --text-hero--font-weight: 500;
 
-  --text-section: 2.75rem; /* 44px */
-  --text-section--line-height: 1.12;
+  --text-section: clamp(2rem, 1.5rem + 2.2vw, 2.75rem); /* 32px → 44px */
+  --text-section--line-height: 1.14;
   --text-section--letter-spacing: -0.02em;
   --text-section--font-weight: 400;
 
-  --text-subsection: 1.625rem; /* 26px */
+  --text-subsection: clamp(1.375rem, 1.2rem + 0.8vw, 1.625rem); /* 22px → 26px */
   --text-subsection--line-height: 1.3;
   --text-subsection--letter-spacing: -0.01em;
   --text-subsection--font-weight: 500;
@@ -58,6 +63,24 @@
   /* Motion — §24.4. The breathing rhythm is the signature. */
   --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-breath: cubic-bezier(0.42, 0, 0.58, 1);
+
+  /* The one ambient motion on the site: a hero photograph that breathes.
+     20s is far past §24.4's 4s floor on purpose — at hero scale a 4s cycle
+     reads as a zoom, not a breath. The start and end frames are identical, so
+     the reduced-motion rule below (which collapses duration and forces a
+     single iteration) lands the image exactly where it began instead of
+     snapping it to a different size. */
+  --animate-breathe: breathe 20s var(--ease-breath) infinite;
+
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1.04);
+    }
+    50% {
+      transform: scale(1.09);
+    }
+  }
 }
 
 /* Durations exposed as plain custom properties so Framer Motion can read them
@@ -74,6 +97,16 @@
 
 [data-surface='dark'] {
   --focus-ring: var(--color-gold);
+}
+
+/* The counterpart, and it is not redundant. A light region nested inside a
+   dark one — a mist band below an ink band, a paper panel on a dark page —
+   would otherwise inherit the gold ring from its ancestor, and gold on mist is
+   1.55:1, far under the 3:1 floor for a focus indicator. Without this rule the
+   markup is only correct as long as no light section ever sits inside a dark
+   one, which is not a property anyone can keep true by remembering. */
+[data-surface='light'] {
+  --focus-ring: var(--color-ink-deep);
 }
 
 @layer base {
