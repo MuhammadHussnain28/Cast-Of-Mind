@@ -64,6 +64,39 @@ function loadEnv() {
     process.exit(1);
   }
 
+  // Where contact-form messages are delivered. Without it in production the
+  // form would accept messages and silently drop them.
+  if (isProduction && !process.env.CONTACT_TO) {
+    console.error('Missing CONTACT_TO.');
+    console.error('Set it to the inbox that should receive contact form messages.');
+    process.exit(1);
+  }
+
+  // Cloudinary. Required in production: without it the therapist application
+  // form cannot accept a photo or a certificate, so nobody can apply at all.
+  // Optional in development so someone working on auth need not hold storage
+  // credentials — the upload endpoint returns a clear 503 when it is unset.
+  const cloudinaryVars = [
+    'CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET',
+  ];
+  const missingCloudinary = cloudinaryVars.filter((key) => !process.env[key]);
+
+  if (isProduction && missingCloudinary.length > 0) {
+    console.error(`Missing Cloudinary variable(s): ${missingCloudinary.join(', ')}`);
+    console.error('Without these, therapist applicants cannot upload documents.');
+    process.exit(1);
+  }
+
+  // Partial configuration is always a mistake, in any environment — it fails at
+  // upload time with an opaque authentication error rather than at startup.
+  if (missingCloudinary.length > 0 && missingCloudinary.length < cloudinaryVars.length) {
+    console.error(`Incomplete Cloudinary config. Missing: ${missingCloudinary.join(', ')}`);
+    console.error('Set all three, or none of them.');
+    process.exit(1);
+  }
+
   if (isProduction && !process.env.EMAIL_FROM) {
     console.error('Missing EMAIL_FROM.');
     console.error('Set it to a sender on a domain verified in Resend,');
@@ -90,6 +123,15 @@ function loadEnv() {
     // Public URL of the logo shown in email headers. Optional — the template
     // falls back to a text wordmark, which is better than a broken-image icon.
     emailLogoUrl: process.env.EMAIL_LOGO_URL || null,
+
+    // Contact form destination. Null in development falls through to the
+    // terminal fallback in sendEmail.
+    contactTo: process.env.CONTACT_TO || null,
+
+    // Cloudinary. All three or none — enforced above.
+    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || null,
+    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || null,
+    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || null,
   };
 }
 

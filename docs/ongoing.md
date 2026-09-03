@@ -1148,3 +1148,769 @@ The developer was explicit that this must stay inside the brand identity and mus
 **No code was touched.** This entry is documentation only. The existing home page still reflects the old, tighter reading of the guidelines; applying the new latitude to it is separate work and has not been done or authorised yet.
 
 ---
+
+## Chunk 2.4 — About page (`/about`)
+
+**Status: Complete.** Nothing skipped. First page built under the §24.9 visual latitude.
+
+Built:
+- `pages/About.jsx` — composition plus the two text-free gradient transition strips.
+- `components/about/` — `AboutHero` · `BrandStory` · `Founder` · `TeamGrid`.
+- `components/layout/ScrollToHash.jsx` — new, mounted in `PublicLayout`.
+- `data/aboutContent.js` — the parts that are **true** (mission, brand philosophy).
+- `data/aboutPlaceholders.js` — **everything invented**, marker on line 1.
+- `App.jsx` — the `/team` redirect, and nothing else.
+- Five portraits in `client/src/assets/`, provenance embedded in each.
+
+**Ground rhythm.** `ink-deep` → strip → `ink` → strip → `mist` → `paper`. The strips carry no words on purpose: a band whose ground runs ink to mist has no text colour that passes contrast at both ends, so the gradient gets its own space and every section holding copy keeps one flat, measured ground. This is the one technique from the abandoned home-page redesign that was worth keeping, and it is the whole fix for the "stack of flat bands" problem.
+
+**Decisions made:**
+
+- **The founder section is third person with no quotation marks.** Asad is a real, named person — unlike the invented clients quoted on the home page, who do not exist. A fabricated first-person quote attributed to him would be misattribution, not placeholder copy. Approved on that basis. If a real quote replaces this later it must be his own words.
+- **Asad appears in both his own section and the team grid.** `/team` redirects to the grid, so the grid has to read as a complete team standing alone rather than as four people and a gap. Developer's decision.
+- **Elevation is declared once per state, which is why the card shadow only appears on hover.** A 1px border sitting under a soft shadow at rest is the "ghost card" — two competing depth cues on a surface that is not actually raised. At rest the cards are flat mist panels with a hairline edge; on hover they lift 3px, the border warms to sage, and a shadow appears, because the card is now genuinely off the page. This is a deliberate deviation from the literal brief (which asked for border *and* shadow) and produces the same result the brief wanted without the tell. 200ms, because §24.4 keeps hover feedback fast.
+- **The logo is presented at 260px, not at display scale.** The singular-wordmark asset was made in chunk 0.5 by clipping the S out of a flattened raster, and carries two known defects recorded above: the wordmark sits ~3% left of centre, and the D's bowl has faint stair-stepping. Invisible at navbar size; visible the larger it is printed — and a brand section is exactly where someone looks closely. **This constraint disappears the moment Asad supplies the vector source**, which is worth asking for regardless because the favicon needs it too.
+- **The white logo original is used rather than the ink recolour**, which is why the brand section is dark. The white file is the untouched client asset; the ink version is a derivative I produced. A brand presentation should be built around the real thing.
+
+**A routing gotcha that would have shipped silently.** React Router sets `location.hash` and **does not scroll**. Without a handler, `/team` → `/about#team` lands the visitor at the top of the About page and the anchor does nothing — the redirect looks like it worked and did not. `ScrollToHash` fixes it, retries across ~10 animation frames because the target usually has not painted when the effect first runs, then gives up rather than looping. Smooth scrolling is disabled under `prefers-reduced-motion`; `scroll-mt-28` (112px) clears the 72px sticky navbar.
+
+**Contrast — computed by script, not estimated. All 17 pairs checked, every text pair clears AA:**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| paper on ink-deep | 19.7:1 | | ink on mist | 16.2:1 |
+| paper/80 on ink-deep | 12.5:1 | | ink/70 on mist | 6.4:1 |
+| paper on ink | 18.1:1 | | ink on paper | 18.1:1 |
+| paper/80 on ink | 11.7:1 | | ink/70 on paper | 6.7:1 |
+| paper/75 on ink | 10.4:1 | | sage-deep on mist | 4.9:1 |
+| sage icon on ink | 5.3:1 | | | |
+
+Decorative and exempt: `ink/8` rest border 1.2:1, `sage/40` hover border 1.5:1, `sage/25` logo ring 1.4:1.
+
+Three comment figures were wrong on first write and were corrected against the calculator rather than left: `sage-deep on mist` was recorded as 5.2 (it is 4.9), `paper/80 on ink` as 11.6 (11.7), and one block listed a `paper/70` pair that the file does not use.
+
+**Verified:**
+- `npm run build` passes; 665 modules; all five portraits emitted.
+- `oxlint` — **0 findings** on every file this chunk touched.
+- Impeccable detector — 0 findings, and as before **read that as a degraded 0**: the parsing dependencies are still absent, so it runs on regex and cannot evaluate contrast. The table above is the compensation.
+- Generated CSS confirmed to contain the arbitrary hover shadow, `scroll-margin-top`, `aspect-ratio:4/5`, `sage-deep`, and both gradient stops.
+- All five portraits metadata-screened before use; **three candidates rejected outright** for carrying `dc:rights` or `dc:creator`.
+- An unused `group` class was removed from the team card during cleanup.
+
+**Not verified — developer check needed.** Nothing has been seen rendered. Worth judging specifically:
+1. **`/team` actually landing on the team grid** — the whole point of `ScrollToHash`, and the easiest thing to get wrong.
+2. The hover lift on the cards — 3px and a soft shadow, or does it need more?
+3. The logo at 260px: does it read as a considered presentation, and are the two known defects visible at that size?
+4. The two gradient strips — continuous descent, or still visible as bands?
+5. 360px, and reduced motion on (the hash jump should be instant, not smooth).
+
+**PRE-LAUNCH BLOCKERS — one added, list now stands at 11:**
+
+11. **NEW — replace or remove everything in `client/src/data/aboutPlaceholders.js`.** Every name, face, role and biography is invented, and this one carries a sharper edge than the home-page placeholders:
+
+    - **Two entries carry clinical credentials** — a PhD in Clinical Psychology with HCPC registration, and an MSc with BACP accreditation. A named person with a clinical title on a mental health platform is an **implied credential claim**: a visitor reasonably concludes that qualified clinical governance exists. If that reaches production before it is true it is closer to a regulatory misstatement than to placeholder copy, and the professional bodies named protect their accreditation wording.
+    - **Each claim is attached to a real person's face.** These are photographs of identifiable people who have not agreed to be presented as this company's staff, still less as holding degrees they may not hold. The Pexels licence permits commercial use of the image; it does not make the claim acceptable.
+
+    **This was raised before building and the developer confirmed it deliberately** (2026-08-31), on the grounds that realistic qualifications help the design read correctly and will be replaced with the real team's details before launch. Recorded here so the decision is traceable and the swap is unmissable — the warning at the top of the file says the same thing at length.
+
+    Before launch, one of: the real team with their real roles, real qualifications and their own photographs, with consent — or remove the founder and team sections from `/about` entirely.
+
+---
+
+### Chunk 2.4 follow-up — About hero refined (2026-08-31)
+
+**A bug shipped in 2.4 and now fixed.** `AboutHero` used `motion-safe:animate-drift`, but `--animate-drift` was defined in the Part 1 home redesign that was reverted to `03d10ff`. The token no longer existed, so Tailwind generated nothing and the class was dead — the sage glow rendered but never moved. Caught by grepping the built CSS (0 occurrences), not by looking at the page. **Lesson: a token introduced in work that gets reverted must be re-checked wherever else it was used.** The token is now defined in `index.css` in its own right.
+
+**Layout** now matches the home hero exactly — `py-10 lg:py-12`, `lg:min-h-[calc(100svh-72px)]`, `items-center` — on a 7/5 twelve-column split. Developer's request, for consistency between the two landings.
+
+**New `components/about/UntanglingLine.jsx`.** An authored SVG rather than a photograph, for two reasons: the home hero already carries a photograph on the right, so a second one would make the two pages the same page with different words; and the BrandStory section directly below already presents the logo's brain-and-roots form, so reusing that motif here would weaken both.
+
+The concept is the mission sentence drawn — one continuous stroke that starts tangled at the top and resolves into a straight line descending to a single gold point. Sage stroke at one weight, `non-scaling-stroke` so it stays 1.75px at any size, drawn via Framer Motion's `pathLength` over 1.6s, with the gold arrival point landing at 1.45s. Full and static under `prefers-reduced-motion`.
+
+**The path was verified, not guessed.** Hand-authored béziers cannot be checked by eye without a browser, so the `d` attribute was parsed, sampled at 212 points and plotted as an ASCII grid in the terminal. The shape confirmed: a loop at the top, a wave whose amplitude decays through the middle, a straight vertical resolution at the bottom. Content spans x 95–189 in a 300-wide viewBox, so the line sits centred with generous air either side — intentional, and what §24.7 asks for on this page.
+
+**Standing instruction recorded: keep code comments concise.** Only where the logic is genuinely non-obvious; no multi-paragraph headers. Durable reasoning belongs in this file, which is the actual decision log. The long headers already in `home/` and `about/` were left in place rather than bulk-trimmed — that is a separate pass and was not requested.
+
+**Verified:** build passes (666 modules); `oxlint` 0 findings on the changed files; detector 0 findings (degraded, as always); `animate-drift`, its keyframes and the 12-column grid all confirmed present in the built stylesheet. Decorative colours: sage on ink-deep 5.8:1, gold 12.1:1.
+
+**Not verified:** the rendered result. The ASCII plot proves the geometry, not how it reads at size. **Worth judging: does the line land as meaningful, or as a squiggle?** If the latter, the fallback is a photograph and it is a ten-minute change.
+
+---
+
+### About hero — layered photo composition (2026-08-31)
+
+**The untangling-line SVG was rejected and removed.** The developer's verdict was that it felt basic, and that was correct: a single hairline stroke is a small idea printed large, occupying about 30% of its frame with the rest empty. Abstraction only reads as restraint when it has density; otherwise it reads as unfinished. `UntanglingLine.jsx` is deleted.
+
+**Replaced with three photographs at three depths** — a dim room with light through an arched window, hands round a cup on mustard linen, fern fronds against a sunlit wall. Chosen as a set rather than individually: room, then gesture, then detail, with a colour story running dark interior → mustard (near `gold`) → sage. Two of the three carry palette colours in the subject itself, which is why they sit on `ink-deep` without fighting it.
+
+Why photographs and not another graphic: the home hero already carries one contained photograph, so a *composition* of three at different depths is visibly a different page rather than the same layout twice. It also puts the most important ingredient — the images — somewhere it can actually be checked before shipping, which the SVG never was.
+
+**Geometry was computed, not eyeballed.** Three absolutely-positioned percentage layers is exactly where blind authoring fails, so the layout was modelled numerically and printed as a coverage map. The first arrangement had a large dead block in the bottom-right quadrant and a fern/room overlap of only 0.038 — effectively adjacent rather than layered. Adjusted to: fern `left-2% w-42%`, room `w-72% aspect-2/3`, hands `left-14% bottom-0 w-46%`. Overlaps rose to 0.067 and 0.093, coverage from 76% to 80%, and the remaining gaps sit as negative space rather than as one hole.
+
+**The room photograph was re-cropped at source to 2:3** to match its display ratio. It had been 4:5, so `object-cover` would have silently trimmed 17% off its sides — including part of the window that is the whole reason the frame was chosen.
+
+**Depth is carried by drift rate, not just by z-index.** Front layer travels 24px, middle 16px, rear 8px — all within §24.9's 10-20px band except the front, which is marginally over at 24px and is the element furthest from the reader's eye. Proportional drift is what makes the group read as space rather than as three images sliding together.
+
+**One elevation cue per element.** The front photograph gets a light ring rather than a shadow: it sits over another photograph on a near-black ground, where a shadow is invisible. The rear layer gets nothing at all, because it is behind everything and needs no separation.
+
+**Also fixed:** `--animate-drift` was reintroduced to `index.css` in the previous change; the composition's ambient wash uses it.
+
+**Verified:** build passes (669 modules); `oxlint` 0 findings; detector 0 (degraded); `aspect-ratio:2/3` and the ring utility both confirmed in the built stylesheet; all three photographs metadata-screened, with two candidates rejected for carrying `dc:rights`.
+
+**Not verified:** how it reads at real size. The coverage map proves the boxes land where intended; it says nothing about whether the three images look good together.
+
+---
+
+## Chunk 2.5 — How It Works page (`/how-it-works`)
+
+**Status: Complete.** Nothing skipped.
+
+Built:
+- `pages/HowItWorks.jsx` — composition and the tone strips.
+- `components/how-it-works/` — `HowItWorksHero` · `ProcessPhase` · `ProcessStep` · `StepIcons` · `ClosingCta`.
+- `data/howItWorksContent.js` — seven steps in three phases. All true, each cited to its spec section.
+
+**Structure: three phases, not seven rows.** Seven identical rows is the sameness trap hit in Services. Grouping does three jobs at once — rhythm, ground alternation without seven bands, and one genuinely reassuring fact delivered by the structure rather than the copy: the first phase is headed *"Before you pay anything"*, so an anxious reader learns that steps 1–3 cost nothing before reading a word of them.
+
+```
+hero ......... ink-deep
+Before you pay anything ... paper   (questionnaire, matching, choosing)
+Signing up ................ mist    (subscribe, credentials)
+Working together .......... paper   (first message, sessions)
+close ........ ink
+```
+
+Tone changes happen in text-free gradient strips, so each phase keeps one flat measured ground.
+
+**Decisions made:**
+
+- **Left rail throughout, not zig-zag.** Alternating sides is busier and this page's job is to calm. Variation comes from the icons and the phase breaks. The rail is drawn on the `<ol>` rather than per step, so it stays continuous between them.
+- **Every step carries a reassurance line** — *"No account, no card. You can close the tab at any point."*, *"You choose — nobody is assigned to you."*, *"Your card details never reach us."*, *"If your therapist is offline your message waits. It is not lost."* This is the copy doing the page's actual job.
+- **Seven authored icons, one language:** 24px viewBox, 1.5 stroke, round caps, colour inherited. Matching is two overlapping circles with a dot in the lens, because the overlap *is* the mechanism. Choosing is three cards with one brought forward. Credentials is an envelope with a key, so it does not read as generic mail.
+- **Different from the home page's version by construction.** Home is a dark section with four steps on a horizontal rail; this is seven steps in three phases on light grounds with a vertical rail. Same visual language, different application.
+
+**Two things deliberately NOT said on this page:**
+1. **The zero-match fallback.** §15 returns every therapist silently when nothing overlaps — an explicit client decision. Explaining it here would broadcast the message they chose not to show.
+2. **Any timing claim.** No "takes five minutes", no "matched within a day". There is no basis for either.
+
+**Geometry verified before shipping, not eyeballed.** Every icon's shapes were bounds-checked against the 24×24 viewBox including the 1.5 stroke. All seven fit; the tightest is Credentials at y 22.0, leaving 1.25 of clearance. This is the same discipline used on the About composition and it exists because hand-authored SVG is exactly where a browserless build goes wrong.
+
+**A real contrast failure found by measurement.** The step number badge was `sage-deep` on a `sage/12` tint. On the paper phases that is 4.85:1, but on the **mist phase it measured 4.40:1 — under the 4.5 floor for text.** The tint sat on an already-tinted ground and lost the margin. Fixed by making the badge `paper` with a sage ring, matching the icon plate: the numeral now holds **5.48:1** and the icon **3.40:1** on every ground, and badge and plate read as one material. Nothing on the page depends on which phase it lands in.
+
+**Full measured table — all pairs clear their floor:**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| paper on ink-deep | 19.7:1 | | ink on mist | 16.3:1 |
+| paper/80 on ink-deep | 12.5:1 | | ink/70 on mist | 6.4:1 |
+| ink on paper | 18.1:1 | | sage-deep on mist | 4.9:1 |
+| ink/70 on paper | 6.7:1 | | badge sage-deep on paper | 5.5:1 |
+| sage-deep on paper | 5.5:1 | | icon sage on paper | 3.4:1 |
+| paper on ink (close) | 18.1:1 | | gold button face on ink | 11.1:1 |
+
+Decorative and exempt: sage/30 rail 1.4:1, sage/30 plate ring 1.3:1.
+
+**Two lint issues fixed at the root rather than suppressed:**
+1. `StepIcons.jsx` exported a lookup object alongside its components, which breaks fast refresh for the whole file. The icons are now individual named component exports and the lookup is built locally in `ProcessStep`.
+2. The page numbered its steps by mutating a counter during render — flagged by the React Compiler rule. Start numbers are now derived up front with a reduce.
+
+**A Tailwind trap avoided.** The tone strips were first written as `` from-${x} `` template literals. Tailwind scans source *text*, so an interpolated class name is invisible to it and the utility never gets generated — the gradients would have silently rendered as nothing. Replaced with a map of complete literal class strings, and all six gradient stops confirmed present in the built stylesheet.
+
+**Verified:** build passes (676 modules); `oxlint` **0 findings**; detector 0 (degraded, as always — the parsing dependencies are still absent, which is why every pair above was computed by hand).
+
+**Not verified — developer check needed.** Nothing has been seen rendered:
+1. **The seven icons at 28px.** Bounds are proven; how they read is not. Choosing and Credentials are the two with the most going on and the most likely to look busy.
+2. The rail drawing per phase, and whether the badge sits on it cleanly.
+3. 360px — the rail and badge occupy the left 56px of every step.
+4. Reduced motion: rails full-length and static, no missing content.
+
+---
+
+## Chunk 2.6 — Contact page and `POST /api/v1/contact`
+
+**Status: Complete.** Nothing skipped. **Slice 2 (public marketing pages) is finished.**
+
+Built — server:
+- `routes/contact.routes.js` · `controllers/contact.controller.js` · `services/contact.service.js`
+- `validation/contact.schema.js` · `constants/contact.js`
+- `services/email/templates/contactMessage.js`
+- `routes/contact.test.js` — 13 tests
+- Edits: `email.service.js` (replyTo), `config/env.js` (`CONTACT_TO`), `routes/index.js`, `.env.example`
+
+Built — client:
+- `pages/Contact.jsx` · `components/contact/{ContactForm,ContactChannels,ContactIcons}.jsx`
+- `data/contactContent.js` · `lib/api/contactApi.js` · `lib/validation/contact.js`
+- Edit: `lib/controlStyles.js` plus the three text controls (see the focus note below)
+
+**Decisions made:**
+
+- **Nothing is written to MongoDB.** Email delivery only, per the chunk brief. A test asserts the contact service exports exactly one function, so a future change that quietly adds a model fails review rather than at runtime.
+- **`replyTo` is the sender; `from` stays our verified domain.** Sending *as* the visitor would fail SPF and land the message in spam. Asad can hit reply and reach them directly.
+- **The honeypot returns success.** A filled honeypot means the message is discarded and the response is byte-identical to a real send. Telling a bot it was caught just teaches it which field to leave alone. Two tests cover this — one that a filled field discards, one that an empty field still sends.
+- **The message body is never logged.** Message content is on the never-log list, and a contact message from someone in distress is exactly the case that rule exists for. Only success or failure is recorded.
+- **Every field is HTML-escaped in the email template.** This is the one email on the platform whose body is written by an untrusted stranger. Line breaks are preserved because they wrote prose, not one block.
+- **An invalid `subject` is rejected rather than silently corrected**, so a tampered payload never reaches the email body.
+- **One reply for every outcome** — sent, discarded, or delivery failed. A visitor cannot act on the difference.
+
+**The escalation phone is deliberately null.** §11 and §18 both describe a published phone number as part of the misconduct route, and no number exists. Inventing one would be worse than a fabricated testimonial: someone in distress could dial it and reach a stranger or nothing at all. While it is null the card shows the email route and says a line is being set up. Supply the real number in `data/contactContent.js` and the card completes itself. Same treatment for support hours — no response-time promise is made anywhere, because there is no basis for one.
+
+**Focus ring — the brief and the spec conflicted, and the spec won on the part that matters.** The request was a sage or gold focus ring. §24.2 is explicit that yellow is never a focus ring on a light surface (1.63:1), and sage manages only 3.40:1 — clearing the 3:1 floor, but with no margin, and it would have diverged from `/login` and `/reset-password`.
+
+Resolved by separating the two jobs: the **keyboard indicator stays the ink `:focus-visible` outline**, and a **sage border plus a soft glow** marks the active field on any focus, mouse included. Keyboard users get both. Approved on that basis.
+
+**This applies site-wide, not just to Contact**, and that is worth stating plainly: `className` on Input/Textarea/Select goes to the `Field` wrapper rather than the control, so the treatment had to live in `lib/controlStyles.js`. Login and password reset now have it too. Additive only — nothing at rest changed, and both pages were rebuilt and linted clean.
+
+**Contrast — computed, all thirteen pairs clear their floor:**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| paper on ink-deep | 19.7:1 | | ink on mist | 16.3:1 |
+| paper/80 on ink-deep | 12.5:1 | | ink/70 on mist | 6.4:1 |
+| ink on paper (labels) | 18.1:1 | | sage-deep on mist | 4.9:1 |
+| ink/60 placeholder | 4.8:1 | | sage icon on paper | 3.4:1 |
+| ink/50 rest border | 3.4:1 | | clay error text | 5.5:1 |
+| sage focus border | 3.4:1 | | clay error border | 5.5:1 |
+
+**A regression I caused, found and fixed.** Making `CONTACT_TO` required in production broke `roleGuards.test.js`, which boots a real `NODE_ENV=production` child process to prove the dev routes are unmounted. The child now exited at startup. **This is the identical pattern to chunk 1.5**, where adding the production email checks broke the same test for the same reason — a production-only env check is invisible until something actually boots production. Fixed by supplying `CONTACT_TO` to the child, since that test is about route mounting rather than email configuration.
+
+**A diagnostic worth recording.** The full suite first reported **94 failures across 4 suites**. Run individually, every one passed. This is the flake recorded in chunk 1.6 — parallel `mongodb-memory-server` instances are more than this machine holds. `npm test -- --runInBand` gave a clean signal and isolated the single real failure above. **If the suite ever fails oddly again, run it serially before investigating.**
+
+**Verified:**
+- `npm test -- --runInBand` — **173 tests across 9 suites, all passing** (160 from earlier chunks, 13 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on everything this chunk touched.
+- Client build passes, 682 modules.
+- Detector 0 findings (degraded, as always — hence the hand-computed table).
+- All three contact icons bounds-checked against the 24×24 viewBox including stroke: envelope, shield and clock all fit.
+- The same non-component-export trap from `StepIcons` was caught again in `ContactIcons` and fixed before it reached lint.
+
+**Manual steps for the developer:**
+1. **Add to `server/.env`:** `CONTACT_TO=atcastofmind@gmail.com`. Without it the server still runs in development (messages print to the terminal), but **production refuses to start**.
+2. **No new packages.** Everything reuses the Resend service from chunk 1.5.
+3. **Sending a real message is yours to trigger** — an outward-facing action, same as the password reset in 1.5. Fill in the form on `/contact` with the dev servers running and confirm it arrives.
+
+**Not verified — developer check needed.** Nothing has been seen rendered:
+1. The sage focus border and glow — **and check `/login` and `/reset-password` too**, since they now have it.
+2. The three icons at 24px.
+3. Validation: submit empty, submit a bad email, and confirm the errors say how to fix rather than just what is wrong.
+4. The success screen replacing the form.
+5. 360px, and reduced motion.
+
+**Pre-launch blockers — list stands at 11, one updated.** Blocker 8 (`support@castofmind.com` does not exist) now has a second consequence: it is the address published on `/contact`, not only in email footers. Add to it: **supply the misconduct escalation phone number**, or confirm the email-only route is the intended launch state.
+
+---
+
+## Developer visual pass — 2026-09-02
+
+Developer replaced three layouts by hand: About hero now mounts a 3D fanned card deck (`WhyCardsDeck.jsx`) driven by scroll and touch, Contact is a split-screen (dark left panel, elevated white form card), and Services uses sticky stacking cards for the five themes.
+
+Reviewed, not modified. Contrast passes on every text pair; open items are sub-44px deck controls, `ink/40`–`ink/50` swipe hints below 4.5:1, the unused `video-for-about.mp4` import still shipping 2.1MB, and `peace.jpg` at 5.5MB.
+
+---
+
+## Chunk 3.1 — therapistApplications model and Cloudinary uploads
+
+**Status: Built and tested. ONE VERIFICATION IS BLOCKED** on a Cloudinary account permission — see "The live check could not complete" below. Nothing was skipped by choice.
+
+Built — model:
+- `models/TherapistApplication.js` — every field in master spec §23, plus `status` / `submittedAt` / `reviewedAt`.
+- `models/TherapistApplication.test.js` — 83 tests.
+
+Built — uploads:
+- `constants/uploads.js` · `config/cloudinary.js` · `utils/fileSignature.js`
+- `middleware/upload.js` · `services/upload.service.js` · `controllers/upload.controller.js` · `routes/upload.routes.js`
+- `routes/uploads.test.js` (27 tests) · `utils/fileSignature.test.js` (14 tests)
+- Edits: `config/env.js` (Cloudinary vars), `routes/index.js` (mount), `.env.example`
+
+**SPEC DISCREPANCY FOUND — the field count is wrong.** §23 is titled "33 fields, 28 mandatory, 5 optional". Adding up its own per-step table gives **34 fields — 30 mandatory, 4 optional**. The summary row disagrees with the rows above it. Counting storage slots it is **35**, because `disciplinaryDetails` is a conditional sub-field the table folds into the yes/no it hangs off. Every field in the per-step tables is built. The number "33" is quoted in `CLAUDE.md`, `docs/chunks.md` and the master spec and is off by one — **not corrected here, because the spec is the client's document.**
+
+**Decisions made:**
+
+- **Files go through our server, not browser-direct to Cloudinary** (Decision A, approved 2026-09-02). Direct signed upload would mean we never see the bytes — and `.claude/rules/backend.md` requires "restrict type, size, **and verify content**". You cannot verify content you never receive. It also hands the browser a signed permit it can point at any file.
+- **Content is checked by magic bytes, not by the label.** The filename and the browser-declared MIME type are both written by the sender. An executable renamed to a .pdf and sent as application/pdf passes every check that trusts either one. `utils/fileSignature.js` reads the leading bytes and rejects everything else, including ZIP (so .docx and .xlsx) and SVG (which can carry script). Hand-rolled in ~50 lines rather than adding `file-type`: four formats, and it is directly unit-testable.
+- **Credential documents are `type: 'authenticated'`; the profile photo is public** (Decision B). A Cloudinary URL is unguessable but not secret, and once leaked it is public for ever — these are a real person's professional papers and sometimes personal ID. The photo stays public because clients see it on the matching page anyway. **Consequence for slice 4: the admin cannot open a certificate by pasting its URL.** The Cloudinary `publicId` is stored beside each document URL (`certificatePublicId1/2`, `licenseDocPublicId`) so slice 4 can sign a short-lived delivery URL without parsing one back out of a URL string.
+- **This endpoint is public and unauthenticated, and has to be** — an applicant has no account until an admin approves them (§10.4), so there is no token to check. That single fact drives the rate limit (10/hour/IP against a legitimate maximum of four), the hard size caps, and the byte-level type check. It is the only endpoint on the platform where a stranger can write to paid storage.
+- **The original filename is discarded.** The `public_id` is 16 random bytes. A filename can carry the applicant's own name straight into a URL.
+- **Duplicate tags are rejected**, not just out-of-range counts. Three identical tags satisfy "3 to 4 tags" while leaving the therapist with effectively one specialty — quietly broken matching rather than a visible error. Same check on treatment orientations and on languages.
+- **Tag count limits are imported from `constants/specialtyTags.js`**, not redeclared in the model, so the model and the form cannot drift apart.
+- **No plaintext `password` field exists on the schema at all** — only `passwordHash`, `select: false`, stripped again in `toJSON`. A mistaken caller cannot store a readable password even by trying. A test pins this.
+- **`disciplinaryActions: true` and `malpracticeInsurance: false` are recorded, never auto-rejected.** Both fail the eligibility notice, but the admin decides. Two tests assert the application still saves as `pending`.
+- **Working hours: end must be after start, and the error says how to fix it** — *"For hours that cross midnight, use the notes field."* Rejecting an end before a start catches the common typo; genuinely overnight availability goes in `workingHours.note`, which is what that field is for. At least one day must be enabled.
+- **A partial unique index on `email` where `status: 'pending'`** — one live application per address. Rejected and approved records are retained, so a rejected applicant can reapply and the history survives. Without it the admin could approve two pending applications for one address and the second would collide on the unique `users.email` index halfway through slice 4's two-document transaction.
+- **`timestamps: { createdAt: 'submittedAt' }`** rather than carrying both a `createdAt` and a near-identical `submittedAt`.
+- **Cloudinary config is required in production, optional in development** — same pattern as Resend. A missing key in development returns a clear 503 from the endpoint rather than stopping the server booting for someone working on auth. **Partial configuration exits at startup in every environment**, because one missing value of three surfaces later as an opaque authentication failure.
+- **An 18+ floor on date of birth** is a sanity check, not a spec rule — flagged rather than slipped in.
+
+**Verified:**
+- `npm test -- --runInBand` — **297 tests across 12 suites, all passing** (173 from earlier chunks, 124 new).
+- `npm run lint` — clean.
+- **Mutation-checked.** Disabling the magic-byte guard — the exact mistake the module exists to prevent — broke **6 tests**. Restored and the suite re-run. The tests detect the behaviour they claim to.
+- The endpoint tests mock Cloudinary via `jest.unstable_mockModule`, so the suite never touches a real account or spends quota, and the upload options can be asserted directly: authenticated delivery on documents, public on photos, three separate folders, random non-reused public ids, `overwrite: false`.
+- Every rejection path asserts **Cloudinary was never called** — a bad file must not reach the network at all.
+
+**THE LIVE CHECK COULD NOT COMPLETE — and the cause is not the code.**
+
+Running real uploads through the real endpoint against the real account, the image and PDF uploads returned **403 from Cloudinary**, while the rejection paths (executable renamed to a .pdf, and an oversized file) both passed correctly with 422 and 400.
+
+Diagnosed rather than guessed. A hand-built signed upload, bypassing our code entirely, returned the same thing — *"Request forbidden due to missing permissions (actions=[create])"* — and the management API returned the same for `actions=[read]`.
+
+**That message is the proof.** An incorrect signature returns *"Invalid Signature"*; bad credentials return *"Invalid credentials"*. "Missing permissions" means the request and the signature are correct and the key is simply not allowed to act. **The API key in `.env` is a scoped key with no permissions granted.** Cloudinary's newer scoped keys are created empty.
+
+**Nothing was left behind in the account** — no upload ever succeeded, so there is nothing to clean up. The `cast-of-mind/_test/` folder was never created.
+
+Also found on the way: `api.cloudinary.com` timed out entirely on the first two attempts and then responded normally, while `res.cloudinary.com` was fine throughout. **The connection to Cloudinary's API from this machine is intermittent.** Worth knowing before blaming code for a timeout. `services/upload.service.js` now logs the HTTP status alongside the SDK message, because the SDK's message on its own is just *"Server returned unexpected status code - 403"* and hides the real cause.
+
+**Manual steps for the developer:**
+
+1. **GRANT THE CLOUDINARY KEY ITS PERMISSIONS — this is what blocks the live check.** Cloudinary Console → Settings → API Keys. Either grant the existing key **create** and **read** on the product environment, or switch to the account's master key. All three Cloudinary variables are already set in `server/.env` and are otherwise valid — only the permissions are missing.
+2. **Enable PDF delivery.** Cloudinary Console → Settings → Security → allow delivery of PDF and ZIP files. Blocked by default on newer accounts; without it a PDF uploads fine and its URL then returns 401, which reads like a bug in our code and is not.
+3. **Packages installed** in `/server`: `cloudinary` (^2.11.0), `multer` (^2.3.0 — v2 is the maintained line; v1 had known CVEs). No new external accounts.
+4. **Re-run the live check once step 1 is done.** With the dev server running, upload a real image and a real PDF to `POST /api/v1/uploads` with a `kind` field of `photo` or `certificate`, and confirm: both return 201, the photo URL opens in a browser, and **the certificate URL does NOT** — that last one is the whole point of Decision B. Say the word and I will re-run the scripted version, which also deletes everything it creates.
+
+**A small fix in passing:** `routes/contact.test.js` from chunk 2.6 had a lint error (the destructure-to-omit idiom tripping `no-unused-vars`). The 2.6 entry records lint as clean, so it was missed. Rewritten as an explicit `delete`; lint is clean again.
+
+**Carried forward:**
+- **Orphaned uploads.** Someone can upload four files and never submit the form; those files stay in Cloudinary for ever. A cleanup script belongs beside `npm run cleanup:tokens`, but it cannot tell what is orphaned until the submission endpoint (3.2) exists to say which URLs are referenced. **Build it in 3.2 or shortly after.**
+- **Slice 4 must generate signed delivery URLs** for authenticated documents, using the stored `publicId` fields. Without it the admin sees a broken link where a certificate should be.
+
+**Pre-launch blockers — unchanged, the list stands at 11.** No placeholder content was created in this chunk.
+
+**Not done (out of scope, by design):**
+- No application form UI (chunk 3.3+), no submission endpoint (3.2), no approval flow or two-document transaction (slice 4).
+- No check that an application email collides with an existing `users` record — that belongs to 3.2's service, alongside password hashing at submission.
+- No signed viewing URLs for the admin (slice 4).
+
+---
+
+## Chunk 3.2 — Application submission endpoint
+
+**Status: Complete.** Nothing skipped. The live check ran end to end against the real server and the real Atlas cluster, and the test record was deleted afterwards.
+
+Built:
+- `POST /api/v1/therapist-applications` — validate, check the email, hash the password, save as pending, send two emails.
+- `GET /api/v1/therapist-applications/:id/status` — public status check.
+- `validation/therapistApplication.schema.js` · `services/therapistApplication.service.js` · `controllers/therapistApplication.controller.js` · `routes/therapistApplication.routes.js`
+- `constants/therapistApplications.js` · `utils/cloudinaryUrl.js`
+- `services/email/templates/applicationReceived.js` (applicant) · `newApplication.js` (admin)
+- `routes/therapistApplications.test.js` — 84 tests
+- Edit: `routes/index.js` (mount)
+
+**Decisions made:**
+
+- **ONE rejection message for every "email already known" case** — an existing client, therapist or admin account, and a pending application all return the identical 409 body. Chunk 1.2 was built so login never reveals whether an address has an account, and on a mental health platform *"this address belongs to a client"* is the sensitive part. Separate messages would have handed that straight back. **Accepted trade-off, approved 2026-09-02:** this still tells a stranger the address is known to us, but never what kind of record it is. Two tests pin it — one asserts the two replies are byte-identical, one asserts the words "client", "therapist" and "admin" never appear in the message.
+- **A fully silent duplicate response was considered and rejected.** The obvious privacy-maximal design is to accept, save nothing, and email the real owner — the pattern chunk 1.5 uses for forgot-password. It does not work here: the status endpoint is keyed by a real application id, so a silent success would have to return a fake id, and that difference leaks anyway.
+- **Submitted file URLs must point at our own Cloudinary account.** The form uploads a file in 3.1, gets a URL back, then submits that URL as ordinary text — so nothing stopped someone posting `photoUrl: "https://evil.example/tracker.jpg"`, which the admin portal would then load while reviewing the application. `utils/cloudinaryUrl.js` requires https, the exact host `res.cloudinary.com`, and a path beginning with our own cloud name. It rejects an http URL, another account's cloud, and a lookalike host such as `res.cloudinary.com.evil.example`. Applied to the optional upload fields too.
+- **Validation lives in two layers and shares one source of truth.** Zod rejects bad input with a 422 and a per-field message before anything reaches the database; the model (3.1) is the last line of defence for any caller that bypasses a route. Every limit is **imported** — `SPECIALTY_TAGS`, `TREATMENT_ORIENTATIONS`, `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_BYTES`, `THERAPIST_TYPE_MAX` — never retyped, so the two layers cannot drift apart.
+- **A failed email never loses the application.** The record is saved first; both sends run through a wrapper that logs a failure and returns. Losing a complete 34-field application because Resend hiccuped would be far worse than a missing notification, and the admin sees every application in the portal regardless. **This was not a theoretical concern — it fired for real during the live check (see below).**
+- **The status endpoint returns only `status`, `submittedAt` and `reviewedAt`.** MongoDB ObjectIds embed a timestamp and a counter, so they are partly guessable; returning a name or an email would hand it to whoever guessed one. A test asserts the response has exactly those three keys and contains no name, address or tag.
+- **The id is checked for shape before the query.** Without it, `/not-an-id/status` throws a Mongoose CastError and the global handler reports it as an unknown 500. It now returns a 400.
+- **The race is covered by the database, not just the read.** Two simultaneous submissions both pass the "does this email exist" check. The partial unique index from 3.1 lets only one win the write, and the 11000 duplicate-key error is translated into the same 409. A test fires two submissions at once and asserts exactly one 201, one 409, and one stored record.
+- **The admin email is a headline, not the full submission.** Name, type, country, specialties, reference. Pasting all 34 fields into an inbox would put an applicant's home address and taxpayer id there for no benefit — the admin portal is where an application is actually reviewed, with the documents attached. Every value is escaped; the name and therapist type are written by an untrusted stranger.
+- **The applicant email promises no timeline and no outcome.** No "we reply within 48 hours" — there is no basis for a number, and a missed promise on a professional application reads worse than saying nothing. Same reasoning as the contact page. A test asserts no time period and no "approved" appears in either the HTML or the text version.
+- **`CONTACT_TO` carries the admin notification**, rather than adding a second variable pointing at the same inbox. Approved 2026-09-02.
+- **Unknown extra fields are dropped, not rejected.** A future form field cannot 422 an entire submission before the backend knows about it.
+- **The plaintext password exists only on the request.** The schema is the one place it appears; the service hashes it immediately and the model has no field that could hold it. Tests confirm the stored document contains a real bcrypt hash, that the hash verifies, and that the plaintext appears nowhere in the document or the response.
+
+**Verified:**
+- `npm test -- --runInBand` — **381 tests across 13 suites, all passing** (297 from earlier chunks, 84 new).
+- `npm run lint` — clean.
+- **Mutation-checked twice.** Disabling the Cloudinary URL guard broke **7 tests**. Disabling the duplicate-email pre-check broke **3** — correctly only 3, because the partial unique index still catches the duplicate-*application* case on its own; the case with no index behind it, an existing `users` record, failed exactly as it should. Both restored and the full suite re-run.
+- **Live end-to-end against the real server and real MongoDB Atlas — 26 checks, all passing:**
+  - A complete 34-field application returned 201 with an id, and no password or hash anywhere in the response.
+  - The stored Atlas record: status `pending`, `reviewedAt` null, `submittedAt` set, all three specialty tags verbatim, working hours stored structurally, optional fields defaulted to empty.
+  - `passwordHash` was a real bcrypt hash that verified against the actual password, **the plaintext appeared nowhere in the document**, and no `password` field existed on it.
+  - A second submission for the same address returned 409 with the unified message.
+  - A foreign `photoUrl` returned 422 and stored nothing.
+  - The status endpoint returned exactly three keys and leaked no name or address.
+  - **The test record was deleted and its absence confirmed.** Nothing was left in the cluster.
+
+**THE EMAIL PATH FAILED FOR REAL — and that is a useful result, not a defect.**
+
+Both emails were attempted during the live run and **both were refused by Resend**:
+
+> *"You can only send testing emails to your own email address. To send emails to other recipients, please verify a domain at resend.com/domains."*
+
+This is **pre-launch blocker 7** (verify `castofmind.com` in Resend) showing up in practice, exactly as that entry predicted. `EMAIL_FROM` is still the shared test sender `onboarding@resend.dev`, which can only deliver to the Resend account owner.
+
+**The application still saved and still returned 201.** The "a failed email never loses the application" design was therefore proven under real conditions rather than only against a mock — which is the single most valuable thing this live run produced. No probe email was delivered to any inbox.
+
+**The two email templates have not been seen rendered.** They are built and unit-tested for content, but nobody has looked at them in a mail client. That needs blocker 7 done first.
+
+**Manual steps for the developer:**
+1. **No new environment variables, no new packages.** Everything reuses Resend from 1.5, `CONTACT_TO` from 2.6, and the model and uploads from 3.1.
+2. **Verify `castofmind.com` in Resend and change `EMAIL_FROM`** — pre-launch blocker 7, and it now blocks seeing either of these emails. Until it is done, no applicant and no admin can receive anything.
+3. **Then re-run one real submission** and check both emails land and read well.
+
+**Carried forward:**
+- **Orphaned uploads — now buildable.** 3.1 recorded that a cleanup script could not tell what was orphaned until this endpoint existed to say which URLs are referenced. It exists now: a script can list Cloudinary assets and delete any whose URL appears in no application. Worth doing before launch, since every abandoned half-filled form leaves files behind for ever.
+- **Slice 4 still needs signed delivery URLs** for the authenticated certificate and licence documents, using the stored `publicId` fields.
+
+**Pre-launch blockers — unchanged, the list stands at 11.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- No form UI (chunk 3.3+). No approve or reject (slice 4). No `therapistProfiles` model — it is created on approval and belongs to slice 4.
+
+---
+
+## Chunk 3.3 — Join as a Therapist page + form steps 1 and 2
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check".
+
+Built:
+- `pages/JoinAsTherapist.jsx` — split-screen frame, replacing the placeholder.
+- `components/join/` — `ApplicationForm` (the shell) · `StepRail` · `StepPersonalDetails` · `StepLocationAvailability` · `PhotoUpload` · `LanguagePicker` · `WorkingHoursGrid` · `EligibilityCard` · `WhyPractiseHere` · `JoinIcons`.
+- `data/joinContent.js` · `lib/timezones.js` · `lib/validation/therapistApplication.js` · `lib/api/uploadApi.js`.
+- Edits: `ui/Input.jsx`, `ui/Textarea.jsx`, `ui/Select.jsx` (ref pass-through), `ui/Button.jsx` (a contrast fix — see below).
+
+**Structure: the page is two modes in one frame.** The left column persuades a qualified clinician to spend twenty minutes; the right column is the tool they spend them in. Warm and open on the left, dense and quick on the right. Most recruitment pages make the form as airy as the pitch, which turns a long application into an endless scroll. Same split-screen frame as `/contact`, so the two public forms read as the same product. **No horizontal band gradients** — depth is radial washes and one elevated card, per the developer's instruction.
+
+**The brief was to stop explaining things in prose and show them instead.** Where that landed:
+
+| Default build | What was built |
+|---|---|
+| A bulleted list of 5 eligibility rules | A frosted plate, each rule with a drawn icon — it reads as a standard you meet or do not |
+| The words "Step 1 of 5" | A 5-node rail whose filled line IS the progress bar, in the same visual language as the How It Works connector |
+| 7 rows of checkbox plus two time boxes | **A week you can see** — every enabled day draws its span across a shared 24-hour track, so the shape of the week is checkable at a glance |
+| "Upload a photo" | The real headshot in the round frame clients will see it in, with live upload percentage |
+| A `<select multiple>` | Chips, plus a free-text field so a therapist working in Pashto is not shut out by my list |
+| Four equal "why join us" cards | Four rows threaded on one hairline rail — a list of commitments, not a grid of tiles |
+
+**Decisions made:**
+
+- **React Hook Form + Zod**, per the developer. This was deferred from earlier chunks pending one blocker: none of the UI inputs passed a `ref`, so `register()` could not reach the real element. Fixed by accepting `ref` as a plain prop — **React 19 treats `ref` as an ordinary prop, so no `forwardRef` wrapper was needed**. Purely additive; nothing already using those components changed.
+- **One `useForm` holds every field for the whole application.** Steps only change which inputs are *rendered*, so Back and Forward cannot lose data — the values never lived in the step component. Moving forward runs `trigger()` on that step's fields only, so Step 2 can never block Step 1.
+- **`register()` for plain inputs, `Controller` only for the three custom controls** (photo, languages, working hours). Controller everywhere would re-render the whole form on every keystroke.
+- **Timezones and countries are derived, never typed out.** `Intl.supportedValuesOf('timeZone')` gives **417 zones**, grouped into 10 regions so a native select stays scannable, each option carrying its live UTC offset so the right one is confirmable. Countries come from `Intl.DisplayNames` over ISO 3166 codes — **197 names, no raw codes, no duplicates**. Only the two-letter codes are stored, so spellings cannot go stale.
+- **A native `<select>`, not a custom searchable combobox.** A hand-built combobox is one of the easiest components to get wrong for keyboard and screen-reader users. The native control gives type-ahead on desktop and the platform wheel on phones for free. `Select` gained a `children` escape hatch so `<optgroup>` can be passed.
+- **Native `<input type="time">`** for the hours. Real picker, keyboard-correct, and its value is always 24-hour `HH:MM` whatever locale it displays in — exactly the format the API stores.
+- **The applicant's own timezone is preselected** from `Intl.DateTimeFormat().resolvedOptions()`, and Monday–Friday 09:00–17:00 is prefilled. A blank 7-day grid is a wall of work; a sensible week is an edit.
+- **Focus moves to the step heading on every step change.** Without it a screen reader user is left where the old Continue button was, with no signal the panel changed.
+- **`noValidate` on the form.** The browser's own bubbles would compete with the inline messages, which say how to fix the problem rather than only naming it.
+- **The compensation line states no percentage** — developer's approved wording, "competitive compensation with guaranteed weekly session rates". The 40/60 split is an offline arrangement (§2) and publishing a figure would commit the business publicly. **Worth Asad confirming this wording**, since "guaranteed" is a commitment either way. Flagged in `data/joinContent.js`.
+- **Every other claim traces to the spec and is cited inline** in the content file: clients arrive matched (§15), nobody reads your sessions (§11, §8.5), you set your hours and control scheduling (§7.4, §23).
+- **A text "Show password" toggle, not an eye glyph** — it states what it will do, and the craft rules ban unicode glyphs standing in for a drawn icon system. Same choice as the login page.
+- **`aria-hidden` on the step-rail graphic with a live text status beside it**, so a screen reader gets "Step 2 of 5: Location and availability" rather than five ambiguous circles.
+
+**Contrast computed by hand — the detector is still degraded.** `htmlparser2`, `css-select`, `css-tree` and `domutils` remain absent on this machine, exactly as recorded since chunk 2.1, so its 0 findings is a **degraded 0** and it evaluates no contrast at all. Every pair below came out of a calculator run against the real hex values.
+
+**Two real failures were found and fixed:**
+
+| What | Was | Now |
+|---|---|---|
+| Step-rail inactive numbers and labels, "Not available", hour ruler, the "to" separator, empty-photo icon | `ink/45` — **2.97:1 FAIL** (and 2.91:1 on mist) | `ink/60` — **4.74:1** pass |
+| Working-hours switch, off state | `bg-ink/20` — **1.53:1 FAIL** against the 3:1 floor for a control boundary | `border-ink/50` track at **3.43:1**, with a dark `ink/60` knob at **4.56:1** (a white knob is invisible on a light track) |
+
+**A THIRD failure was found in shipped code, and it is site-wide.** `ui/Button.jsx` set the primary (gold) button's border to `ink/35`, and its comment claimed **"ink/35 measures 3.45:1 against paper"**. It does not — **`ink/35` is 2.24:1**. The recorded figure matches `ink/50` (3.43:1), so chunk 0.4 appears to have computed one value and written down another. This matters because gold on paper is 1.63:1, so that border is the *only* thing giving the primary CTA a findable edge — it has been below the WCAG 1.4.11 floor on **every gold button on the site** since chunk 0.4.
+
+Fixed to `ink/50` and the comment corrected. **This touches a shared primitive outside this chunk and is flagged rather than slipped in** — it was left in place only as long as it took to measure it. The accessibility floor is listed as non-negotiable, so leaving a known failure across every page was not an option.
+
+**Full measured table — everything else clears its floor:**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| paper on ink-deep | 19.67:1 | | ink on paper | 18.06:1 |
+| paper/85 on the frosted card | 13.33:1 | | ink/70 on paper | 6.74:1 |
+| paper/80 on ink-deep | 12.54:1 | | ink/60 on paper | 4.74:1 |
+| paper/70 on ink-deep | 9.65:1 | | ink on mist | 16.25:1 |
+| paper/60 on the frosted card | 7.11:1 | | clay error text | 5.48:1 |
+| gold icon on ink-deep | 12.06:1 | | ink on gold (button face) | 11.08:1 |
+| sage icon on ink-deep | 5.78:1 | | sage on paper (icon, border) | 3.40:1 |
+| ink/50 control border | 3.43:1 | | paper knob on sage | 3.40:1 |
+
+Decorative and exempt: `ink/12` hairline 1.28:1, `paper/12` border 1.34:1, `sage/35` icon ring 1.66:1, `ink/8` track 1.2:1.
+
+**Verified:**
+- `npm run build` passes.
+- `oxlint` — **0 findings** on every file this chunk touched. (The nine pre-existing warnings in `home/Hero.jsx`, `home/Services.jsx` and `about/WhyCardsDeck.jsx` are untouched and not mine.)
+- **The validation schema was actually executed, not just compiled — 20 checks, all passing.** A valid application parses and lowercases the email; short, over-72-byte, bad-email, under-18, future-date and bad-title inputs are all rejected; empty and duplicate languages rejected; no-days-enabled rejected; end-before-start rejected **with the message that points at the notes field**; a non-24-hour time rejected; and junk times on a *disabled* day are correctly ignored. This mattered because Zod 4 changed several APIs and a broken schema would only fail at runtime, not at build.
+- **The derived lists were executed too:** 417 timezones in 10 regions with live UTC offsets, 197 country names with no raw codes and no duplicates, and the machine's own zone detected correctly.
+- Generated CSS confirmed to contain `animate-drift` **and its keyframes** (the exact token that was silently dead in chunk 2.4), `backdrop-blur-md`, the arbitrary blurs, the elevation shadow, the focus glow, and the toggle's knob translation.
+- Server suite re-run: **381 tests, 13 suites, all passing** — unchanged by this chunk.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The working-hours week.** Does the sage bar across the 24-hour track actually read as "this is my week", or as decoration? This is the piece the chunk was built around.
+2. **The step rail** — does the line filling between nodes read as progress?
+3. **The photo upload, end to end.** Choose a real headshot and watch idle → uploading → uploaded. Then try a `.exe` renamed to `.png`; the server rejects it by its real bytes and the message should appear under the frame.
+4. **Back and forward between steps 1 and 2**, confirming nothing is lost — the point of the chunk.
+5. **360px.** The week grid is the tightest thing on the page; the span bar is hidden below `lg` on purpose.
+6. **Reduced motion on** — the step transition and all reveals should be absent, with nothing missing or invisible.
+7. **Keyboard through the whole form**, especially the day toggles and the language chips.
+
+**Manual steps for the developer:**
+1. **Packages installed** in `/client`: `react-hook-form` (^7.87.0), `@hookform/resolvers` (^5.9.1). Zod was already there. No new environment variables, no external accounts.
+2. **Ask Asad to confirm the compensation wording** in `client/src/data/joinContent.js`. It states no percentage, which is deliberate — but "guaranteed weekly session rates" is still a commitment.
+3. The photo upload posts to the real `/api/v1/uploads`, so both dev servers need to be running to test it.
+
+**Carried forward:**
+- **Draft persistence was deliberately not built.** A 34-field application loses everything on an accidental refresh. The frontend rules permit storing non-sensitive answers and **forbid persisting the password**. Raised in the plan, agreed as a later chunk. Worth doing before the form ships.
+- **The client and server schemas mirror each other but cannot share a file** across the split. Both now carry a comment naming the other. This is the one place the two can drift.
+- **`client/src/assets/peace.jpg` is still 5.6 MB** and dominates the build output. Flagged in the 2026-09-02 visual pass and still open.
+
+**Pre-launch blockers — unchanged, the list stands at 11.** No placeholder people or invented statistics were created; every claim on this page is spec-sourced or explicitly flagged.
+
+**Not done (out of scope, by design):**
+- Steps 3, 4 and 5. Continue is disabled at the end of step 2 and says so.
+- No submission — `POST /api/v1/therapist-applications` exists from 3.2 but nothing calls it yet.
+- No review screen and no post-submit confirmation screen (§24.7 requires both; they belong with step 5).
+
+---
+
+## Chunk 3.4 — Application form steps 3 and 4
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check".
+
+Built:
+- `components/join/StepProfessionalBackground.jsx` — step 3, 8 fields (6 mandatory, 2 optional).
+- `components/join/StepPracticeSpecialties.jsx` — step 4, 5 fields, all mandatory.
+- `components/join/TagPicker.jsx` — one control, two configurations.
+- `components/join/CharCounter.jsx`.
+- `data/specialtyTags.js` · `data/treatmentOrientations.js` — the mirrored master lists.
+- `server/test/constantsParity.test.js` — 37 tests.
+- Edits: `lib/validation/therapistApplication.js` (step 3 and 4 schemas), `ApplicationForm.jsx` (wire the steps), `data/joinContent.js` (step intros).
+
+**THE DECISION LEFT OPEN SINCE CHUNK 1.1 IS NOW MADE.** That entry recorded: *"whether it gets them by a duplicated file or a small public endpoint is that chunk's decision, deliberately not pre-empted here."*
+
+**Chosen: a copy in `client/src/data/`, guarded by a parity test.** The lists are client-fixed and will never change, so an endpoint would add a network round trip, a loading state and an error state to every render of step 4 for no benefit. The one real cost of a copy is drift — and drift here is silent and serious: a therapist storing `"anxiety"` or `"Anxiety "` would match no client for ever, with nothing erroring anywhere. Matching would simply return fewer people than it should, and nobody would know why.
+
+So the copy is only acceptable if something proves it is still a copy. `server/test/constantsParity.test.js` does that, and **it deliberately reaches across the client/server boundary** — a server test importing a client file. Unusual, and flagged rather than slipped in: this is a repo-level invariant, not a server one, and the server suite is the only test runner in the project.
+
+**Neither list was typed by hand.** Both client files were generated directly from the server constants, so they are byte-identical by construction rather than by care — including `Alzheimer's` with its apostrophe.
+
+**Decisions made:**
+
+- **The 3–4 limit is shown, not written.** Four slots sit above the tag grid — three labelled "Choice 1/2/3", one labelled "Optional" — and fill in as tags are picked. The rule is legible at a glance instead of being a sentence to parse. The slot row is `aria-hidden`; the live "2 of 4 chosen" line beside it carries the same information for a screen reader.
+- **At the ceiling the remaining chips lock rather than erroring.** Unchosen tags go quiet, stop responding, and one line explains why. Hitting a limit and being told afterwards is worse than watching the limit arrive.
+- **Specialty tags and treatment orientations are the same component, configured to look unequal — on purpose.** Specialties sit in a sage-bordered panel headed *"This is the only thing that decides who is matched with you"*, with filled chips and the slot row. Orientations get plain outline chips and a line saying they appear on your profile and never affect matching. Two identical chip grids would imply they weigh the same, and §15 is explicit that only one of them does.
+- **Counters do not truncate, and there is no `maxLength`.** Pasting a long bio and silently losing the end is worse than seeing `1,340 / 1,200` turn clay and being told to trim. You always know what happened to your text.
+- **Counters are `aria-hidden`; the limit is stated once in the helper text.** A count announced on every keystroke is miserable with a screen reader.
+- **`yearsExperience` is coerced before its numeric rules run.** A number input hands back a *string*, so without the coercion every value would have failed as "not a number" — a bug that only appears at runtime. Covered by six tests.
+- **The two optional step-3 fields are grouped in their own panel** headed "Optional — leave blank if they do not apply", rather than sitting in the flow looking like two more things to fill in.
+- **The taxpayer ID carries a plain explanation**, per the approved plan: used only for paying you, never shown to clients, never used in matching, and safe to leave blank. §23 flags the field as sensitive, and asking a stranger for a tax number with no reason given is how a good applicant closes the tab.
+- **Disciplinary details are revealed only on "yes"**, and the question carries a line saying a yes does not end the application. Recording the answer honestly matters more than a clean form.
+- **A "yes" is still not auto-rejected** — consistent with the model and the server, which record and let the admin decide.
+- **`.js` extensions added to the two new data imports** in the validation file. Vite resolves extensionless imports; plain Node does not, and that file needs to load in both so its logic can be executed directly.
+
+**A REAL BUG WAS CAUGHT AND FIXED BEFORE IT SHIPPED.** The first version of the merged `applicationSchema` reached for `stepFourSchema.shape?.specialtyTags` with a fallback of `z.array(z.string())`. But `stepFourSchema` ends in `.superRefine()`, which returns a *wrapped* schema whose `.shape` is `undefined` — so the fallback would have won, and **the merged schema used by `zodResolver` would have silently accepted any strings at all: five tags, zero tags, tags not on the master list.** The step-level check would still have passed, so nothing would have looked wrong.
+
+Fixed by extracting the step-4 fields into a plain shape object that both schemas build from, with the conditional refinement applied to each. **Three tests now specifically pin the merged schema** — it must still reject five tags, still reject an unknown tag, and still require details on "yes".
+
+**Verified:**
+- `npm test -- --runInBand` — **418 tests across 14 suites, all passing** (381 from earlier chunks, 37 new).
+- `npm run build` and `oxlint` — clean, **0 warnings** on every file this chunk touched.
+- **The parity test was mutation-checked.** Changing a single letter's case in the client copy (`"Anxiety"` → `"anxiety"`) broke **2 tests**. Restored and re-run. A one-character drift is caught.
+- **The new schema logic was executed, not just compiled — 46 checks, all passing.** Year coercion from string; 1 year rejected and exactly 2 accepted; fractional and 200 rejected; therapist type at exactly 50 and 51; every count boundary on both tag lists (2/3/4/5 and 0/1/5/6); duplicates rejected; a tag outside the list rejected; **a lowercase variant and a trailing-space variant both rejected** — the exact drift the parity test exists to prevent; all 27 tags and all 33 orientations confirmed individually selectable; bio at 1200 and 1201; "yes" with empty and with whitespace-only details both rejected, with the error pointing at the right field.
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**: `htmlparser2`, `css-select`, `css-tree` and `domutils` are still absent, so it runs on regex and evaluates no contrast at all. The table below is the compensation.
+
+**Contrast computed, and one real failure found and fixed:**
+
+| What | Was | Now |
+|---|---|---|
+| Locked (unselectable) tag chip | `text-ink/40` — **2.57:1** | `bg-mist text-ink/60` — **4.56:1** |
+
+WCAG exempts disabled controls from contrast, so this was technically compliant — but the whole point of the locked state is that you can still *read* the tag to decide what to give up. Illegible defeats the design. It now reads as inactive through its filled ground rather than through faint text.
+
+**All other new pairs clear their floor:**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| ink on sage/12 (filled slot) | 16.02:1 | | ink on mist/50 (optional box) | 17.21:1 |
+| ink on sage/15 (chosen chip) | 15.46:1 | | ink/70 on mist/50 (note) | 6.60:1 |
+| paper on ink (quiet chip) | 18.06:1 | | sage-deep on mist/50 | 5.22:1 |
+| sage-deep on the sage/6 panel | 5.15:1 | | clay counter (over limit) | 5.48:1 |
+| sage-deep icon on sage/12 | 4.86:1 | | ink/60 counter and empty slot | 4.74:1 |
+
+Non-text boundaries: sage chip border 3.40:1 and ink/50 chip border 3.43:1 both clear the 3:1 floor. Decorative and exempt: the sage/40 panel edge 1.53:1, the ink/40 dashed slot outline 2.57:1 (raised from ink/30 for visibility), and the ink/12 group border 1.28:1.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The four slots.** Do they read as "pick 3 to 4" instantly, or as four mysterious boxes? This is the piece the chunk was built around.
+2. **Choosing a fourth tag** — do the remaining 23 visibly lock, and is the reason clear?
+3. **Does the specialty panel clearly outrank the orientations list?** They must not look like two equal chip grids.
+4. **The counters** — type past 50 in therapist type and past 1200 in the bio and confirm nothing is truncated and the number turns red.
+5. **Disciplinary "yes"** — the extra field should appear immediately.
+6. **360px.** 27 chips and 33 chips wrapping is the tightest layout on the page.
+7. Keyboard through the chips, and back and forward across all four steps confirming nothing is lost.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts.**
+2. **If the master tag list ever changes**, edit `server/constants/` and re-run `npm test` — the parity test will fail until the client copy matches, which is the point.
+
+**A note on your edit to `joinContent.js`:** the compensation line currently reads *"Competitive compensation are guaranteed."* — "compensation" is singular, so it should be "is". Left as written rather than changed, since it is your copy.
+
+**Carried forward, unchanged:**
+- Draft persistence still not built. A now 34-field form still loses everything on an accidental refresh.
+- The client and server schemas still mirror each other by hand and cannot share a file. **The tag lists are now covered by a test; the validation rules are not.**
+- `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 11.**
+
+**Not done (out of scope, by design):**
+- Step 5 — malpractice insurance, insurance details, and the three document uploads.
+- No review screen, no submission, no confirmation screen. Continue is disabled at the end of step 4 and says so.
+
+---
+
+## Chunk 3.5 — Step 5, review screen, submission
+
+**Status: Complete.** Nothing skipped. **Slice 3 (therapist application) is finished.** The API half was verified live end to end; the browser half is yours.
+
+Built:
+- `components/join/StepComplianceDocuments.jsx` — step 5, 5 fields (3 mandatory, 2 optional).
+- `components/join/DocumentUpload.jsx` · `YesNoField.jsx` · `ReviewScreen.jsx` · `SubmittedScreen.jsx`.
+- `lib/toApplicationPayload.js` · `lib/api/applicationApi.js` · `lib/useApplicationDraft.js`.
+- Edits: `lib/validation/therapistApplication.js` (step 5 schema, `TOTAL_STEPS`, the three publicId fields), `ApplicationForm.jsx` (review, submission, error recovery, draft), `data/joinContent.js` (step 5 intro, review and confirmation copy), `lib/api/ApiError.js` (see below).
+
+**THE REAL WORK WAS A TYPE MISMATCH NOBODY HAD NOTICED.** This is the first chunk where the form actually posts, and the two sides disagreed in three places:
+
+| Field | Form holds | API wants |
+|---|---|---|
+| `disciplinaryActions` | `'yes'` / `'no'` (radio strings) | boolean |
+| `malpracticeInsurance` | `'yes'` / `'no'` | boolean |
+| `yearsExperience` | string from a number input | number |
+
+Left alone, **every correctly-filled application would have been rejected with a 422.** `lib/toApplicationPayload.js` is the single translation layer, kept free of React so it can be executed directly — 29 checks run against it, because a silent mistake here is invisible until a real applicant hits it.
+
+It also drops stale data the form may still be holding: **`disciplinaryDetails` is not sent when the answer is "no"** (someone who typed an explanation and then changed their mind), and **a disabled working day sends empty times rather than whatever was last typed**, so a leftover value cannot fail the server's format check on a day nobody works.
+
+**Decisions made:**
+
+- **Draft saving, approved 2026-09-03.** `lib/useApplicationDraft.js` writes to `localStorage`, debounced at 500ms. **The password is stripped on write and again on read** — `.claude/rules/frontend.md` permits non-sensitive draft persistence and forbids persisting passwords, and nothing else on this form is a credential. A draft older than 14 days is dropped rather than restored, because fields change between releases and a month-old half-form confuses more than it helps. Every read and write is wrapped in try/catch: `localStorage` throws outright in some private-window modes, and a convenience must never be the reason the form fails to load. The draft is cleared the moment a submission succeeds, and writing stops on the confirmation screen so it cannot be written back after being cleared.
+- **A restored draft says so, and says the password is missing.** Silently repopulating 30 fields while one is mysteriously blank is worse than explaining it.
+- **`ApiError` now carries `details`.** The server has sent per-field validation paths since chunk 0.2, but the client error wrapper was dropping them — so the planned 422 handling would have quietly done nothing. It now maps each server message back onto its own field and **jumps to the earliest step that has a problem**, rather than showing one generic failure on a five-step form.
+- **A 409 carries a way back.** The duplicate-email message is true but useless on the review screen, because the email lives on step 1 — so the alert includes a link that goes there.
+- **Submit is disabled while sending.** The rate limiter allows five submissions an hour; a double click would burn two of them.
+- **The review screen validates everything, not just one step,** before posting. It is the last place a gap can be caught locally.
+- **THE PASSWORD IS NEVER RENDERED ON THE REVIEW SCREEN — not even as dots.** There is nothing to check by looking at masked characters, and drawing it at all would put a credential on screen somewhere shoulder-surfable. It shows "Chosen — you will use it to sign in".
+- **The week is reviewed as a week**, not as fourteen time values, so it stays checkable at a glance.
+- **`DocumentUpload` is a sibling of `PhotoUpload`, not a generalisation of it.** The affordances genuinely differ: a PDF has no thumbnail, so it needs a file name, a format badge, a size and a real progress bar, where a headshot needs the round preview clients will see. Forcing one component to do both would have made both worse.
+- **Each document upload writes two fields.** The URL the applicant submits, and the Cloudinary `publicId` — because chunk 3.1 stores credential documents as *authenticated*, so the plain URL returns nothing and slice 4 must sign a viewing link from the id. The server schema has accepted these three fields since 3.2; the form now actually collects them.
+- **`YesNoField` was extracted** because the disciplinary question (step 4) and the insurance question (step 5) are the same control, and two copies would drift.
+- **A "no" to insurance is not a dead end.** It says the team will discuss cover before any client is matched — true, and consistent with the model recording rather than judging.
+- **The review screen is step 6 in position but not in the rail**, which keeps reading "5 of 5". It is a read-through, not another form to fill.
+- **NO TIMELINE ON THE CONFIRMATION SCREEN.** §24.7 asks for "roughly when", and this deliberately does not answer it: no turnaround has been agreed, and a missed promise on a professional application reads worse than none — the same call made for the emails in chunk 3.2. The approved wording says what happens and in what order instead. **If Asad sets a real turnaround it is one line in `submitted.next`.**
+
+**A lint warning was fixed at the root rather than suppressed.** The draft was first read with `useRef(readDraft()).current`, and the React Compiler rule correctly objected to reading a ref during render. Changed to a lazy `useState(readDraft)`, which reads once on mount and is render-safe.
+
+**Verified:**
+- `npm run build` and `oxlint` — clean, **0 warnings** on every file this chunk touched.
+- Server suite re-run: **418 tests across 14 suites, all passing** — unchanged by this chunk.
+- **The payload mapper and step 5 schema were executed, not just compiled — 29 checks, all passing.** Both booleans in both directions, the string-to-number coercion, stale disciplinary text dropped on "no" and kept on "yes", a disabled day's junk times blanked, trimming and lowercasing, empty optional uploads sent as `''` rather than `undefined`, and a field-by-field comparison against the server's contract confirming **every expected key present and no unexpected extras**.
+- **LIVE END TO END against the real server, real Cloudinary and real Atlas — 27 checks, all passing.** A real PNG and a real PDF uploaded through the actual upload endpoint, the payload built by **the same mapper the form uses**, then submitted. The stored record confirmed field by field:
+  - `disciplinaryActions` stored as **boolean `false`**, `malpracticeInsurance` as **boolean `true`**, `yearsExperience` as **number `9`** — the three mismatches, proven fixed in the database rather than assumed.
+  - The stale `disciplinaryDetails` was **not** stored; the disabled day was stored blank, not junk.
+  - All three specialty tags and both orientations stored verbatim; the availability note kept.
+  - The certificate `publicId` stored, so slice 4 can sign a viewing URL.
+  - `passwordHash` is bcrypt, it verifies against the real password, and **the plaintext appears nowhere in the document**.
+  - A second identical submission returned **409** with the unified privacy-safe message.
+  - **The test record and both Cloudinary assets were deleted, and the collection confirmed empty afterwards.** Nothing was left behind.
+
+**Two process notes worth recording:**
+- **An orphan record survived a failed first run** because the script imported `mongoose` from the client directory, where it is not installed. It was found by querying Atlas directly, deleted, and the run repeated on a clean database. Checked rather than assumed.
+- **A scripted edit silently did not apply.** A `replace` that was meant to insert an orphan-cleanup block never matched, and reported success anyway. The block was simply absent. **Verify that an edit landed, rather than trusting the exit code** — the first symptom was a confusing 409, not an error.
+
+**Yours to check — the form has not been driven in a browser:**
+1. **The whole flow, steps 1 to 5, then review, then submit.** This is the first time it can be done.
+2. **Refresh the page halfway through** — the draft should restore, the password field should be empty, and the note should explain why.
+3. **Submit twice with the same email** — the second should show the 409 with a working "go back to personal details" link.
+4. **Upload a `.exe` renamed to `.pdf`** as a certificate — the server rejects it by its real bytes and the message should appear under that upload.
+5. **The review screen** — check every value is right, that the password shows as "Chosen" and never as characters, and that each Edit link lands on the right step.
+6. 360px, reduced motion, and keyboard through step 5 and the review.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **Verify `castofmind.com` in Resend and change `EMAIL_FROM`** — pre-launch blocker 7. Both application emails still fail with the shared test sender, so **neither you nor an applicant can see them yet**. The application saves regardless, which the live run confirmed again.
+3. **Ask Asad for a real review turnaround** if he wants one stated on the confirmation screen.
+
+**Carried forward:**
+- The client and server validation rules still mirror each other by hand. The tag lists are covered by a parity test; **the rules are not, and the payload mapper is now a third place that has to agree with both.**
+- `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 11.**
+
+**Not done (out of scope, by design):**
+- The admin approval side — the applications list, approve and reject, and the two-document transaction that creates the therapist's `users` + `therapistProfiles` records. That is slice 4, and `therapistProfiles` does not exist yet.
+- Signed viewing URLs for the authenticated documents (also slice 4, using the publicIds this chunk now stores).
+
+---
+
+## Chunk 3.6 — Form resilience and polish
+
+**Status: Complete.** Nothing skipped. **Slice 3 is closed.** The two checks that need a browser and a keyboard are yours — listed below.
+
+**HALF OF THIS CHUNK WAS ALREADY BUILT IN 3.5, and it is recorded rather than re-billed.** Draft persistence, the loading and disabled states on submit, the upload error states, and focus moving on step change all landed in earlier chunks. This entry covers only what was genuinely missing, plus one bug the review turned up.
+
+Built:
+- `components/join/ResumePrompt.jsx` — the resume-or-start-fresh choice.
+- `components/join/ErrorSummary.jsx` — the per-step summary with jump links.
+- Edits: `ApplicationForm.jsx` (resume flow, summary wiring, live announcer, mobile button order), `DocumentUpload.jsx` and `PhotoUpload.jsx` (retry), `TagPicker.jsx` / `LanguagePicker.jsx` / `WorkingHoursGrid.jsx` (jump anchors, 360px), `ReviewScreen.jsx` (360px), `StepPracticeSpecialties.jsx` (field names).
+
+**A BUG FOUND AND FIXED.** The 3.5 draft note rendered on **every step, forever**, whenever a draft existed — fill three steps and "we kept what you had already filled in" was still sitting there on step 5. It is gone, replaced by the prompt below which shows once and then never again.
+
+**Decisions made:**
+
+- **A saved draft is now OFFERED, never applied silently.** Before, thirty fields repopulated on load with a passive note. Now the form shows a choice first: **Resume my application** or **Start fresh**. Silently restoring someone's half-finished application is presumptuous on a shared computer, and it buried the one thing they need to know — that the password was deliberately not saved. The prompt says that in its own panel, and says how long ago the draft was saved and which step it reached.
+- **Draft writing is paused while the choice is open.** Without it, the empty form behind the prompt would overwrite the very draft being offered before the applicant answered.
+- **The error summary takes focus when it appears**, which is the WCAG-recommended pattern for a validation summary: a screen reader reads the list immediately, and Tab from there walks the links instead of restarting at the top of the page.
+- **`shouldFocus` was turned OFF on the step validation** as a direct consequence. React Hook Form focusing the first bad field and the summary focusing itself would fight, and the summary would lose — the reader would land mid-form with no idea a list existed.
+- **The summary flattens nested errors.** Working hours keep their messages one level down (`workingHours.monday`), so a top-level read alone would show nothing for the very step most likely to need the summary.
+- **Jump links reach custom controls through `data-field`.** A plain input is found by its `name`, but the tag pickers, the language chips and the working-hours grid have no single named element — each now carries an anchor the summary resolves to, then focuses the first focusable child inside it.
+- **Upload retry keeps the `File` object.** A failed upload used to clear everything, so recovering meant finding the document in the file picker again. The common failure here is a flaky connection mid-form, not a wrong file, so **Try again** re-sends what was already chosen. Added to both the photo and document uploads.
+- **A live region announces the step, because moving focus does not.** Focus already went to the heading, which announces "Location and availability" — but not *where that is*. An off-screen `aria-live` region now says "Step 2 of 5, location and availability", and "Review your answers before submitting" at the end.
+- **On a phone the buttons stack with the primary action on top** (`flex-col-reverse`). After scrolling a long step, Continue should not be the control furthest from the thumb.
+
+**The 360px pass — three specific fixes, not a general tidy:**
+
+| What was wrong at 360px | Fix |
+|---|---|
+| Working hours: the day label and toggle took a fixed 120px, leaving almost nothing for two time inputs beside it | The label takes the full width and the row wraps below `sm`; time inputs shrink instead of overflowing |
+| Specialty slot row: `basis-40` forced two 160px boxes per line, truncating longer tag names | Full width below `sm`, back to two-up from `sm` |
+| Review screen: a 180px label gutter on a 360px screen | 160px from `sm`, 180px from `lg`, padding reduced |
+
+**Verified:**
+- `npm run build` and `oxlint` — clean, **0 warnings** on every file this chunk touched.
+- Server suite: **418 tests across 14 suites, all passing** — untouched, as intended. No field definitions changed, per the chunk's own "Do NOT".
+- **The draft module was executed against a faked `localStorage` — 14 checks, all passing.** The one that matters: a draft written with a `password` key (as a rogue or older build might) has it **stripped on read**, while every other field survives. Also covered: corrupt JSON returns null instead of throwing, a wrong version is rejected, a missing `savedAt` is rejected, a 15-day-old draft is dropped while a 13-day-old one is kept, and **a `localStorage` that throws outright — which is what a private window does on some browsers — returns null and does not crash the form.**
+- Generated CSS confirmed to contain every new responsive utility (`basis-full`, `sm:basis-40`, `flex-col-reverse`, `sm:w-[120px]`, `grid-cols-[160px_1fr]`).
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**: the parsing dependencies are still absent, so it evaluates no contrast.
+
+**Contrast: no new pairs.** Everything added reuses values already computed — `clay` on `clay/5` 5.12:1 (error summary), `ink` on `mist` 16.25:1 and `ink/70` on `mist` 6.42:1 (resume panel), and the gold button with its `ink/50` border at 3.43:1.
+
+**YOURS TO CHECK — these two need a browser and a keyboard, and neither has been done:**
+
+**1. The draft round trip.**
+Fill steps 1 to 3, then reload the page. You should see the resume prompt, not the form. Choose **Resume** — everything comes back, you land on the step you left, and the password field is **empty**. Then reload again and choose **Start fresh** — everything is gone and you are on step 1.
+
+**2. The whole form on the keyboard only.** Tab, Shift-Tab, Enter, Space, arrow keys. No mouse. The places I expect trouble, in order:
+- **The day toggles** (step 2) — Space should flip them, and the focus ring should be visible on the switch, not just the label.
+- **The tag chips** (step 4) — Enter and Space should both toggle; check a *locked* chip is skipped rather than focusable-but-dead.
+- **The language chips** (step 2) — Enter in the "another language" box must add a chip, **not submit the form**.
+- **The file inputs** (steps 1 and 5) — the real input is visually hidden, so confirm Tab reaches the **button** and that it is announced with its label.
+- **The error summary** — trigger it by pressing Continue on an empty step, then confirm focus lands on it and Tab walks the links.
+
+**3. 360px**, on the three places named in the table above.
+
+**Manual steps for the developer:**
+- **No new packages, no new environment variables, no field changes.**
+- **Verify `castofmind.com` in Resend** — still pre-launch blocker 7, still the reason neither application email can be seen.
+
+**Carried forward, unchanged:**
+- The client and server validation rules still mirror each other by hand, and the payload mapper is a third place that must agree. Only the tag lists are covered by a test.
+- `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 11.**
+
+**Not done (out of scope, by design):**
+- No field definitions touched, on the chunk's instruction.
+- Slice 4 — the admin portal, the applications list, approve and reject, the two-document transaction, and signed viewing URLs for the authenticated documents.
+
+---
+
+### Developer hero pass — 2026-09-03
+
+Developer replaced both remaining heroes by hand.
+
+**About hero.** The layered three-photograph composition is commented out and replaced by **`WhyCardsDeck.jsx`** — a scroll-driven fanned card deck. The section is now `sm:h-[180vh]` with `sticky top-0`, so the deck animates as the reader scrolls past it. A video experiment (`video-for-about.mp4`) sits commented out alongside.
+
+**How It Works hero.** Rebuilt as a two-column layout: copy plus a "Get started free" CTA on the left, and a new **`HowItWorksPathway.jsx`** on the right — a four-node interactive pathway whose milestone cards expand on click. The previous hero is retained as a commented block at the top of the file.
+
+Reviewed, not modified.
+
+---

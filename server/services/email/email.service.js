@@ -18,7 +18,7 @@ const resend = env.resendApiKey ? new Resend(env.resendApiKey) : null;
  *
  * @returns {Promise<{ delivered: boolean }>}
  */
-export async function sendEmail({ to, subject, html, text }) {
+export async function sendEmail({ to, subject, html, text, replyTo }) {
   // DEVELOPMENT FALLBACK. With no API key, print the message to the terminal
   // instead of sending it, so the whole reset flow can be walked through with no
   // Resend account. This branch is unreachable in production: the server exits
@@ -26,6 +26,7 @@ export async function sendEmail({ to, subject, html, text }) {
   if (!resend) {
     console.log('\n--- EMAIL (not sent — no RESEND_API_KEY) ---');
     console.log(`To:      ${to}`);
+    if (replyTo) console.log(`Reply-To: ${replyTo}`);
     console.log(`Subject: ${subject}`);
     console.log(text);
     console.log('--- end of email ---\n');
@@ -38,6 +39,9 @@ export async function sendEmail({ to, subject, html, text }) {
     subject,
     html,
     text,
+    // Lets the business reply straight to the sender. The From stays our own
+    // verified domain — sending as the visitor would fail SPF and land in spam.
+    ...(replyTo ? { replyTo } : {}),
   });
 
   if (error) {

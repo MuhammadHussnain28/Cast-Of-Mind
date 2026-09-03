@@ -81,6 +81,22 @@
       transform: scale(1.09);
     }
   }
+
+  /* Ambient wash drift (§24.9). Start and end frames match so the
+     reduced-motion rule below leaves it where it began. */
+  --animate-drift: drift 26s var(--ease-breath) infinite;
+
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: translate3d(3%, -4%, 0) scale(1.15);
+      opacity: 0.75;
+    }
+  }
 }
 
 /* Durations exposed as plain custom properties so Framer Motion can read them

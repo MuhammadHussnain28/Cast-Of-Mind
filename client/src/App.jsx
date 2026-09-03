@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 import { ToastProvider } from './components/ui'
 import PublicLayout from './components/layout/PublicLayout'
@@ -37,6 +37,18 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/about" element={<About />} />
+              {/* The standalone team page was merged into About (§24.7 and
+                  docs/04 §5). Anyone arriving at /team — an old link, a
+                  bookmark, a search result — lands on the team grid rather than
+                  on a 404. `replace` keeps it out of history, so the back
+                  button returns where they came from instead of bouncing them
+                  through the redirect again.
+
+                  The scroll itself is done by ScrollToHash in PublicLayout:
+                  React Router sets location.hash and does NOT scroll, so
+                  without it this redirect silently lands at the top of the
+                  page and looks like it worked. */}
+              <Route path="/team" element={<Navigate to="/about#team" replace />} />
               <Route path="/join-as-therapist" element={<JoinAsTherapist />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />

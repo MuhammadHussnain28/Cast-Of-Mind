@@ -1,8 +1,10 @@
 import Field from './Field'
-import { controlBase, controlBorder } from '../../lib/controlStyles'
+import { controlBase, controlBorder, controlFocus } from '../../lib/controlStyles'
 import { cx } from '../../lib/cx'
 
+// `ref` accepted as a plain prop (React 19) for react-hook-form. Chunk 3.3.
 export default function Textarea({
+  ref,
   label,
   helper,
   error,
@@ -23,12 +25,13 @@ export default function Textarea({
     >
       {({ id, describedBy, invalid }) => (
         <textarea
+          ref={ref}
           id={id}
           rows={rows}
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
           required={required}
-          className={cx(controlBase, controlBorder(invalid), 'resize-y leading-relaxed')}
+          className={cx(controlBase, controlFocus, controlBorder(invalid), 'resize-y leading-relaxed')}
           {...rest}
         />
       )}

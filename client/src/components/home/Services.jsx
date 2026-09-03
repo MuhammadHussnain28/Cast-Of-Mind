@@ -163,7 +163,10 @@ export default function Services() {
           </div>
         </div>
 
-        <ul>
+
+        {/* originla one  */}
+
+        {/* <ul>
           {concernThemes.map((theme, i) => (
             <ThemeRow
               key={theme.id}
@@ -172,23 +175,90 @@ export default function Services() {
               reduceMotion={reduceMotion}
             />
           ))}
-        </ul>
+        </ul> */}
 
-        {/* The brightest point of the page, and the only moment with no words on
-            it. Decorative: it carries the arrival, not information.
+       
 
-            It gets the same ink wash the hero photograph does. OWN-WORLD says
-            photographs sit under a wash, and this one shipped raw at first -
-            which put an off-palette red window frame at full strength at the
-            page's brightest moment, in a world declared as approved tokens
-            only. 14% is enough to pull it toward the palette without dimming
-            the arrival, which is the whole job of this band.
+      {/* testing one  */}
 
-            Height and crop are deliberate. The asset is 2400x900; at 1440 the
-            band is about 3:1, so object-cover trims the top and bottom rather
-            than showing an arbitrary middle slice of a much taller frame.
-            object-center keeps the window itself in the band. If this photo is
-            ever swapped, check the new one's aspect against these heights. */}
+      <div className="relative bg-ink-deep py-6 lg:py-10">
+        {concernThemes.map((theme, index) => {
+          const grounds = [
+            { bg: 'bg-ink-deep', border: 'border-paper/12', text: 'text-paper', tagText: 'text-paper/70', dot: 'text-paper/30' },
+            { bg: 'bg-ink',      border: 'border-paper/12', text: 'text-paper', tagText: 'text-paper/70', dot: 'text-paper/30' },
+            { bg: 'bg-ink',      border: 'border-paper/10', text: 'text-paper', tagText: 'text-paper/70', dot: 'text-paper/30' },
+            { bg: 'bg-mist',     border: 'border-ink/10',   text: 'text-ink',   tagText: 'text-ink/65',   dot: 'text-ink/30' },
+            { bg: 'bg-mist',     border: 'border-ink/8',    text: 'text-ink',   tagText: 'text-ink/65',   dot: 'text-ink/30' },
+          ]
+          const g = grounds[index]
+          return (
+            <div
+              key={theme.id}
+              className="sticky px-4 sm:px-6 lg:px-8 mb-6"
+              style={{
+                top: `calc(5rem + ${index * 18}px)`,
+                zIndex: index + 1,
+              }}
+            >
+              <div
+                className={`
+                  mx-auto w-full max-w-5xl min-h-[200px]
+                  rounded-3xl ${g.bg} ${g.border} border
+                  px-7 py-8 sm:px-10 sm:py-10 lg:px-12 lg:py-12
+                  shadow-[0_-6px_30px_-10px_rgba(13,9,22,0.6)]
+                  transition-all duration-300 ease-out
+                `}
+              >
+                <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+                  
+                  {/* Left: Heading + Blurb */}
+                  <div className="lg:col-span-5">
+                    <Heading level={3} size="subsection" tone={g.text === 'text-paper' ? 'inverse' : 'default'}>
+                      {theme.name}
+                    </Heading>
+                    <Text size="ui" className={`mt-2 max-w-measure ${g.tagText}`}>
+                      {theme.blurb}
+                    </Text>
+                  </div>
+                  {/* Right: Tags */}
+                  <ul className={`flex flex-wrap items-baseline gap-x-3 gap-y-2 lg:col-span-7 lg:justify-end`}>
+                    {theme.tags.map((tag, i) => (
+                      <li key={tag} className={`text-ui ${g.tagText}`}>
+                        {tag}
+                        {i < theme.tags.length - 1 && (
+                          <span aria-hidden="true" className={`ml-3 ${g.dot}`}>·</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        {/* Spacer so the last card has room to fully stack */}
+        <div className="h-[40vh]" />
+      </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         <div className="relative bg-paper">
           <img
             src={windowLight}

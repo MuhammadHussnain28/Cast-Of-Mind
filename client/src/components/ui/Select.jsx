@@ -1,5 +1,5 @@
 import Field from './Field'
-import { controlBase, controlBorder } from '../../lib/controlStyles'
+import { controlBase, controlBorder, controlFocus } from '../../lib/controlStyles'
 import { cx } from '../../lib/cx'
 
 /**
@@ -8,7 +8,9 @@ import { cx } from '../../lib/cx'
  * platform picker, which is easier than any custom list.
  * Only the arrow is restyled, drawn inline so no icon file is needed.
  */
+// `ref` accepted as a plain prop (React 19) for react-hook-form. Chunk 3.3.
 export default function Select({
+  ref,
   label,
   helper,
   error,
@@ -17,6 +19,7 @@ export default function Select({
   options = [],
   placeholder,
   className,
+  children,
   ...rest
 }) {
   return (
@@ -31,12 +34,14 @@ export default function Select({
       {({ id, describedBy, invalid }) => (
         <div className="relative">
           <select
+            ref={ref}
             id={id}
             aria-describedby={describedBy}
             aria-invalid={invalid || undefined}
             required={required}
             className={cx(
               controlBase,
+              controlFocus,
               controlBorder(invalid),
               'cursor-pointer appearance-none pr-11',
             )}
@@ -47,11 +52,12 @@ export default function Select({
                 {placeholder}
               </option>
             )}
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
+            {children ??
+              options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
           </select>
           <svg
             className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/60"

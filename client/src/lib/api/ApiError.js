@@ -13,11 +13,16 @@ const TIMEOUT_MESSAGE = 'That took too long. Please try again.'
  * directly instead of being replaced with something generic.
  */
 export class ApiError extends Error {
-  constructor(message, { code, status, cause } = {}) {
+  constructor(message, { code, status, details, cause } = {}) {
     super(message)
     this.name = 'ApiError'
     this.code = code || 'UNKNOWN_ERROR'
     this.status = status ?? null
+    // Per-field problems on a 422, as [{ path, message }]. The server has sent
+    // these since chunk 0.2's validate middleware; carrying them through lets a
+    // long form put each message back on the field it belongs to instead of
+    // showing one generic failure. Null for every other status.
+    this.details = Array.isArray(details) ? details : null
     this.cause = cause
   }
 }
@@ -62,6 +67,7 @@ export function toApiError(error) {
       return new ApiError(body.message, {
         code: body.code || 'SERVER_ERROR',
         status: response.status,
+        details: body.details,
         cause: error,
       })
     }

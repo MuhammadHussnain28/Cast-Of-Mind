@@ -213,6 +213,9 @@ describe('the dev routes are not mounted in production', () => {
           // the check under test is the only thing that can fail.
           RESEND_API_KEY: process.env.RESEND_API_KEY || 're_test_key_not_used',
           EMAIL_FROM: process.env.EMAIL_FROM || 'Cast of Mind <test@example.com>',
+          // Required in production since chunk 2.6. This test is about route
+          // mounting, not email configuration, so it just supplies a value.
+          CONTACT_TO: process.env.CONTACT_TO || 'test@example.com',
         },
       },
     );

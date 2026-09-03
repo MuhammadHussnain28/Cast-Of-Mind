@@ -7,7 +7,7 @@ import img1 from "../../assets/imgForHero.jfif"
 import img2 from "../../assets/img2.jpg"
 import img3 from "../../assets/img3.jpg"
 import img3rbg from "../../assets/img3-bgremoved.png"
-
+import img4 from "../../assets/peace.jpg"
 
 /**
  * The first viewport: words on the left, one photograph on the right.
@@ -134,7 +134,7 @@ export default function Hero() {
               srcset so a phone fetches 96 kB rather than 349 kB for a frame it
               renders at a third of the width. */}
           <img
-            src={img1}
+            src={img4}
             alt=""
             aria-hidden="true"
             fetchPriority="high"

@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import Navbar from './Navbar'
 import Footer from './Footer'
 import SkipLink from './SkipLink'
+import ScrollToHash from './ScrollToHash'
 
 /**
  * Wraps every public page: navbar on top, page in the middle, footer below.
@@ -10,6 +11,7 @@ import SkipLink from './SkipLink'
 export default function PublicLayout() {
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
+      <ScrollToHash />
       <SkipLink />
       <Navbar />
       <main id="main" tabIndex={-1} className="flex-1 focus-visible:outline-none">
