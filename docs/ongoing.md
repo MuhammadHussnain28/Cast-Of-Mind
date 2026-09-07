@@ -1914,3 +1914,1483 @@ Developer replaced both remaining heroes by hand.
 Reviewed, not modified.
 
 ---
+
+### Decision log — admin 2FA will be email OTP, not an authenticator app (2026-09-04, developer)
+
+**Recorded now, built in chunk 10.5.** Admin two-factor authentication (pre-launch blocker 12 below) will be a **6-digit one-time code emailed via Resend to the admin address**, not TOTP in an authenticator app.
+
+**Rationale, as given:** Asad may delegate day-to-day admin work to an assistant or manager. A code sent to the admin mailbox allows shared operational access without requiring Asad's personal phone every time someone signs back in after the 30-minute idle timeout.
+
+**The caveat, raised before the decision was confirmed and recorded here so 10.5 sees both sides.** Master spec §11 already states that the admin's email inbox is the master key, because "Forgot password" sends a reset link there. Putting the second factor in the same inbox means one compromised mailbox yields both the password reset *and* the OTP — so this raises the bar against a **stolen password** but not against a **compromised inbox**, which is the threat §11 names. The developer confirmed the decision on the delegation grounds above, which are real. Worth pairing with, at 10.5 or before:
+
+- a strong, unique password on the admin mailbox with its own 2FA at the mail provider — that is where the real second factor ends up living;
+- short OTP expiry (5–10 minutes), single use, stored hashed, and rate limited — the same treatment the reset token already gets in chunk 1.5;
+- keeping the admin login address unpublished, which is pre-launch blocker 8's `support@` split.
+
+Implementation notes for 10.5: the OTP reuses `baseTemplate` and the Resend service from chunk 1.5, and `EMAIL_FROM` must be on a verified domain first (blocker 7) or the code cannot be delivered at all.
+
+---
+
+## Chunk 4.1 — Admin layout and route protection
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check".
+
+Built — server:
+- `routes/admin.routes.js` — everything under `/api/v1/admin`, guarded at router level.
+- `controllers/admin.controller.js` · `services/admin.service.js` — `GET /api/v1/admin/session`.
+- `middleware/adminActionLog.js` · `constants/admin.js`.
+- `routes/admin.test.js` — 17 tests.
+- Edit: `routes/index.js` (mount).
+
+Built — client:
+- `pages/admin/AdminLayout.jsx` and five section pages (`Dashboard` · `Applications` · `Therapists` · `Clients` · `Bookings`), replacing the single `Admin.jsx` placeholder, which is deleted.
+- `components/admin/` — `AdminSidebar` · `AdminTopBar` · `AdminIcons` · `DataTable` · `IdleTimeout` · `AdminSectionPlaceholder` · `AdminNotFound`.
+- `lib/useIdleTimer.js` · `lib/api/adminApi.js` · `data/adminNav.js`.
+- Edits: `App.jsx` (nested layout route), `lib/authSession.js` (`endSession`), `components/auth/SignOutButton.jsx`, `components/auth/FormAlert.jsx` (a `notice` tone and a `role` prop), `pages/Login.jsx` (the inactivity notice), `pages/Styleguide.jsx` (the DataTable demo).
+
+**THE GUARDS SIT ON THE ROUTER, NOT ON EACH ROUTE.** This is the decision the chunk turns on. `router.use(adminRateLimiter, adminActionLog, requireAuth, requireAdmin)` means every screen slice 4 adds from here inherits protection instead of having to remember it — a new admin route cannot ship unguarded by forgetting a middleware argument. It also means a **mistyped path under the mount is refused before it reaches the 404 handler**, so an outsider cannot map the admin surface by comparing 403s against 404s. Three tests pin exactly that: unknown path → 403 for a client, 401 with no token, and 404 only once you are actually the admin.
+
+The same shape is used on the client: `ProtectedRoute` wraps the **layout**, so all five child routes are covered by one guard. That decides only what renders — the server check is the security.
+
+**Decisions made:**
+
+- **The admin action log goes to the server log, not a collection.** Approved 2026-09-04. §18 asks for IP logging on admin actions, but §20 defers an audit trail as overkill for a single admin and §10 fixes the schema at 14 collections — a 15th here would contradict both. One structured line per request: time, admin id, method, path, status, IP. **Consequence, stated plainly: host logs rotate, so this is accountability, not a permanent audit trail.** If a durable one is wanted, chunk 10.6 (admin polish and audit) is where the chunk plan already puts that work.
+- **The log records the path only — never the body, never the query string.** An admin searching a client list would otherwise write that person's name into the server log. Two tests cover it, one firing `?q=` with a name in it and asserting the name never appears.
+- **It logs refused attempts too**, because a client token reaching an admin path is exactly the event worth having a record of. Worth knowing: the line is written on response *finish*, by which point `requireAuth` has already run, so a refused attempt **names the account that made it**. Only a request with no valid token at all logs as `anonymous`. My first test asserted the opposite and was wrong; the real behaviour is the more useful one, and both cases are now pinned.
+- **`GET /admin/session` re-reads the database.** The guards do no lookup by design (chunk 1.2), so a deactivated or demoted admin keeps a working token for up to 15 more minutes. This endpoint is where that actually bites, and a test proves it by deactivating the admin, confirming 401, then reactivating and confirming 200 — so the status check is the only thing that changed the outcome.
+- **The idle timeout is served by the server, not hardcoded in the browser.** §18 sets ~30 minutes; the value now lives in `constants/admin.js` and travels in the session payload, so the spec's number has one home.
+- **The idle sign-out is a real `POST /auth/logout`**, which clears `refreshTokenHash` — the session is genuinely revoked, not merely hidden. **The gap, stated rather than glossed: if the tab dies (a closed laptop) no timer fires and the refresh cookie stays valid for its remaining 7 days.** Closing that needs a `lastSeenAt` field on `users`. Developer's decision, 2026-09-04: client timer now, server-side reinforcement carried to **chunk 12.3** alongside the deferred refresh-token reuse detection.
+- **The timer compares timestamps on one 1s interval, rather than nesting setTimeouts.** That is the difference that matters for the case people actually hit: a browser may throttle or defer a pending timeout while the machine sleeps, so it can fire late or out of order, while comparing `Date.now()` against the last activity is correct the instant the tab wakes.
+- **Activity is shared across tabs** through a plain timestamp in `localStorage`. It is not a credential and never touches the access token, which stays in memory. Every read and write is wrapped in try/catch, because `localStorage` throws outright in some private-window modes and a convenience must never be the reason the portal fails to load.
+- **The warning modal's countdown is `aria-hidden`.** A number announced every second is unusable with a screen reader; the dialog description carries the fact once and the digits are there for people watching them.
+- **A modal is the right answer here**, which is unusual — the craft rules treat modals as a first-thought smell. It earns it because the session is about to end whatever the admin is doing, and they need the chance to stop it.
+- **The sidebar is dark `ink`, and that is not decoration.** Gold on a light surface is 1.63:1 and is banned as text or an indicator, so ink is the **only** place in this portal where the accent can mark the current section at all (gold on ink, 11.08:1). `data-surface="dark"` flips the focus ring to gold there via the rule already in `index.css`.
+- **The active nav item is marked by a filled ground and weight as well as the gold icon** — colour alone fails WCAG 1.4.1. It is deliberately *not* a coloured left border, which is the category default the craft rules name.
+- **No Fraunces anywhere in the admin chrome.** §24.3 restricts it to display sizes, and a serif over dense table data is the "display font where a label should be" mistake. `Heading size="subsection"` is already Satoshi, so the page titles needed no new token. §24.8's "same typefaces" is satisfied by the palette and Satoshi carrying the brand; nothing requires both faces to appear.
+- **No new colour or type tokens.** Everything reuses `text-ui`, `text-caption` and `text-subsection`.
+- **`endSession` was extracted into `lib/authSession.js`** so the sign-out button and the idle timeout cannot drift on what signing out means. `SignOutButton` now calls it.
+- **The login page explains an inactivity sign-out.** Without it the admin lands there with no idea why and assumes something broke. `FormAlert` gained a `notice` tone and a `role` prop for it — an error the user did not ask to see should interrupt a screen reader (`alert`); a notice that is simply present on load should not (`status`). **This touches a shared primitive outside the chunk and is flagged rather than slipped in.**
+
+**The DataTable is on `/styleguide`, not on an admin screen.** The chunk forbids building a management screen, and demo rows sitting on `/admin/therapists` would read as real data. The styleguide is already where every primitive is exercised and is already on the pre-launch delete list, so the demo goes with it.
+
+It ships five states — loading (**skeleton rows, not a spinner floating in the content area**), populated, empty, no-search-results, and error with a retry. Empty and no-results are deliberately separate: "no results for that search" needs a way to clear the search, while "nothing here yet" needs to say what will appear and when, and showing the first when the truth is the second reads as a broken filter. A real `<table>` with `<th scope="col">`, `aria-sort`, sort controls as buttons inside the header cell, and a polite live region announcing the result count. Below `md` it renders cards instead — a table cannot reflow to 360px without losing the row and column relationships that are the reason to use one, and exactly one of the two layouts is in the DOM so nothing is announced twice.
+
+Client-side sort, search and pagination by default, with a `mode="server"` branch that skips all of it and reports changes through `onQueryChange` — chunk 4.2 switches over without a rewrite, which the "every list endpoint paginates" rule will require.
+
+**Two defects found by reading, before they shipped:**
+
+1. **The public 404 was being reused inside the admin shell.** It renders its own `<main>`, and a document may only have one — nesting it would have broken the landmark a screen reader navigates by. It is also full-viewport-height, and its only exit is the marketing homepage, which is the wrong destination for someone working in the portal. `AdminNotFound` replaces it.
+2. **`document.title` was never restored.** Navigating from `/admin` to a public page would have left the tab reading "Dashboard · Cast of Mind admin". Now restored on unmount.
+
+**Two lint findings fixed at the root, not suppressed:**
+
+- `useIdleTimer` seeded a ref with `Date.now()` **during render**, which the React Compiler purity rule correctly flagged — it returns a different answer on every re-render. The ref now starts at 0 and is seeded inside the effect.
+- `DataTable` reset the page in its own effect on `[query]`, a synchronous `setState` inside an effect. The reset now rides along inside the debounce's timeout callback, where both changes belong to the same event — the same root fix `useApi` got in chunk 0.6, rather than a disable comment.
+
+**Contrast computed by script — all 23 text and control pairs pass, 0 failures.** No fix was needed this time, which is worth noting because every previous UI chunk found at least one.
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| paper label on ink | 18.06:1 | | ink header on mist | 16.25:1 |
+| paper label on the active `paper/10` ground | 13.72:1 | | ink cell on paper | 18.06:1 |
+| paper/70 idle label on ink | 9.20:1 | | ink/60 sort icon on mist | 4.56:1 |
+| gold active icon on ink | 11.08:1 | | ink/70 card label on paper | 6.74:1 |
+| gold active icon on the active ground | 8.41:1 | | ink-deep placeholder on mist | 17.69:1 |
+| ink h1 on paper | 18.06:1 | | clay error text on `clay/5` | 5.12:1 |
+| ink/70 email on paper | 6.74:1 | | ink/50 control border on paper | 3.43:1 |
+
+Decorative and exempt: sidebar divider `paper/12` 1.40:1, table and top-bar borders `ink/12` 1.28:1, skeleton bar `ink/10` 1.23:1.
+
+**Verified:**
+- `npm test -- --runInBand` — **435 tests across 15 suites, all passing** (418 from earlier chunks, 17 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched.
+- Client build passes, 727 modules.
+- **Mutation-checked.** Removing `requireAdmin` from the router — the exact mistake router-level guarding exists to prevent — broke **4 tests**. Restored and the suite re-run.
+- Generated CSS confirmed to contain the 248px sidebar grid template, `tabular-nums`, the skeleton pulse under `@media (prefers-reduced-motion:no-preference)`, both `data-surface` focus-ring rules, and the sort-arrow rotation.
+- **LIVE against the real running server and real MongoDB Atlas — the full role matrix, which chunk 1.4 could not do.** That entry recorded that only an admin exists in the cluster, so client and therapist paths had never been exercised live. Solved without creating fake users: the guards read the role from the token and do no database lookup, so tokens were signed with the dev `JWT_ACCESS_SECRET` for a client and a therapist against a non-existent id. Results — no token **401**, junk token **401**, therapist token **403**, client token **403**, admin token **200** returning the real admin email with `idleTimeoutMs: 1800000` and `idleWarningMs: 120000`, and an unknown admin path with a client token **403, not 404**. **Nothing was written to the cluster.**
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**: `htmlparser2`, `css-select`, `css-tree` and `domutils` are still absent (re-checked this chunk, all four still missing), so it runs on regex and evaluates no contrast at all. The table above is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The idle timeout end to end.** Easiest way to test it without waiting 28 minutes: temporarily lower `ADMIN_IDLE_TIMEOUT_MS` and `ADMIN_IDLE_WARNING_MS` in `server/constants/admin.js` to, say, 60000 and 30000, restart the server, and sit still. The warning should appear, the countdown should tick, **Stay signed in** should dismiss it, and doing nothing should sign you out and land you on `/login` with the inactivity notice. Put the real values back afterwards.
+2. **Two tabs open on `/admin`.** Work in one, leave the other still — neither should sign out, because activity is shared. This is the part most likely to be wrong.
+3. **The `[admin]` log lines in your server terminal.** One per admin request, with the path and no query string.
+4. **`/styleguide` → "Admin DataTable"** — sort each column (three presses: ascending, descending, cleared), search, page through, and switch between the rows / loading / empty / error buttons.
+5. **The sidebar at 360px** — the drawer should trap Tab, Escape should close it, and focus should return to the menu button.
+6. **Keyboard through the table** — the sort buttons must show a visible focus ring on the mist header row.
+7. **Reduced motion on** — the drawer and modal should appear without sliding, and the skeleton bars should not pulse.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts.**
+2. Nothing to configure — the admin account already exists in Atlas and the new endpoint uses it as-is.
+
+**Carried forward:**
+- **Server-side idle enforcement** (`lastSeenAt` on `users`) to chunk 12.3, with the refresh-token reuse detection already parked there.
+- **A durable admin audit trail**, if wanted, to chunk 10.6.
+- The client and server validation rules still mirror each other by hand; `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**PRE-LAUNCH BLOCKERS — one added, the list now stands at 12:**
+1. **`/styleguide` must be deleted** — development only. **Now also carries the DataTable demo rows.**
+2. **LinkedIn URL in `lib/siteConfig.js` is a placeholder** — swap for the real profile.
+3. **Legal pages need real content** — Privacy, Terms, Refund.
+4. **Favicon still missing** — client to supply.
+5. **Footer tagline copy is mine, not the client's.**
+6. **Delete `server/routes/dev.routes.js` and its mount** — guard-testing routes.
+7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`. Now also blocks the admin 2FA email at chunk 10.5.
+8. **Create `support@castofmind.com`** and forward it — printed in every email footer and on `/contact`, and it does not exist yet. Also supply the misconduct escalation phone number, or confirm email-only is the intended launch state.
+9. **`client/src/assets/hero.png` has unknown provenance** — referenced by nothing. Delete it or record where it came from.
+10. **Replace or remove everything in `client/src/data/homePlaceholders.js`** — invented testimonials and figures attached to photographs of real, identifiable people.
+11. **Replace or remove everything in `client/src/data/aboutPlaceholders.js`** — invented team, including two entries carrying clinical credentials.
+12. **NEW — admin two-factor authentication does not exist.** §18 calls it effectively non-negotiable for a platform holding mental health data, and it is scheduled for **chunk 10.5**. Until then **the admin account is protected by a password alone**, and per §11 the admin mailbox can reset that password. The method is decided — email OTP via Resend; see the decision entry above, including its caveat.
+
+**Not done (out of scope, by design):**
+- No dashboard statistics, no applications list, no therapist, client or booking management. Those are chunks 4.2–4.6, 10.1 and 10.2 — the five sections are honest placeholders naming the chunk that fills them.
+- No admin 2FA (chunk 10.5, blocker 12 above).
+- No subscription access gate — slice 12.
+
+---
+
+## Chunk 4.2 — Applications review screen
+
+**Status: Complete.** Nothing skipped. **Verified live against the real pending application in Atlas**, including the document stream. The rendered screens are still yours to look at.
+
+Built — server:
+- `routes/admin.routes.js` — three routes added under the existing guarded mount.
+- `services/adminApplications.service.js` · `controllers/adminApplications.controller.js`
+- `validation/adminApplications.schema.js` · `constants/adminApplications.js` · `utils/cloudinaryDelivery.js`
+- `routes/adminApplications.test.js` — 32 tests.
+- Edit: `middleware/validate.js` — added `validateQuery`.
+
+Built — client:
+- `pages/admin/Applications.jsx` — the real list, replacing the 4.1 placeholder.
+- `pages/admin/ApplicationDetail.jsx` at `/admin/applications/:id`.
+- `components/admin/applications/` — `StatusBadge` · `FieldList` · `SensitiveValue` · `WorkingHoursSummary` · `DocumentPanel`.
+- `lib/api/adminApplicationsApi.js`.
+- Edits: `App.jsx` (detail route), `components/admin/DataTable.jsx` (two fixes, below), `data/adminNav.js`.
+
+---
+
+### THE FINDING THAT CHANGED THE DESIGN
+
+Chunk 3.1 stored certificates as Cloudinary **`authenticated`** assets and recorded that slice 4 would need to sign a delivery URL for them. Probing the real asset before writing any code showed something that entry did not anticipate:
+
+**The stored `secure_url` is itself a permanent, working credential.** It already carries an embedded signature — `…/image/authenticated/s--Fc3-SV2d--/v…/….pdf` — and fetching it returns the file. Strip the `s--…--` segment and it returns 401. There is no expiry.
+
+So "authenticated" here means "the URL must be signed", not "the holder must be authenticated". The consequence is direct: **if the detail endpoint returned those URLs to the browser, we would be handing out unrevocable access to a stranger's professional credentials**, and the whole streaming design would be theatre.
+
+**What was built instead.** The detail response carries document *metadata* only — which documents exist, and their format. Every stored URL and public id is stripped from the payload. Bytes are served by a separate route that signs a 5-minute URL server-side, fetches it, and pipes it back. Three tests pin this, one of which asserts the string `authenticated` never appears in a detail response.
+
+This also settles the question the plan asked: streaming was chosen over redirecting, and the probe turned that from a preference into a requirement.
+
+---
+
+**Decisions made:**
+
+- **Documents stream through our own API.** Approved 2026-09-04. Nothing leaves our origin, so no Cloudinary URL can leak through history, a referrer header or a screenshot; every view is recorded by the 4.1 admin action log; and access ends with the admin's session. Consistent with Decision A in 3.1 — bytes go through our server so we can see them. The cost is bandwidth through the backend, which is nothing at review volumes.
+- **`private_download_url` rather than a plain signed delivery URL**, because it actually expires. It serves as an attachment, which does not matter: we set our own `Content-Disposition: inline` on the response the browser receives.
+- **The upstream content type is never echoed unchecked.** It is matched against the four types chunk 3.1 accepts on upload, and anything else becomes `application/octet-stream`. If that path ever served `text/html`, passing the type through would run someone else's markup on our own origin. A test sends `<script>` with a `text/html` header and asserts it comes back as a download, not as HTML.
+- **The list projection is narrow.** Name, email, therapist type, country, experience, status, dates. Not the home address, the taxpayer id, the education summary or any document field. The list cannot display them, and shipping an applicant's personal data to a browser that will not show it is exposure for nothing. A test asserts each absent field.
+- **The search regex is escaped.** `q` goes into a `$regex`, so unescaped, `.*` returns every applicant and `(a+)+$` is catastrophic backtracking aimed at our own database. Two tests cover it, and disabling the escape breaks both.
+- **Full-name search works across two fields.** A term containing a space is matched as first-name-plus-last-name in either order, because "Muhammad Rauf" appears in no single field and would otherwise find nobody.
+- **The status counts are computed over ALL applications, not the current filter.** A badge that changed when you clicked a chip would be reporting the chip rather than the work outstanding. They travel in `meta` so the badge and the four chips cost no extra request.
+- **The taxpayer id is masked behind a Reveal control.** §23 flags it as sensitive. The admin is trusted with it, but a review screen gets shared and screenshotted — and the 2026-09-04 delegation decision means an assistant may be the one reviewing. The street address is shown in full, because judging licensing jurisdiction needs it on nearly every review.
+- **The detail screen is laid out in the applicant's five steps, not in schema order.** The reviewer is checking a story told in a particular sequence; reading it back in that sequence is how a gap becomes obvious.
+- **Two eligibility answers are surfaced as a flag strip at the top** — a declared disciplinary action, and no malpractice insurance. Both are §23 eligibility conditions, both are recorded rather than auto-rejected (the 3.1 decision), and both are otherwise buried in steps 4 and 5 of a long page. The strip says explicitly that neither rejects an application on its own.
+- **Approve and Reject render disabled for pending applications**, with one line saying what approving will do and which chunk wires it. Visibly deliberate rather than looking broken.
+- **`validateQuery` writes to `req.validatedQuery`, not `req.query`.** Express 4 allows reassigning `req.query`; Express 5 makes it a getter and the assignment throws. Writing to a new property means a future upgrade cannot break every route that validates a query string at runtime.
+
+**Two fixes to the DataTable built in 4.1**, both found by using it for the first time:
+
+1. **`onQueryChange` moved into a ref.** It sat in the reporting effect's dependency array, so a parent passing an inline arrow would re-fire it on every one of its own renders. Same pattern `useIdleTimer` already uses for `onTimeout`.
+2. **A `resetKey` prop.** A filter owned by the parent has to send the table back to page 1 — page 4 of the previous filter is usually an empty screen that reads as a bug. Implemented as a render-phase state adjustment, React's documented pattern for reacting to a changed prop, because an effect would render twice and flash the old page.
+
+**A wasted request removed.** Changing the status chip while on page 3 fetched page 3 of the new filter, then page 1 a render later when the table reported its reset. The chip now resets the parent's page at the same moment, so both agree and only one request goes out.
+
+**Two lint findings fixed at the root, not suppressed.** Both screens set `loading` and `error` synchronously at the top of their fetch effect, which the React Compiler rule correctly flags. Rewritten so **`loading` is derived**: a `requestKey` string describes the request currently wanted, and loading is simply whether the stored result matches it. Every `setState` now happens in a promise callback. This is the same root fix `useApi` got in chunk 0.6, and it removed a state variable rather than adding one.
+
+**Two test bugs caught and fixed — one of them the dangerous kind:**
+
+1. **A test that passed while proving nothing.** The helper was `get(path, token = tokens[ADMIN])`, so the "no token is refused" case calling `get(path, undefined)` triggered the *default parameter* and sent the admin token — then asserted 401 against a 200. It failed loudly here, but the same shape with a laxer assertion would have sat green forever. Replaced with an explicit `NO_TOKEN` sentinel. This is the second false-passing test the project has caught (chunk 1.3 had one), and both came from a test setting up the wrong thing rather than asserting the wrong thing.
+2. **Mongoose silently ignored the fixture timestamps.** `submittedAt` is mapped as the `createdAt` timestamp, and Mongoose refuses to change `createdAt` in an update — so three `updateOne` calls reported success and did nothing, and the newest-first assertion failed against creation order. Fixed by going through the raw collection.
+
+**Contrast computed by script — all 28 new text and control pairs pass, 0 failures.**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| active chip: paper on ink | 18.06:1 | | badge pending: ink on `gold/20` | 16.27:1 |
+| active chip count: `paper/75` on ink | 10.45:1 | | badge approved: sage-deep on `sage/15` | 4.69:1 |
+| idle chip: ink on paper | 18.06:1 | | badge rejected: clay on `clay/10` | 4.74:1 |
+| idle chip count: `ink/70` on paper | 6.74:1 | | flag text: clay on `clay/5` | 5.12:1 |
+| idle chip border: `ink/50` on paper | 3.43:1 | | flag note: `ink/70` on `clay/5` | 6.54:1 |
+| field term: `ink/70` on paper | 6.74:1 | | hours closed: `ink/60` on paper | 4.74:1 |
+| field value: ink-deep on paper | 19.67:1 | | reject button: paper on clay | 5.48:1 |
+
+The two badge tones are the tightest at 4.69:1 and 4.74:1 — both clear 4.5:1, but they have almost no margin and must not be lightened. Decorative and exempt: badge borders 1.29–1.63:1, card borders `ink/12` 1.28:1, the row-link underline `ink/30` 1.96:1.
+
+**Verified:**
+- `npm test -- --runInBand` — **467 tests across 16 suites, all passing** (435 from earlier chunks, 32 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched.
+- Client build passes, 735 modules.
+- **Mutation-checked twice.** Disabling the regex escape broke **2** tests; removing the document-URL stripping from the detail response broke **1**. Both restored and re-run.
+- Cloudinary is faked in the suite via `jest.unstable_mockModule`, so no test touches a real account. Fixture URLs are built from the configured cloud name, because `isOwnCloudinaryUrl` pins to it — hardcoding a fake cloud made every document assertion fail for the wrong reason, which is how a test suite ends up asserting its own mock.
+- **LIVE against the real running server, real Atlas and real Cloudinary — 20 checks, all passing.** Using the developer's own pending application, and writing nothing:
+  - list returns it with `counts {pending:1, approved:0, rejected:0}`, and the payload contains no `taxpayerIdNumber`, `streetAddress`, `passwordHash` or `certificateUrl`;
+  - search by first name finds it; searching `.*` returns **0** results, so the escape holds against the real database;
+  - detail returns the taxpayer id, **no** `$2b$` hash, and **no** `authenticated` URL anywhere in the body, while keeping the public photo URL;
+  - `documents` reports certificate 1 present as `pdf`, the other two absent;
+  - the document route returned **200 `application/pdf`, 272,383 real bytes beginning `%PDF`**, with `inline; filename="certificate1.pdf"`, `Cache-Control: private, no-store`, no `Location` header and no Cloudinary string in any header;
+  - a missing document 404, an unknown field 400, a malformed id 400, and a therapist token 403.
+
+**A blocker from chunk 3.1 is now RESOLVED.** That entry's manual steps 1 and 2 — granting the Cloudinary key `create` and `read`, and enabling PDF delivery — are done. `cloudinary.api.ping()` succeeds, a real PDF certificate uploaded through the form is stored on the account, and it now delivers through the new route. The live check 3.1 could not complete has effectively completed here.
+
+**Yours to check — the screens have not been seen rendered:**
+1. **The detail screen top to bottom** against what you actually submitted — every value in the right step, nothing showing "Not provided" that you filled in.
+2. **The document viewer.** Press View on Certificate 1: the PDF should appear inline, and "Open in a new tab" should work afterwards. This is the piece the chunk was built around.
+3. **The Reveal control** on the taxpayer id.
+4. **The status chips** — counts correct, switching filters does not lose your search, and the empty states read properly for a status with nothing in it.
+5. **Search**, including a full name with a space in it.
+6. **360px** on the detail screen — the field list is two columns from `sm` and the working-hours table is the tightest part.
+7. Keyboard through the chips and the document buttons.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts.**
+2. Nothing to configure — Cloudinary is already working, which this chunk confirmed.
+
+**Carried forward:**
+- Chunk 4.3 approves and rejects: the two-document transaction, the `therapistProfiles` model, and the credentials email. **Blocker 7 (Resend domain) will block that email**, exactly as it blocked the application emails in 3.2.
+- Server-side idle enforcement to 12.3; a durable admin audit trail to 10.6 if wanted.
+- `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created; every value on these screens comes from the real record.
+
+**Not done (out of scope, by design):**
+- No approve or reject logic, no `therapistProfiles` model, no two-document transaction, no credentials email. That is chunk 4.3 — the buttons are rendered disabled and say so.
+- No dashboard statistics (4.4), no therapist management (4.5), no client or booking screens (10.1, 10.2).
+
+---
+
+## Chunk 4.3 — Approval flow creates therapist account
+
+**Status: Complete.** Nothing skipped. **Verified live end to end**, including logging in as a newly approved therapist with the password from the form — then deleting everything the test created.
+
+Built — server:
+- `models/TherapistProfile.js` — the `therapistProfiles` collection per §10.3.
+- `models/workingHours.js` — the availability sub-schema and its validator, now shared by both models.
+- `services/adminApprovals.service.js` — the transaction.
+- `services/email/templates/therapistWelcome.js` · `sendTherapistWelcomeEmail` in `email.service.js`.
+- `routes/adminApprovals.test.js` — 22 tests, running against a real replica set.
+- Edits: `models/TherapistApplication.js` (`rejectionReason`, shared working hours), `constants/adminApplications.js`, `constants/email.js`, `validation/adminApplications.schema.js`, `controllers/adminApplications.controller.js`, `routes/admin.routes.js`, `test/mongoMemory.js`, and three existing test files (see the ripple below).
+
+Built — client:
+- `components/admin/applications/ReviewActions.jsx` — both confirmations.
+- Edits: `pages/admin/ApplicationDetail.jsx`, `lib/api/adminApplicationsApi.js`.
+
+---
+
+### A SPEC CONTRADICTION, RESOLVED RATHER THAN GUESSED AT
+
+`docs/04` §9.2 says approval "generates a temporary password, and emails credentials." **That is stale.** §11 and §8.7 both say the therapist sets their own password on the application form, it carries over on approval, and the admin never sees it — "Confirmed by Asad" — and §21 lists it under *Recently Resolved*. The chunk brief agrees explicitly.
+
+Built to §11: **the welcome email contains no password at all.** It says to sign in with the address they applied with and the password they chose, and points at "Forgot password" if they cannot remember it. A live test proves the original password still works after approval.
+
+**The stale §9.2 line is left in the client's document rather than edited**, and recorded here so the next reader does not implement it.
+
+---
+
+### THE TRANSACTION, AND HOW IT WAS ACTUALLY TESTED
+
+Approval performs **three writes in one `session.withTransaction`**: create `users`, create `therapistProfiles`, and move the application to `approved` with `reviewedAt`.
+
+The third belongs inside for a reason worth stating: left outside, a crash between the writes could create a live therapist while the application still read `pending`, and the next admin would approve them a second time.
+
+**A rollback test needs real transactions, and the existing harness could not provide them.** `mongodb-memory-server` was starting a standalone instance, where transactions do not exist — every write simply succeeds, so a rollback test would have passed while proving nothing. `test/mongoMemory.js` gained `startMemoryReplSet`, used by this suite alone because a replica set takes about four seconds to elect and the other sixteen suites do not need one.
+
+**Mutation-checked.** Taking the three writes out of the transaction — leaving the code otherwise identical — broke **2 tests**, both rollback assertions. Restored and re-run.
+
+**Decisions made:**
+
+- **The welcome email is sent AFTER the commit, never inside it.** An email sent inside a transaction that then aborts tells someone they were approved when they were not. A test asserts no email is sent when the transaction rolls back.
+- **A failed email does not undo the approval.** The account exists and works; losing it because Resend hiccuped would be far worse than a missing notification. Same reasoning as the application emails in 3.2 — and the live run exercised it for real, since `emailSent` came back `false`.
+- **Approving twice is idempotent, not an error.** The second call returns 200 with `alreadyApproved: true` and the original `reviewedAt`, and creates nothing. A plain 409 would show the admin a failure immediately after a success, which reads as though something broke. The UI says "this had already been approved."
+- **A rejected application can never be approved.** Developer's decision, 2026-09-04. Approve acts only on a pending record; a rejected one returns 409 and the applicant submits a new application, which §10.4 already allows by retaining rejected records. Keeps the state machine one-directional, and the original rejection is never quietly overwritten.
+- **An approved application can never be rejected** — a therapist account exists by then, and deactivating them is chunk 4.5's job, not this one.
+- **Rejecting twice does not overwrite the first reason.** A test pins it: the second call is idempotent and the original reason survives.
+- **The email clash is checked inside the transaction AND caught at the index.** The pre-check gives a clear 409; the unique index on `users.email` is the actual guarantee, and an 11000 error is translated into the same clean 409 rather than a 500.
+- **NO REJECTION EMAIL.** Developer's decision, 2026-09-04. §16's email table lists none, and the wording of a rejection to a qualified clinician is a business decision that belongs to Asad. The reason is stored for the admin's own record. **Open item, recorded plainly: a rejected applicant currently hears nothing at all, ever.** Worth Asad deciding before launch.
+
+**Two SPEC ADDITIONS — approved by the developer, 2026-09-04**, the same footing as the reset-token fields added in chunk 1.5:
+
+| Field | Where | Why |
+|---|---|---|
+| `rejectionReason` | `therapistApplications` | The chunk brief asks for an optional reason and §10.4 has nowhere to put one. Internal only — nobody is sent it. |
+| `applicationId` | `therapistProfiles` | The permanent link back to the application. §10.3 stores the document URLs but not the Cloudinary public ids needed to sign a viewing URL for them, and those live on the retained application. Matching on email instead would break the moment an admin edits a therapist's email, which §9.3 explicitly allows. |
+
+**The working-hours schema is now shared, not copied.** `models/workingHours.js` holds the day sub-schema, the `DAYS` list and the document-level validator, and both models import it. The approval flow builds a profile from an application, so the two shapes must agree exactly — and a duplicated forty-line validator is precisely what drifts once and then silently accepts a week on one model that the other would reject. The application model's 83 tests were re-run immediately after the extraction and all still pass.
+
+**A ripple through three existing test files, and it is the third time this pattern has bitten.** Adding one export to `email.service.js` broke `therapistApplications.test.js`, `contact.test.js` and `auth.reset.test.js` — each mocks that module with a factory listing only the exports that existed when it was written, and an ESM mock factory must provide **every** export or importing `app.js` fails to link. All three failed to run rather than failing an assertion, so no test was silently skipped. Fixed by adding the new export to each factory, with a comment saying why.
+
+Recorded because chunk 1.5 and chunk 2.6 both hit the same shape: **a change to shared infrastructure breaks a test that was mocking it, and the breakage appears somewhere unrelated to the change.** Adding an export to a mocked module is now a known cost.
+
+**Contrast: no new pairs.** Everything added reuses values already computed and recorded — `ink` on `mist` 16.25:1 and `ink/70` on `mist` 6.42:1 (the action panel and the rejection-reason panel), `ink` on `gold` 11.08:1 (Approve), `paper` on `clay` 5.48:1 (Reject), and the existing Modal and Textarea treatments.
+
+**Verified:**
+- `npm test -- --runInBand` — **489 tests across 17 suites, all passing** (467 from earlier chunks, 22 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched.
+- Client build passes, 736 modules.
+- **Mutation-checked**, as above: removing the transaction broke both rollback tests.
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**.
+- Tests cover every case the chunk names and several it does not: both records created, the full field copy including working hours and the note, the application marked approved, **the applicant able to log in with their original password**, a mid-transaction failure leaving zero users and zero profiles with the application still `pending`, no email on rollback, a retry after a rollback succeeding cleanly, approving twice, rejection creating no account, the reason optional and length-capped, rejecting twice not overwriting, an approved application refusing rejection, no password hash in any response, and the role guard on both endpoints.
+- **LIVE against the real running server, real Atlas and real Cloudinary — 11 checks, all passing.** A throwaway application was submitted through the real public endpoint with a password chosen for the test, then:
+  - approved: `users` created with `role=therapist status=active`, `therapistProfiles` created with the right specialty tags and `status=active`, and `applicationId` linking the two;
+  - the stored `passwordHash` was **byte-identical to the application's** — nothing was regenerated;
+  - **logging in at `/api/v1/auth/login` with the form password returned 200 and `role: therapist`** — the check the chunk asks for;
+  - approving again returned `alreadyApproved: true` with still exactly one user;
+  - rejecting the approved application returned 409;
+  - `emailSent: false`, because Resend cannot deliver to a test address — which exercised the "a failed email does not undo the approval" path for real.
+  - **Everything created was then deleted and the cluster confirmed restored**: 1 user (the admin), 1 application (the developer's own, untouched), 0 profiles.
+- **The developer's real pending application was deliberately NOT approved.** That creates a live account for an actual person on the production cluster, and it is the developer's call rather than mine. The flow is proven; approving it is one click.
+- No new Cloudinary assets were uploaded — the throwaway application reused the URLs already on the real record, so nothing was created or deleted there.
+
+**Yours to check — the screens have not been seen rendered:**
+1. **Approve your real application**, if you are ready to. The confirmation says exactly what will happen; afterwards the status badge should flip to Approved and a toast should report whether the email went out.
+2. **The email will NOT arrive** until pre-launch blocker 7 is done — `EMAIL_FROM` is still the Resend test sender, which delivers only to your own Resend account address. If you approve with your own address, you should get it.
+3. **The reject dialog** — the optional reason, and that cancelling changes nothing.
+4. **Both dialogs on the keyboard**: Escape closes, Tab stays trapped, focus returns to the button that opened it.
+5. **360px** on both dialogs.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **Verify `castofmind.com` in Resend and change `EMAIL_FROM`** — pre-launch blocker 7. Until then no approved therapist can receive their welcome email, and the approval itself still succeeds regardless, which the live run confirmed.
+3. **Decide whether rejected applicants should be emailed.** Nothing is sent today, by decision. If Asad wants a message, the wording is his and it is a small addition.
+
+**Carried forward:**
+- The rejection email question above.
+- Chunk 4.4 (dashboard statistics) can now count therapists for real — `therapistProfiles` exists.
+- Chunk 4.6 will sign viewing URLs for an approved therapist's documents using `applicationId` to reach the public ids.
+- Server-side idle enforcement to 12.3; a durable admin audit trail to 10.6 if wanted.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No manual "add therapist" feature** — deliberately excluded per §9.2, and the chunk's own "Do NOT".
+- No therapist portal, no therapist profile editing, no deactivation — chunks 4.5, 4.6 and slice 8.
+- No dashboard statistics (4.4).
+
+---
+
+## Chunk 4.4 — Admin dashboard statistics
+
+**Status: Complete.** Nothing skipped. Verified live against the real cluster with `subscriptions`, `sessions` and `reviews` genuinely absent.
+
+Built — server:
+- `services/adminStats.service.js` · `constants/adminStats.js`
+- `GET /api/v1/admin/stats`, added to the existing guarded router.
+- `routes/adminStats.test.js` — 13 tests.
+- Edits: `controllers/admin.controller.js`, `routes/admin.routes.js`.
+
+Built — client:
+- `pages/admin/Dashboard.jsx` — replaces the 4.1 placeholder.
+- `components/admin/dashboard/` — `MoneyBand` · `SignupsTrend` · `StatFigure` · `PendingApplicationsCard` · `QualityPanel`.
+- `lib/dashboardFormat.js`.
+- Edits: `lib/api/adminApi.js`, plus the four Applications fixes below.
+
+---
+
+### THE DESIGN PROBLEM, AND WHY THE OBVIOUS BUILD IS WRONG
+
+§9.1 asks for roughly twelve figures in four groups. The default build is a 4×3 grid of identical stat cards — and that is the "same-size cards as the page structure" pattern the craft rules name. It gives every figure equal weight, so nothing leads, and the one item that needs *acting on* disappears among the counts.
+
+**Four groups, four deliberately different forms:**
+
+| Group | Form | Why |
+|---|---|---|
+| Money | A dark `ink-deep` band with one hero figure | Gold and sage cannot carry weight on a light surface (gold on paper is 1.63:1 and is never text), so this is the only ground in the portal where the palette can do its job. It also gives the page one focal point. |
+| People | Quiet figures, no borders of their own | The container is the group; a border round each number would be three more rectangles. |
+| Pending applications | An action card, gold rule, whole card links | §9.1 calls it "an action item". Rendering it as another number is what makes it vanish. |
+| Quality | A rating plus a short feed | Reviews are a feed. A tile would drop the reviews entirely. |
+
+**Exactly one hero figure**, per the house chart rules — MRR, and nothing else competes with it.
+
+**Decisions made:**
+
+- **The hero is Satoshi, not Fraunces.** A serif on a dashboard number reads as decoration, and §24.3 restricts Fraunces to display sizes regardless. **Proportional figures, not `tabular-nums`** — equal-width digits make a number like `121` look loose at 56px. `tabular-nums` stays where numbers align vertically: table rows, the filter counts, axis ticks.
+- **`averageRating` is `null` when nothing has been rated, never 0.** Zero would claim every therapist scored the lowest possible mark — a different and damaging statement. The API returns null and the panel renders the absence. A test pins it.
+- **The quality panel repeats §9.6's own caveat in the UI** — stars are mandatory and written reviews optional, so most ratings arrive with no context. The caption says to read it as a trend, not a verdict, rather than letting one number look like a judgement on a person.
+- **The trend is genuinely live from day one.** It counts new client signups per month from `users`, a collection that already exists — so it is real data now rather than a placeholder waiting for slice 6. Every month is returned including the empty ones; a trend with its zero months dropped is a different shape from the truth.
+- **The trend renders as one series, so it has no legend** — a one-swatch legend box only restates the title. 2px sage line, a ~10% wash rather than a solid block, hairline solid gridlines (never dashed), and the current month marked with a gold dot ringed in the surface colour so it reads over the line.
+- **Nothing is gated behind hover.** The endpoint value is labelled in the caption, every point has a hover *and* keyboard tooltip with a hit area far larger than the mark, and a visually hidden table carries all twelve exact values for a screen reader.
+- **The month label is generated `en-US`, not the `en-GB` used everywhere else for dates.** en-GB abbreviates September as "Sept" — four characters where every other month is three, leaving the axis visibly ragged. Caught in the live run, not by reading.
+- **MRR sums each subscription's own `amount`** rather than count × €200. Same number today, still correct if a price ever changes.
+- **The pending card's gold rule is not the only signal.** It changes with state, so the same information is also in the number and in the words ("They are waiting for review" / "Nothing waiting for review") — colour alone would fail WCAG 1.4.1.
+
+**How the not-yet-existing collections are read.** `subscriptions`, `sessions`, `reviews`, `bookings` and `clientprofiles` go through the **raw driver** rather than a model, because MongoDB answers 0 and `[]` for a collection that has never been created. Every figure is honest today and starts reporting by itself the moment its slice ships, with no code change.
+
+The names are centralised in one constant with a warning: **they must match what Mongoose will pluralise to**, or the dashboard reports 0 for ever — silently, which is far worse than an error. A test asserts those collections really are absent, so the "returns 0 without crashing" claim is not being made against collections that quietly exist.
+
+**Churn uses `updatedAt`**, because it is the only timestamp cancelled and expired subscriptions share — `cancelledAt` exists but expiry has no stamp of its own. Slice 11 may want a dedicated `endedAt`; the limitation is commented at the query.
+
+---
+
+### THE FOUR APPLICATIONS FIXES
+
+The developer reviewed chunk 4.2 and judged the screens good but short of finished. That was correct, and the diagnosis was specific rather than a matter of taste. Four of the eight problems were fixed here because leaving them would have made the new dashboard inconsistent with the screen beside it:
+
+1. **The top bar said "Applications" while you were reading one application.** The header stopped being useful exactly when you were deepest in. There is now a breadcrumb, and the detail page's own title reads "Review application".
+2. **Skeletons flashed on every refetch.** Changing a filter replaced correct data with grey bars and jumped the layout. Skeletons are now the first load only; a refetch holds the previous rows at 60% opacity. This is a named anti-pattern in the house chart rules and the dashboard follows the same rule.
+3. **Four heavy outlined filter pills competed with each other**, each carrying a 3.43:1 border. They are now a segmented control on a mist track: only the selected segment carries weight. An unselected segment is identified by its own label, which needs no border — WCAG 1.4.11 does not apply to text.
+4. **Even `gap-6` spacing everywhere**, which reads as unconsidered rather than calm. Filter and summary now sit tight together (`gap-3`) with generous separation before the table (`gap-8`).
+
+**Still open, recorded so they are not lost** — a focused pass, not this chunk:
+- The application detail page is five identical bordered boxes stacked vertically.
+- No hierarchy inside them: the specialty tags, the only field that drives matching, are set exactly like the zip code.
+
+**Contrast computed by script — all 25 new pairs pass, 0 failures.**
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| hero paper on ink-deep | 19.67:1 | | sage trend line on the chart ground | 5.37:1 |
+| band label `paper/70` on ink-deep | 9.65:1 | | gold end dot on the chart ground | 11.21:1 |
+| chart axis `paper/70` on ground | 9.26:1 | | "No ratings yet" `ink/60` on paper | 4.74:1 |
+| people figure ink on paper | 18.06:1 | | star `sage-deep` on paper | 5.48:1 |
+| activity `ink/70` on mist | 6.42:1 | | segmented idle ink on the mist track | 16.25:1 |
+
+Decorative and exempt: the chart gridline `paper/12` 1.40:1, the pending card's gold rule 1.63:1 (an accent, and its meaning is also carried in words), card and track borders `ink/12` 1.28:1.
+
+**Verified:**
+- `npm test -- --runInBand` — **502 tests across 18 suites, all passing** (489 from earlier chunks, 13 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched. The three remaining warnings in `home/Hero.jsx` are the developer's own, open since 2.2.
+- Client build passes, 742 modules.
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**.
+- **LIVE against the real running server and Atlas.** `listCollections` confirmed only `users`, `therapistapplications` and `therapistprofiles` exist — so the defensive reads were exercised against genuinely missing collections rather than empty ones. `/admin/stats` returned **200**, every money figure 0, `averageRating: null`, twelve trend buckets ending on the current UTC month, `pendingApplications: 1` (the real application), `totalTherapists: 0`, and a therapist token **403**.
+- The zero-state test deletes the fixture client accounts first, so "every figure reads zero" is a real assertion rather than one that tolerates its own seed data.
+
+**Yours to check — nothing has been seen rendered:**
+1. **The money band.** Does it read as a considered focal point, or as a dark rectangle? This is the piece the chunk was built around.
+2. **The trend at a flat zero** — the line should sit on the baseline and look deliberate, not broken.
+3. **Hover and keyboard along the trend**, and that the axis months are evenly spaced now.
+4. **The pending applications card** — it should look like the one thing to act on, and it links to the list.
+5. **The four fixes on Applications**: the breadcrumb on a detail page, changing filters without a skeleton flash, the segmented control, and the tighter grouping.
+6. **360px** — the band collapses to one column and the chart keeps its axis labels.
+7. Reduced motion: the skeleton should not pulse, and nothing else moves.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. Nothing to configure.
+
+**Carried forward:**
+- **OPEN ITEM for slice 6:** §10.6 types `amount` as a Number without saying whether it holds euros or cents. The dashboard formats it as whole euros. It cannot be wrong today because there are no subscriptions, and it would be very wrong later — **check this when slice 6 defines the field.**
+- The two remaining Applications defects above.
+- Whether rejected applicants should be emailed (chunk 4.3).
+- Server-side idle enforcement to 12.3; a durable admin audit trail to 10.6 if wanted.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created: every figure on this screen is real, and the ones that read zero are genuinely zero.
+
+**Not done (out of scope, by design):**
+- **No charts beyond the one trend**, per the chunk's own "Do NOT" and §9.1's "counts and simple trends".
+- No management screens — therapists (4.5), clients (10.1), bookings (10.2) are still placeholders.
+
+---
+
+## Chunk 4.5 — Therapist management screen
+
+**Status: Complete.** Nothing skipped. Both of the chunk's verify steps were run live against the real cluster, and everything the run created was deleted afterwards.
+
+Built — server:
+- `services/adminTherapists.service.js` · `controllers/adminTherapists.controller.js`
+- `constants/adminTherapists.js` · `validation/adminTherapists.schema.js`
+- `utils/search.js` — the shared search helper, extracted from 4.2.
+- `services/email/templates/emailChanged.js` · `sendEmailChangedNotices` in `email.service.js`
+- `test/emailServiceMock.js` · `test/emailMockParity.test.js` — see below.
+- `routes/adminTherapists.test.js` — 31 tests.
+- Edits: `routes/admin.routes.js` (five routes), `middleware/adminActionLog.js`, `constants/email.js`, `services/adminApplications.service.js` (now uses the shared search), and five test files rewired onto the shared email mock.
+
+Built — client:
+- `pages/admin/Therapists.jsx` and `pages/admin/TherapistDetail.jsx`.
+- `components/admin/therapists/` — `TherapistHeader` · `TherapistEditForm` · `TherapistActions`.
+- `lib/api/adminTherapistsApi.js`.
+- Edits: `App.jsx`, `pages/admin/AdminLayout.jsx` (breadcrumbs are now a table rather than one hardcoded case), `components/ui/Badge.jsx` (a dark-surface tone — see the contrast failure below).
+
+---
+
+### THE LINE THIS CHUNK DOES NOT CROSS
+
+Nothing here reads `messages`, `journals` or `privateNotes`, and no endpoint exists that could. §11 records that an admin conversation viewer was proposed as the safe alternative to plain-text passwords and **the client decided against building it**; misconduct is reported by email and phone and handled off-platform.
+
+A test asserts the detail response contains no such keys, and the live run checked the same thing against a real record. The decision is pinned rather than merely respected today.
+
+**Decisions made:**
+
+- **Deactivation flips BOTH records in one transaction.** `users.status` decides whether they can sign in; `therapistProfiles.status` decides whether matching can still offer them to a client. Flipping only the first produces the worst state available — a therapist clients can still be matched with, who cannot log in to answer them. **Mutation-checked: removing the profile half broke 2 tests.**
+- **The edit is a transaction too**, because the email lives on `users` and everything else on the profile. A test proves a rejected email change does not leave a renamed therapist behind.
+- **The editable set is a hard allowlist, and anything else is REFUSED rather than dropped.** A bio silently ignored is worse than a bio rejected, because the admin believes it saved. `.strict()` on the schema does this; **mutation-checked: removing it broke 5 tests.** Refused fields include `workingHours`, `photoUrl`, `status` and `taxpayerIdNumber`.
+- **What the admin may edit** (developer's decision, 2026-09-04): email, specialty tags, title, first and last name, professional title, credential type, credential initials, licence number. **Education summary and current work situation are deliberately not editable** — correcting a licence number is a different act from rewriting someone's account of their own career.
+- **Changing the login email notifies BOTH addresses** (developer's decision, 2026-09-04). Not in §16's table; added as a security notice rather than business copy. The old inbox is the one that can raise an alarm and the one that until now controlled password recovery (§11); without any notice a therapist silently loses the ability to sign in with no way to find out why. Sent after the commit, and a failure never undoes the edit.
+- **Password reset calls the SAME `forgotPassword` the public endpoint uses.** One reset path in the codebase, no admin-only shortcut that could drift from it. The admin never sees, sets or chooses a password — a test asserts the response carries none, and another asserts only a *hashed* token is stored.
+- **The admin reset endpoint differs from the public one in exactly one way, deliberately.** `/auth/forgot-password` stays silent about deactivated accounts because saying anything leaks whether an address exists. Here the admin already knows the account exists, so it says plainly that no email was sent and why — otherwise they click a button, nothing happens, and they have no idea it was refused.
+- **Deactivating a therapist with active clients is allowed**, with the count stated in the confirmation and an explicit note that bookings and subscriptions are untouched and must be cancelled separately (§13 gives the admin that control). Blocking it would mean the one action needed in an urgent case is the one the system refuses.
+- **The action log now records WHICH fields an edit changed** — names only, never values. Editing someone's credentials is exactly what §18 wants accountability for, but an email address in a rotating host log is personal data with no reason to be there.
+- **The client sends only the fields that actually changed**, so a save does not report an edit of every field.
+- **Counts stay defensive**: active clients reads `bookings`, ratings read `reviews`, both through the raw driver, so they read 0 today and switch on when slice 6 and chunk 10.3 land. `averageRating` is `null`, never 0 — same reasoning as the dashboard.
+
+---
+
+### THE MOCK RIPPLE, FIXED AT THE ROOT THIS TIME
+
+Adding one export to `email.service.js` again broke every suite that mocks it — an ESM mock factory must provide **every** export or importing `app.js` fails to link, and the failure appears as four unrelated suites refusing to run with a message about a module none of them test.
+
+**This was the fourth time** (chunks 1.5, 2.6, 4.3, and now). Patching four factories again would have guaranteed a fifth, so:
+
+- `test/emailServiceMock.js` is now the single place that knows the service's exports. Each suite spreads it and overrides only what it needs to observe.
+- `test/emailMockParity.test.js` fails **first and clearly**, naming the missing function, if a sender is added without updating the shared mock. It also catches the reverse — a stale entry faking a function that no longer exists, which would let suites pass against something deleted.
+
+**Mutation-checked:** removing an export from the shared mock makes the parity test fail with the missing name, instead of four suites dying with a link error.
+
+---
+
+### A CONTRAST FAILURE FOUND BY MEASURING
+
+`Badge tone="success"` is built for light surfaces — `sage-deep` text on a `sage/15` tint. On the therapist header's dark `ink-deep` band that is dark on dark: **3.05:1, failing the 4.5 floor.** It looked fine in the source and would have looked plausible on screen.
+
+Fixed by adding an `inverse` tone to `Badge` (`bg-paper/10 text-paper border-paper/25`, **15.61:1**) and marking the state with a small dot beside the word. The dot only reinforces — the word carries the state, so nothing depends on colour (WCAG 1.4.1).
+
+**All other pairs pass.** Header text 19.67:1 · header captions 9.65:1 · specialty panel ink-deep on `sage/6` 18.48:1 · panel headings `ink/70` on paper 6.74:1 · list badge success on paper 4.69:1 · sage state dot 4.59:1 · danger button 5.48:1. Decorative: the photo ring `paper/20` 1.77:1, the sage panel edge 1.53:1.
+
+---
+
+### THE UI
+
+Consistent with the dashboard by construction rather than by intention: the therapist header uses the same dark `ink-deep` band with the same ambient sage wash the dashboard uses for its headline, so the admin recognises "this is what the page is about" from the surface alone. The list uses the same segmented control and spacing rhythm as applications.
+
+The detail page is **weighted, not uniform** — the specialty tags lead in their own sage-edged panel because they are the only field on the screen that changes who gets matched with whom; credentials and practice sit side by side beneath; bio, hours and reviews follow. This is the treatment the applications detail page still needs (see below).
+
+`TagPicker` is reused from the application form rather than rebuilt, so the 3–4 limit is enforced the same way in both places and a set that would break matching cannot be saved.
+
+**Verified:**
+- `npm test -- --runInBand` — **535 tests across 20 suites, all passing** (502 from earlier chunks, 33 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched. The remaining warnings are the developer's own in `home/Hero.jsx`, `home/Services.jsx` and `about/WhyCardsDeck.jsx`.
+- Client build passes, 747 modules. Detector 0 findings (degraded, as always).
+- **Mutation-checked three times**: deactivating only the user broke 2 tests; dropping the strict allowlist broke 5; removing an export from the shared email mock made the parity test fail by name.
+- **LIVE against the real server and Atlas — 15 checks, all passing.** A throwaway therapist was created through the real pipeline (submit → approve), then:
+  - list and search found them, with status counts;
+  - the detail carried no conversation data and no hash;
+  - **editing specialty tags persisted** — `Trauma and/or Abuse / Grief / Parenting` read back from the database, with `changedFields: ["licenseNumber","specialtyTags"]`;
+  - an attempt to edit the bio returned **422**;
+  - login worked, then after deactivation **both records read `inactive` and login returned 401 `INVALID_CREDENTIALS`** — the same generic message as any other failure, so nothing confirms the address exists;
+  - a reset on the deactivated account was refused with an explanation;
+  - reactivating restored login.
+  - **Everything created was deleted and the cluster confirmed restored**: 1 user, 1 application (the developer's own, untouched), 0 profiles.
+
+**Yours to check — nothing has been seen rendered:**
+1. **The therapist detail page** — does the dark header read as consistent with the dashboard, and do the specialties clearly lead?
+2. **The edit form**, especially the TagPicker at the 3–4 ceiling and the helper line that appears when the email is being changed.
+3. **The three confirmation dialogs**, and that the reset one makes clear no password can ever be seen.
+4. **360px** on the detail page and the dialogs.
+5. Keyboard through the edit form and the segmented control.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. **Verify `castofmind.com` in Resend** — pre-launch blocker 7. The email-change notices are subject to it like every other email: the change still applies, but neither address would receive anything today.
+
+**Carried forward:**
+- **The applications detail page still needs its hierarchy pass** — five identical bordered boxes, with the specialty tags set exactly like the zip code. The therapist detail page built here is the pattern to follow.
+- Whether rejected applicants should be emailed (4.3).
+- The `amount` unit question for slice 6 (4.4).
+- Server-side idle enforcement to 12.3; a durable admin audit trail to 10.6 if wanted.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No admin conversation viewer of any kind** — deliberately excluded per §11 and the chunk's own "Do NOT".
+- No manual "add therapist" — excluded per §9.2.
+- No client management (10.1), bookings overview (10.2) or reviews screen beyond the per-therapist list (10.3).
+
+---
+
+## Chunk 4.6 — Therapist profile page
+
+**Status: Complete.** Nothing skipped. **Slice 4 (admin portal) is finished.** The chunk's verify step was run live: logged in as a real approved therapist, edited the bio, and confirmed a specialty-tags change is rejected.
+
+Built — server:
+- `services/therapistProfile.service.js` · `controllers/therapistProfile.controller.js`
+- `constants/therapistProfile.js` · `validation/therapistProfile.schema.js`
+- `routes/therapist.routes.js` — `GET` and `PATCH /api/v1/therapist/profile`.
+- `routes/therapistProfile.test.js` — 33 tests.
+- Edit: `routes/index.js` (mount).
+
+Built — client:
+- `pages/portal/PortalLayout.jsx` · `pages/portal/PortalHome.jsx` · `pages/portal/TherapistProfile.jsx`
+- `components/portal/` — `ClientPreviewCard` · `VerifiedPanel` · `ProfileEditor` · `PracticeCounts` · `PortalIcons`
+- `lib/api/therapistProfileApi.js`
+- Edits: `App.jsx`. `pages/portal/Portal.jsx` (the 1.6 placeholder) is deleted.
+
+---
+
+### THE LOCK
+
+`PATCH /api/v1/therapist/profile` accepts exactly `photoUrl` and `bio`. Every other field is **refused with a 422 naming it**, never silently dropped — a therapist told their save succeeded while the specialty tags that decide their matching quietly stayed put would be worse than an error.
+
+**Mutation-checked: removing `.strict()` from the schema breaks 16 tests.**
+
+The dangerous shape has its own test: a locked field sent *alongside* a legitimate bio change. The whole request is rejected and neither half applies, so a valid edit can never be used as a carrier for an invalid one.
+
+**There is no id in either route.** The therapist comes from the verified access token, so there is no parameter to point at somebody else's record — a test confirms a second therapist hitting the same URL gets their own answer, never the first's.
+
+**THE TWO ALLOWLISTS ARE TESTED AS DISJOINT.** Chunk 4.5 gave the admin eight fields; this chunk gives the therapist two. A field appearing on both would be a field whose value nobody owns, editable by two parties under different rules. The test fails the moment a future chunk hands the same field to both.
+
+**Decisions made:**
+
+- **The response returns only §8.7's display list**, plus the two editable fields and the stats. Deliberately absent: the taxpayer id, the home address, and the credential documents — none are on the display list, and there is no reason to put a tax number back on the wire to render a profile page. A test asserts all three are missing.
+- **The photo URL is re-checked against our own Cloudinary account.** A photo is submitted as text after an upload, so nothing stops a therapist posting a link to anywhere — and every client who saw them on the matching page would load it. Same guard the application form uses (3.2).
+- **Practice stats are three counts and nothing else.** §8.7 carries an explicit scope warning that charts and trends belong in the admin portal and would duplicate the admin dashboard inside the therapist's own. `bookings` and `sessions` are read through the raw driver, so they read 0 today and switch on when slices 6 and 9 ship.
+- **"Clients helped" counts distinct clients, not bookings.** Someone who left and came back is one person helped, not two.
+- **No password field anywhere**, per §11 — set once on the application form and recoverable only by reset. The page says so and links to "Forgot password", which is kinder than leaving someone hunting for a control that will never exist.
+- **`/therapist/profile` is singular** against the plural-resources convention. That rule governs collections; this is a singleton for the authenticated user, so it does not apply. Noted rather than silently deviated from.
+- **`/portal` moved out of the marketing layout** into its own shell. It was rendering a signed-in surface inside the public navbar and footer — the same mistake the admin portal fixed in 4.1. The shell is deliberately minimal: slice 8 replaces the body with the inbox, so a navigation rail built now would be thrown away.
+
+---
+
+### THE VISUAL IDEA
+
+A therapist has two audiences, and the page says so structurally rather than in a paragraph.
+
+**The card at the top is what a client sees** — photo, name, credentials, professional title, specialty tags and bio, rendered as a `paper` card presented on an `ink` stage, captioned *"How you appear to someone choosing a therapist."* That card is also the editing surface. A "bio" field in a form tells a therapist nothing about what it is for; seeing the actual thing a client reads while deciding who to trust makes both editable fields obviously worth care. Show the thing rather than describing it.
+
+**Below it, the locked fields are presented as verification, not restriction.** Each carries a small drawn **shield-and-check** in sage under a *"Verified by Cast of Mind"* heading. A padlock would say "you are shut out"; §8.7's actual reasoning is the opposite — these are the fields a person checked, and that checking is what makes them worth anything to a client. The mark should read as a credential, and the one line of copy explains exactly that.
+
+Consistency with the rest of the product comes from reuse rather than resemblance: the same dark-band language the admin detail pages use (on `ink` rather than `ink-deep`, because §24.8 says the portals run warmer), the same drawn icon set at one stroke weight, `WorkingHoursSummary` and `PhotoUpload` reused outright, and the same spacing rhythm.
+
+**Contrast computed by script — all 20 new pairs pass, 0 failures.** Stage caption `paper/70` on ink 9.20:1 · card name 18.06:1 · specialty chip ink on `sage/15` 15.46:1 · verified panel heading 16.97:1 · shield icon `sage-deep` on `sage/6` 5.15:1 · practice icon on mist 4.93:1 · over-limit counter clay 5.48:1 · password link ink on mist 16.25:1. Decorative: the verified panel edge `sage/40` 1.53:1, card borders `ink/12` 1.28:1.
+
+---
+
+### AN OPEN ITEM THIS CHUNK CREATES
+
+**Education summary and current work situation are now editable by nobody.** Chunk 4.5 deliberately excluded them from the admin's allowlist — they are the therapist's own account of their career, and rewriting someone's professional history is a different act from correcting a licence number. This chunk's brief then lists both as read-only for the therapist.
+
+Put together, a typo in either is permanent. Developer's decision, 2026-09-04: **leave them frozen and flag it.** They are a point-in-time record of what was claimed at application, and the application document is retained permanently anyway, so freezing is arguably correct rather than an oversight. **Worth Asad knowing**, because the only route to a correction today is a developer or a direct database edit.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **568 tests across 21 suites, all passing** (535 from earlier chunks, 33 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched.
+- Client build passes, 755 modules. Detector 0 findings (degraded, as always).
+- **Mutation-checked:** dropping `.strict()` broke 16 tests.
+- **LIVE against the real server and Atlas — 12 checks, all passing.** A throwaway therapist was created through the real pipeline (submit → approve), then **signed in as that therapist**:
+  - read their own profile, with `stats` reading three zeroes;
+  - the response carried no taxpayer id, no home address and no hash;
+  - **the bio edit saved** and read back from the database;
+  - **a specialty-tags change returned 422 and the tags were unchanged** — the chunk's verify step;
+  - a locked field sent alongside a valid bio change rejected the whole request, leaving both untouched;
+  - a foreign photo URL returned 422;
+  - an admin token on the therapist route returned 403.
+  - **Everything created was deleted and the baseline confirmed restored.**
+
+**A note on the live run, and a correction to an assumption.** The first attempt crashed: it expected a *pending* application to borrow Cloudinary URLs from, and there was none. The developer had approved their own application through the UI in between — so the cluster now legitimately holds a real therapist (`Muhammad Rauf`, active, with specialty tags edited through the 4.5 admin screen). **Nothing was damaged:** the cleanup only deletes by id and every id was still null. The script was corrected to take its baseline from whatever is actually there rather than assuming, and re-run clean.
+
+**Yours to check — nothing has been seen rendered:**
+1. **The client-preview card.** Does seeing your own card make the bio and photo feel worth editing? That is the idea the page is built on.
+2. **The verified panel** — does the shield read as "checked", or as "locked out"? The wording and the mark are both trying to land the first.
+3. **Editing**: change the bio, watch the counter, save, and confirm the preview card updates.
+4. **The photo upload**, including a `.exe` renamed to `.png` — the server rejects it by its real bytes.
+5. **360px**, and the whole page with reduced motion.
+6. Keyboard through the editor and the top bar.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. You can now sign in as `devhussnain28@gmail.com` and see this page against your own real profile.
+
+**Carried forward:**
+- **Education summary and current work situation are frozen** — see above.
+- **Changing a photo orphans the previous Cloudinary asset.** This joins the orphaned-uploads item already open from 3.1 and 3.2; a cleanup script can now identify unreferenced assets from both applications and profiles.
+- The applications detail page still needs its hierarchy pass (4.5).
+- Whether rejected applicants should be emailed (4.3); the `amount` unit question for slice 6 (4.4).
+- Server-side idle enforcement to 12.3; a durable admin audit trail to 10.6 if wanted.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No client sidebar and no chat** — slice 8, and the chunk's own "Do NOT". The portal shell is deliberately minimal so that work replaces the body rather than fighting a rail built too early.
+- No charts or trends on the practice stats, per §8.7's scope warning.
+- The client portal is still a placeholder — slice 7.
+
+---
+
+## Chunk 5.1 — clientProfiles model and questionnaire state
+
+**Status: Complete.** Nothing skipped. **Slice 5 has started.** The model and the state layer were executed and tested; the shell has **not been seen rendered** — see "Yours to check".
+
+Built — server:
+- `models/ClientProfile.js` — the `clientProfiles` collection per §10.2.
+- `models/fixedListValidator.js` — extracted, see below.
+- `constants/clientProfile.js` — types, genders, preferences, relationship statuses, tag counts, age bounds.
+- `models/ClientProfile.test.js` — 60 tests.
+- Edits: `models/TherapistApplication.js` and `models/TherapistProfile.js` (both now import the shared validator), `test/constantsParity.test.js` (+3 tests).
+
+Built — client:
+- `store/questionnaireSlice.js`, registered in `store/index.js`.
+- `lib/validation/questionnaire.js` — per-step and per-branch Zod schemas.
+- `lib/questionnaireDraft.js` — sessionStorage draft.
+- `data/questionnaireSteps.js` · `data/relationshipStatuses.js`.
+- `components/questionnaire/QuestionnaireFlow.jsx` · `QuestionnaireProgress.jsx`.
+- `pages/Questionnaire.jsx` — replaces the placeholder.
+
+---
+
+### THE SIX DECISIONS, ALL APPROVED 2026-09-05
+
+**1. Concern tags are 1–4 in the database, 3–4 on screen.** The spec disagrees with itself — §10.2's comment says "3-4", §6 says "select 3–4 tags (minimum 1)", the chunk brief says 1–4. The only reading where all three hold is that storage accepts 1 and the screen asks for 3–4. Recorded as **two named constants**, `CONCERN_TAGS_MIN = 1` and `CONCERN_TAGS_ASK_MIN = 3`, rather than one number and a comment. Client-side validation enforces the storage floor deliberately: someone who genuinely has one concern must not hit a gate the spec does not require. A single tag is safe — zero overlap shows every therapist silently (§15), so nobody reaches a dead end.
+
+**2. There is NO `email` field on `clientProfiles`, and that is not an omission.** §6 lists email as a questionnaire question; §10.2 has no field for it because email belongs to `users` — one address, one account, one unique index. The Redux slice carries it to checkout, and it lands on `users` at payment. Two tests assert the stored document has no `email` key, and the model file says why.
+
+**3. Draft persistence is sessionStorage, not localStorage.** The therapist form uses localStorage for 14 days, which is right for a job application and wrong here: the most sensitive thing in this flow is `concernTags` — a list of someone's mental health concerns, beside their name, age and email. localStorage would leave that on a shared or family computer for a fortnight. sessionStorage survives a refresh, which is exactly what the brief asks for, and is gone when the tab closes. A test asserts localStorage is never written to at all.
+
+**4. NO 18+ restriction — developer's decision.** §10.2 sets no minimum age and one was deliberately not invented. Bounds are 1–120 as a sanity check only, applied identically to an individual and to each partner. This differs from the therapist application, which does hold an 18+ floor.
+
+**5. Relationship status is a fixed dropdown**, not free text. **The list is mine, not Asad's** — §10.2 types it as a bare String and names no options. Worth his confirmation before launch; the constants file and the client mirror both say so. It includes "Prefer not to say", and a test pins that: an anxious visitor must not be forced to disclose this to continue.
+
+**6. A dedicated `QuestionnaireProgress` bar**, not a reuse of the join form's `StepRail`. That rail is five fixed labelled nodes; this flow is seven or eight depending on the branch, and labelling every node would crowd a 360px screen with words nobody needs yet.
+
+---
+
+### WHY REDUX HERE, WHEN THE THERAPIST FORM USES ONE `useForm`
+
+Not inconsistency. That form submits from a single page, so React Hook Form owning its state is correct. These answers must **outlive the `/questionnaire` route** — `/matches`, `/therapist/:id` and `/checkout` all read them, and RHF state dies the moment the route unmounts. Redux survives the navigation. That is the whole reason the brief asks for a slice.
+
+**Nothing sensitive is persisted by the store itself.** The access token is still not in Redux (chunk 1.6), no `redux-persist` is registered anywhere, and draft saving is sessionStorage in its own module.
+
+---
+
+### THE BRANCH GUARD
+
+`type: "individual"` must carry `name`/`age`/`gender` and **must not** carry `coupleData`; `type: "couple"` must carry both partners and **must not** carry the individual fields. A document holding both shapes is one where nobody can say which is true, and every screen reading it would have to guess.
+
+The questionnaire deliberately **keeps both branches' answers** while someone switches back and forth — switch to couple, switch back, and the individual answers are still there. `selectActiveAnswers` is the boundary where that stops: it drops the inactive branch before anything is validated or sent. **Mutation-checked: neutering the guard broke 6 tests.**
+
+**A couple is one profile, not two** (§6, confirmed by Asad), so partner data nests rather than becoming a second document. A test asserts one document after creating a couple.
+
+---
+
+### THE VALIDATOR WAS EXTRACTED RATHER THAN COPIED A THIRD TIME
+
+`fixedListValidator` — count, membership, **and no duplicates** — already existed verbatim in both `TherapistApplication` and `TherapistProfile`. `concernTags` needed the same three checks, and a third copy is how a validator drifts once and then silently accepts on one model what another rejects. Now `models/fixedListValidator.js`, imported by all three. Same precedent as `models/workingHours.js` in chunk 4.3.
+
+**This touches two shipped models and is flagged rather than slipped in.** Both models' full suites were re-run immediately after and all still pass. **Mutation-checked: removing the duplicate check broke 3 tests across two suites** — so the shared version is genuinely covered from both sides.
+
+---
+
+### A CONTRAST FAILURE FOUND BY MEASURING, BEFORE IT SHIPPED
+
+The progress bar's fill was `sage` on an `ink/12` track. Computed: **2.66:1** — under the 3:1 floor for a graphic that carries meaning. It looked entirely reasonable in the source.
+
+Fixed with `sage-deep`: **4.28:1 against the track**, 5.48:1 against paper. Note this is `sage-deep` used as a fill rather than as success text, which is a small widening of that token's stated job in §24.2 — the reasoning is identical (plain sage does not carry enough contrast), and it is recorded here rather than done quietly.
+
+**All other pairs pass:** step counter ink on paper 18.06:1 · step label `ink/70` 6.74:1 · placeholder panel `ink` on mist 16.25:1 and `ink/70` on mist 6.42:1 · error text clay on mist 5.12:1 · "Start over" `ink/70` on paper 6.74:1 with an `ink/40` underline · gold Continue button face 11.08:1 with its `ink/50` border at 3.43:1. Decorative and exempt: the `ink/12` track and panel border at 1.28:1.
+
+---
+
+### A BUG CAUGHT BEFORE IT SHIPPED
+
+The save effect ran on mount with the still-empty answers and **overwrote the very draft the restore effect was putting back**. This is the same trap chunk 3.6 fixed on the therapist form ("the empty form behind the prompt would overwrite the draft being offered"), arrived at from a different direction.
+
+Fixed with a `hasAnyAnswer` guard rather than a flag or a timer: an untouched form has nothing worth saving. It also means simply opening `/questionnaire` writes nothing at all, which is the right default when the thing being stored is a list of health concerns. Seven checks cover it.
+
+**Also fixed at the root, not suppressed:** the draft is read with a lazy `useState(readQuestionnaireDraft)` rather than a ref read during render — the exact React Compiler objection chunk 3.5 hit.
+
+---
+
+**Other decisions:**
+
+- **The flow is 7 steps for an individual, 8 for a couple** — each partner gets their own screen, because six name/age/gender fields on one screen is the wall of fields §24.7 rules out. **The total therefore changes from 7 to 8 the moment someone picks "couple"**, which is one change at the one moment it is explicable; hiding the total until they answer is worse for someone deciding whether they have the energy to start.
+- **Ages are coerced from strings.** A number input hands back a string, and chunk 3.5 shipped exactly this bug on the therapist form — every correct application was rejected with a 422 until the payload mapper fixed it. Coerced in the schema this time so the mistake cannot be made twice.
+- **The collection name is pinned by a test.** Chunk 4.4 reads `clientprofiles` through the raw driver and warns that a name mismatch makes the dashboard report 0 for ever, silently. A test now asserts `ClientProfile.collection.name` equals the string that constant holds.
+- **`coupleData` defaults to `undefined`, not `{}`**, so an individual profile genuinely has no couple key rather than an empty object Mongoose invented. Checked against the raw document, not the Mongoose one.
+- **`.js` extensions on the slice's imports**, so it loads in plain Node and its reducer logic can be executed directly. Vite resolves either form.
+- **The step heading takes focus on each change** but the live region is what says *where* — focus alone announces "Where are you based?" without saying it is step 3 of 7. First render is skipped: taking focus on page load is disorienting.
+- **The progress bar is `aria-hidden`.** The same fact is in the text above it and in the live region; three announcements of one fact is worse than one.
+
+**Verified:**
+- `npm test -- --runInBand` — **631 tests across 22 suites, all passing** (568 from earlier chunks, 63 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched. The six remaining warnings are the developer's own in `home/Hero.jsx` and `about/WhyCardsDeck.jsx`, open since 2.2.
+- Client build passes, 762 modules. `bg-sage-deep` and `flex-col-reverse` confirmed present in the generated CSS.
+- **Mutation-checked twice**, as above: the branch guard (6 tests) and the shared duplicate check (3 tests).
+- **The validation schemas and step definitions were executed, not just compiled — 44 checks, all passing.** Both branches parse; age coerces from string in both the individual and the partner shapes; an individual payload is rejected by the couple schema and vice versa; every count boundary on concern tags (0/1/4/5); duplicates rejected; a lowercased and a trailing-space variant both rejected — the exact drift the parity test exists to prevent; all 27 tags individually selectable; a later step never blocks an earlier one; nested partner errors key correctly as `partner2.name`; every declared step field exists in `emptyAnswers`.
+- **The slice and the draft were executed against a faked storage — 40 checks, all passing.** Switching branch keeps both sets of answers and `selectActiveAnswers` drops the inactive one in both directions; step advance and back clamp at both ends and the ceiling moves with the branch; restore backfills missing keys; reset does not share the frozen `emptyAnswers` object; and on the draft — round trip, **writes to sessionStorage and never to localStorage**, wrong version dropped, a 25-hour-old draft dropped while a 23-hour-old one is kept, corrupt JSON returns null rather than throwing, and **a storage that throws outright, which is what a private window does on some browsers, returns null without crashing the form.**
+- Detector — 0 findings, and as since chunk 2.1 **read that as a degraded 0**: `htmlparser2`, `css-select`, `css-tree` and `domutils` are still absent, so it evaluates no contrast at all. The measured table above is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The whole flow end to end.** Continue through all seven steps, then Back through them — the placeholder panel names the fields each screen will ask for, so the order and the branching are checkable now.
+2. **Pick "couple" on step 1** — the total should go from 7 to 8 and two partner steps should appear after it.
+3. **The draft round trip.** Answer a step or two, refresh, and your answers should still be there. Then **close the tab, reopen `/questionnaire`, and they should be gone** — that is the sessionStorage decision working.
+4. **The progress bar** — does it read as calm progress, or as a loading bar? It is the one piece of chrome the later chunks inherit.
+5. **360px**, and reduced motion on (the step transition should be absent, the bar should jump rather than slide, and nothing should be missing).
+6. **Keyboard**: Tab to Continue and Back, confirm the focus ring is visible, and confirm focus lands on the question heading after each step change.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts, no new colour or type tokens.**
+2. **Ask Asad to confirm the relationship-status list** in `server/constants/clientProfile.js` — it is mine, not his.
+3. **If the list ever changes**, edit the server constant and re-run `npm test` — the parity test fails until the client mirror matches, which is the point.
+
+**Carried forward:**
+- **The client and server rules still mirror each other by hand.** The tag lists and now the relationship statuses are covered by the parity test; the validation *rules* are not, and slice 6 will add a payload mapper as a third place that has to agree.
+- **Nothing writes `clientProfiles` yet** — by design. The payment webhook creates it inside the four-document transaction in slice 6, and the questionnaire holds its answers in the browser until then, because an account must never exist before the money does.
+- The `amount` euros-or-cents question for slice 6 (4.4). Whether rejected applicants should be emailed (4.3). Education summary and current work situation are still frozen (4.6). `client/src/assets/peace.jpg` is still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created: every value on this screen is either a real spec constant or a field label.
+
+**Not done (out of scope, by design):**
+- **No question screens** — 5.2 (individual), 5.3 (couple), 5.4 (concerns and gender preference). Each step renders a marked placeholder naming what it will ask for.
+- **No matching and no checkout** (5.5, 5.6 and slice 6). The last step's button is disabled and says where the flow will hand over.
+- No API endpoint for clientProfiles — there is nothing for one to do until payment exists.
+
+---
+
+## Chunk 5.2 — Questionnaire: individual path
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check".
+
+Built:
+- `components/questionnaire/QuestionnaireAside.jsx` — the standing panel.
+- `components/questionnaire/AnswerEcho.jsx` · `QuestionScreen.jsx` · `ChoiceCards.jsx` · `ChoiceChips.jsx` · `FieldError.jsx` · `QuestionnaireIcons.jsx`.
+- `components/questionnaire/steps/` — `StepWhoFor` · `StepAboutYou` · `StepLocation` · `StepRelationship` · `StepContact`.
+- `data/questionnaireContent.js` — every word the flow says.
+- Edits: `QuestionnaireFlow.jsx` (rewritten around the split frame), `QuestionnaireProgress.jsx` (a `tone` prop), `store/questionnaireSlice.js` (`selectAnswerEcho`), `data/questionnaireSteps.js` (headings moved out).
+
+---
+
+### THE COMPOSITION, AND WHY IT IS NOT A FORM
+
+Five screens of "one question and one box" is a form. §24.7 says this sequence deserves the most design care on the site, so the shape of it had to carry something.
+
+**A split frame — the same one `/contact` and `/join-as-therapist` already use**, so the three form surfaces read as one product rather than three. Left: a sticky `ink-deep` panel with a soft sage radial wash (a glow, never a vertical band gradient). Right: one question on `paper`, with room around it.
+
+**The left panel fills in as you answer.** Name, age, where you are, relationship status — building up as a short list. It is not decoration:
+
+- It makes Back **visibly** safe. This chunk's own verify step is "navigate backwards and forwards, confirm no answer is lost", and the panel is that proof without having to click anything.
+- It changes the register from filling a form to someone taking notes while you talk.
+
+**THE PRIVACY RULE BUILT INTO IT, which chunk 5.4 must not break:** the echo **never shows concern tags**, and `selectAnswerEcho` is written so it cannot. That panel stays on screen for the rest of the flow, so anything in it is readable by whoever is sitting near the reader — a list of someone's mental health concerns is not that. The email is left out too (long, wraps badly, and it is confirmed on its own screen). **Four checks pin this**, including one that sets three real concern tags and asserts none of them reach the panel.
+
+---
+
+### NO DROPDOWNS WHERE A QUESTION DESERVES BETTER
+
+| Question | Built as | Why not a select |
+|---|---|---|
+| Individual or couple | Two large cards, each with a drawn figure | It is the branch question and the first thing anyone sees. The couple card carries the one-account rule (§6) **at the moment it is chosen**, not as a surprise at checkout. |
+| Gender (4) | Chips | One tap instead of open-scan-close. |
+| Relationship status (8) | Chips, two columns | Seeing "Prefer not to say" **without opening anything** is the point. |
+| Country (197) | Native select | The one question where the platform picker genuinely wins — type-ahead on desktop, the wheel on phones. Reuses the therapist form's derived ISO list; no second country list exists. |
+
+Both custom controls are **real radio groups with the input hidden rather than replaced**, so arrow keys, grouping and screen readers behave normally. **Selection is never colour alone** (WCAG 1.4.1) — a drawn check and a border change accompany every fill. The hidden input's own focus ring would be drawn on a clipped 1px box, so the ring is carried by the card or chip via `has-[:focus-visible]`, using the same `--focus-ring` token as everything else.
+
+---
+
+### THE CRAFT FLOOR CHANGED THE PLAN ONCE
+
+The approved plan had an eyebrow above each question ("Where you are" over "Where are you based?"). The craft floor bans that outright — *"no brief earns it back"* — and it was right: the step label already sits in the progress panel, so the eyebrow was a second copy of a label the heading did not need. **Dropped.**
+
+Also applied from it: elevation declared once (the cards carry a border and **no** shadow, so there is no ghost card), card radii at 16px, and the icons drawn rather than glyphs.
+
+---
+
+### COPY — AND ONE CLAIM CORRECTED BEFORE IT SHIPPED
+
+Every screen carries one reassurance line, the device chunk 2.5 established. They are all true and all cited in the content file:
+
+- **Location** — *"Used for your records, and to show session times in your own clock. It never limits which therapists you can see."* §15: country and timezone are never matching filters. This is the reassuring part, and it is worth saying plainly to someone in a small country.
+- **Email** — *"This becomes your login if you subscribe. No account is created until a payment succeeds."* §12's golden rule, told to the person it protects.
+- **Aside, permanently** — *"Nothing is charged until you choose a therapist and subscribe."*
+
+**The correction:** my first draft of the "about you" line read *"Your therapist sees this. Nobody else does."* **That is false** — §9.4 gives the admin sight of client profiles and questionnaire responses. It now says only *"Your therapist sees this once you are matched."*, which is certain. A test asserts the words "nobody else" and "only your therapist" appear nowhere in the flow's copy.
+
+The gender screen also says *"This is about you. You can state a preference for your therapist later."* — people conflate the two questions, and the preference screen is four steps away.
+
+---
+
+### A PROCESS NOTE: THE FIRST ICON CHECKER LIED
+
+Icon geometry is bounds-checked before shipping, as in chunks 2.5 and 2.6. The first checker reported **4 of 6 icons overflowing the viewBox** — and it was wrong. It was reading arc flags and relative radii inside path data (`a6.75 6.75 0 0 1 13.5 0`) as absolute coordinates.
+
+Replaced with a command-aware parser that tracks the current point and samples curves and arcs through the real endpoint-to-centre conversion. **All six icons fit, stroke included** — the tightest is Place at y 4.00–21.75. Recorded because a checker that produces false failures is worse than none: the obvious next move was to "fix" six correct icons.
+
+---
+
+### CONTRAST — 33 PAIRS COMPUTED, 0 FAILURES
+
+The progress bar's fill **flips token with its ground**, which is the detail I would otherwise have got wrong in one direction or the other:
+
+| Ground | Fill | Against track | Against ground |
+|---|---|---|---|
+| Light shell | `sage-deep` | 4.28:1 | 5.48:1 |
+| Dark aside | `sage` | 4.30:1 | 5.78:1 |
+
+Plain `sage` on the light track is **2.66:1 and fails**; `sage-deep` on the dark ground would be dark on dark. Same bar, two tokens.
+
+Aside: paper 19.67:1 · paper/70 9.65:1 · paper/60 echo term 7.30:1. Question side: heading 18.06:1 · reassurance `ink/70` 6.74:1 · error clay 5.48:1. Cards: title 18.06:1, selected title on `sage/12` 16.02:1, `sage-deep` border and check 5.48:1, `ink/50` rest border 3.43:1. Chips: chosen `ink` on `sage/15` 15.46:1, check 4.69:1. Continue button 11.08:1 on its gold face.
+
+**The tightest pair is the unselected card's sage icon on its mist plate at 3.06:1.** It clears the 3:1 floor with almost nothing to spare — **it must not be lightened**, and that is noted at the component.
+
+Decorative and exempt: aside divider `paper/15` 1.48:1, card and rule borders `ink/12` 1.28:1, icon plate ring `sage/30` 1.37:1.
+
+---
+
+**Other decisions:**
+
+- **Errors clear per field, not all at once.** Correcting your age should not silently wipe the message still sitting under gender.
+- **`role="alert"` on the custom-control errors**, so someone who pressed Continue and stayed put is told why. Text inputs keep the existing `Field` error plumbing.
+- **The standing panel is desktop-only.** On a phone it would eat a third of the screen, so the answers appear as a compact row under the buttons instead, and the progress bar rides at the top of the panel which stacks above the question.
+- **Headings moved out of `questionnaireSteps.js` into `questionnaireContent.js`**, so screen copy has one home rather than being split across a structure file and a content file.
+- **Motion is one authored moment plus the step change**: echo items settle in as they are added (400ms), and the screen crossfades at 250ms. Both gated on `useReducedMotion`.
+
+**Verified:**
+- `npm test -- --runInBand` (server) — **631 tests across 22 suites, all passing**, unchanged by this chunk.
+- `oxlint` — **0 findings** on every file this chunk touched. Client build passes, **775 modules**.
+- **All six icons bounds-checked** against the 24×24 viewBox with a real path parser, stroke included.
+- **33 contrast pairs computed, 0 failures** (table above).
+- **24 new checks executed** on the echo selector and the copy: the privacy rule (concern tags never appear, email never appears), the couple branch never leaking the individual name field, city and country reading as one place — plus copy checks for no urgency language, no invented timeline, no overclaim about who can see the answers, and sentence-case headings.
+- The 5.1 checks re-run unchanged: **44** on validation and step definitions, **40** on the slice and draft.
+- Generated CSS confirmed to carry `has(:focus-visible)` (5 rules), `bg-sage/12`, `bg-sage/15`, `bg-sage-deep`, `blur(130px)`, the `minmax(320px…)` grid template and `100dvh`.
+- Impeccable detector — 0 findings, and **read that as a degraded 0**: `htmlparser2`, `css-select`, `css-tree` and `domutils` were re-checked this chunk and are all still absent, so it evaluates no contrast at all. The computed table is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The whole individual path**, forwards then backwards. Nothing should be lost, and the left panel should show it without you having to check.
+2. **The two cards on screen 1** — do they read as a considered opening rather than a settings screen? This is the first thing a visitor sees after "Get started".
+3. **The sticky aside.** It is `lg:sticky` inside a grid column; sticky in a grid item is the one thing here most likely to behave differently from how I have reasoned about it. Scroll a long screen (relationship status) and confirm the panel stays put.
+4. **360px** — the panel stacks above the question, the cards go single-column, and the echo becomes the row under the buttons.
+5. **Reduced motion on** — the crossfade and the echo settle should both be absent, with nothing missing.
+6. **Keyboard**: arrow keys should move between the two cards and between chips, Tab should reach Continue, and the focus ring should be visible on cards and chips (that ring is carried by the label, not the hidden input — worth a specific look).
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. **The relationship-status list still wants Asad's confirmation** (carried from 5.1) — it is now visible on screen as eight chips, so it is easier to review.
+
+**Carried forward:**
+- **`clientProfiles` has no timezone field** (§10.2), so slices 7 and 9 will have to convert session times using the browser's zone. Fine, but it should be a decision rather than a surprise when the Session Hub is built.
+- The client and server validation rules still mirror each other by hand; slice 6 adds a payload mapper as a third place that must agree.
+- The `amount` euros-or-cents question for slice 6 (4.4); whether rejected applicants are emailed (4.3); `peace.jpg` still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created: every word on these screens is spec-true.
+
+**Not done (out of scope, by design):**
+- **The couple branch** (5.3) — the two partner screens still render the marked placeholder.
+- **Concern tags and therapist gender preference** (5.4) — same. The concerns screen is the emotional core of the flow and deserves its own chunk.
+- No matching (5.5), no therapist results (5.6), no checkout.
+
+---
+
+### Chunk 5.2 follow-up - concern tags now shown in the summary panel (2026-09-05, developer)
+
+**A decision from chunk 5.2 is REVERSED.** That entry recorded the answer echo as deliberately
+never showing concern tags. The developer's instruction is that the client should see their whole
+answer set accumulating on the left, tags included. Done.
+
+**What changed:**
+- `selectAnswerEcho` now returns concern tags, therapist gender preference and email as well.
+  The preference is read back in the words the screen offered ("A female therapist"), never the
+  stored value - `no_preference` is a database string, not something to show a person.
+- An echo item now carries either `value` (a string) or `values` (a list) and never both. Tags
+  render as small pills in the panel, so four long names wrap instead of running as one paragraph.
+- `AnswerEcho` renders the pills; the mobile summary row joins the list with commas. Reading
+  `item.value` on a list item would have printed "undefined" on a phone - caught before it shipped.
+- The privacy comments in `selectAnswerEcho` and `AnswerEcho` are rewritten. They previously
+  instructed chunk 5.4 to keep tags out, which is now the opposite of the decision.
+
+**The trade-off, recorded because it was argued and then overruled rather than missed:** the panel
+stays on screen for the rest of the flow, so a list of someone's mental health concerns is visible
+to anyone near the reader - on a train, in an open-plan office. The developer weighed that against
+the client seeing a complete picture of what they have answered, and chose the complete picture.
+**If it is ever revisited, showing a count ("3 chosen") rather than the tags themselves keeps most
+of the reassurance without the exposure.**
+
+**Preference and email were added alongside the tags** because the instruction was "all their chosen
+answers"; both are trivially removable if only the tags were wanted.
+
+**Verified:** `oxlint` 0 findings; client build passes, 775 modules; **34 echo and copy checks, all
+passing** (up from 24 - the four privacy assertions are replaced by eleven covering the fuller
+panel, including that no tag is dropped, that four tags fit, that "No preference" reads back
+properly, and that the rows appear in flow order). The 5.1 checks re-run unchanged: 44 and 40.
+Contrast on the new pill: **paper on `paper/10` over ink-deep is 15.61:1**; the pill against the
+panel ground is 1.26:1 and decorative.
+
+**Not verified:** how a four-tag row looks in a 26rem panel at real size. Worth a glance.
+
+---
+
+## Chunk 5.3 — Questionnaire: couple path
+
+**Status: Complete.** Nothing skipped. **Slice 5's questionnaire branches are both built.** Not seen rendered — see "Yours to check".
+
+Built:
+- `components/questionnaire/steps/StepPartner.jsx` — one component, used twice.
+- `components/questionnaire/PartnerSlots.jsx` — the pair diagram.
+- `components/questionnaire/ScopeMarker.jsx` — one-of-you / both-of-you.
+- Edits: `QuestionnaireFlow.jsx` (partner wiring, branch-aware copy, nested error clearing), `QuestionScreen.jsx` (a `marker` slot), `data/questionnaireContent.js` (partner screens, couple overrides, pair copy), `store/questionnaireSlice.js` (the echo split).
+
+**No model, schema or step-list changes.** `partnerSchema`, `partnerUpdated`, `selectActiveAnswers` and the 8-step couple list all landed in 5.1 and were already tested; this chunk is screens, copy and wiring.
+
+---
+
+### THE DISTINCTION IS CARRIED BY A MARK, NOT A PARAGRAPH
+
+The chunk asks for a clear visual difference between "about you both" and "about each of you". Every couple-branch screen now carries one small marker under its heading:
+
+| Screen | Mark | Line |
+|---|---|---|
+| Either partner | one figure | About one of you |
+| Location, relationship, concerns, preference, email | two figures | About both of you |
+
+**One figure means one person; two figures mean both.** It reuses the exact icons from the branch cards on screen 1, so the card someone chose at the start becomes the mark they see the whole way through. The individual branch shows no marker at all — there is nothing to distinguish, so nothing is added.
+
+It sits **below** the heading. Above it, it would be an eyebrow, which the craft floor bans outright.
+
+---
+
+### THE ONE-ACCOUNT RULE, DRAWN
+
+`PartnerSlots` puts two seats and a brace above the partner fields: the pair being collected into one account, captioned *"One account for both of you"*.
+
+- On the **first** partner screen the second seat sits empty and reads "Next", so it is obvious another person is coming.
+- On the **second**, the first seat is filled with `Marta · 38` and a check — which confirms nothing was lost **and** stops the common mistake of entering the same person twice.
+
+It reuses the slot language from the therapist form's specialty picker (chunk 3.4), so "these positions get filled" means the same thing in both places. `aria-hidden`, because the fields and heading already carry all of it and a screen reader does not need the diagram narrated.
+
+**The rule is stated at three separate moments**, each where it actually bites: the couple card on screen 1 (5.2), the pair diagram on both partner screens, and the email screen — *"One login for both of you — you will both sign in with this address."* That last one is where §6's rule becomes literally true, so it is spelled out rather than left to a card chosen six screens earlier.
+
+**The second partner screen names the first:** *"You have told us about Marta. This is the other of you."* A fallback line covers the case where no name was entered, and a test asserts the fallback carries no leftover `{name}` placeholder.
+
+---
+
+### BRANCH-AWARE COPY WITHOUT DUPLICATE SCREENS
+
+`screens[stepId]` gained an optional `couple` override, and the flow merges it when the branch is couple. Location asks *"Where are you both based?"*; relationship becomes *"How would you describe your relationship?"*; email carries the one-login line. **The components, validation and layout are identical** — both branches converge on the same five shared screens rather than on copies of them, and a test asserts the shared tail of `COUPLE_STEPS` is the *same object references* as the individual path, not a duplicate.
+
+---
+
+### A BUG THIS CHUNK WOULD HAVE INTRODUCED, HANDLED UP FRONT
+
+Partner errors key by their full path (`partner1.name`) because that is what the step schema produces. The existing `handleChange` cleared errors by top-level patch key, so a corrected partner name would have left *"Enter a name."* sitting underneath it — visibly wrong, and only on the couple path.
+
+`handlePartnerChange` maps each changed field back to its full key before clearing. Flagged here because it was foreseeable from the schema shape rather than discovered by clicking.
+
+---
+
+### A CONTRAST FAILURE FOUND BY MEASURING
+
+The filled seat's border was `sage-deep/40` — **1.76:1 against paper**. Raised to full `sage-deep` at **5.48:1**, which also matches the selected choice card from 5.2, so a "this one is chosen/filled" edge now measures the same everywhere.
+
+**All other new pairs pass:** scope marker text and icon 5.48:1 · current seat label `ink/60` 4.74:1 and value 18.06:1 · filled seat label on `sage/12` 4.54:1, value 16.02:1, check 4.86:1 · waiting seat text 4.74:1 · brace caption 5.48:1.
+
+The filled seat's label at **4.54:1 is the tightest pair on the screen** and must not be lightened. Decorative and exempt: the waiting seat's dashed `ink/40` border 2.57:1 and the brace rule `sage/40` 1.53:1 — the seat's state is also carried by its text and its check, never by colour alone.
+
+---
+
+**The sidebar now splits the partners into two rows** (developer's decision, approved before building):
+
+```
+First partner     Marta · 38
+Second partner    Joris · 41
+```
+
+The previous single `Partners — Marta and Joris` row was **throwing the ages away**. Splitting it also makes this chunk's own verify step — "confirm both partners' data is captured correctly" — visible on screen rather than something to check in Redux DevTools.
+
+**Verified:**
+- `npm test -- --runInBand` (server) — **631 tests across 22 suites, all passing**, untouched by this chunk.
+- `oxlint` — 0 findings on every file this chunk touched. Client build passes, **778 modules**. The nine remaining warnings are the developer's own in `home/Hero.jsx`, `home/Services.jsx` and `about/WhyCardsDeck.jsx`.
+- **40 new checks executed against the real reducer, walking the couple path exactly as the UI does.** The verify step itself: both partners captured with all three fields each, the two objects distinct, writing partner 2 leaving partner 1 untouched, and a partial write (age only) preserving the other fields. Plus: the couple payload dropping the individual fields, the whole branch validating, errors keyed by full path, one partner never blocking the other, ages 0 and 121 rejected on partners as on individuals, and **switching branch mid-flow keeping both answer sets intact in both directions**.
+- Also covered: the two sidebar rows with ages and in order, a partner with no age yet still showing their name, no partner row before a name exists, every couple override keeping both a heading and a reassurance, both branches keeping the no-account-until-payment fact, and the couple step order converging on the individual path's own step objects.
+- Earlier suites re-run: **34** echo and copy, **44** validation, **40** slice and draft — all passing. One stale assertion was updated rather than worked around: it still expected the old joined `Marta and Joris` row.
+- Generated CSS confirmed to carry `border-dashed`, `border-sage-deep`, `grid-cols-2` and `mt-0.5`.
+- Detector — 0 findings, and **read that as a degraded 0**: the four parsing dependencies are still absent, so it evaluates no contrast. The measured table above is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The pair diagram across both partner screens.** Does the empty second seat read as "someone else is coming", and does the filled first seat on screen 3 read as "already done"? This is the piece the chunk was built around.
+2. **The scope marker** — is one figure versus two figures legible enough at 16px to carry the distinction, or does it need the words to do more work?
+3. **The whole couple path**, forwards and backwards, watching the sidebar fill with both partners.
+4. **Switch branch mid-flow**: fill the individual path, go back to screen 1, choose couple, then switch back. Nothing should be lost either way — it is proven in the reducer, but worth seeing.
+5. **360px** — the two seats are a 2-column grid and are the tightest new layout.
+6. Reduced motion, and keyboard through both partner screens.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. The relationship-status list still wants Asad's confirmation (carried from 5.1).
+
+**Carried forward:**
+- `clientProfiles` has no timezone field (§10.2), so slices 7 and 9 must convert session times using the browser's zone.
+- The client and server validation rules still mirror each other by hand; slice 6 adds a payload mapper as a third place that must agree — **and it will need to nest `partner1`/`partner2` under `coupleData`**, which is the one shape difference between the form state and the API.
+- The `amount` euros-or-cents question for slice 6 (4.4); whether rejected applicants are emailed (4.3); `peace.jpg` still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **Concern tags and therapist gender preference** (5.4) — still the marked placeholder on both branches. They are shared answers, so the scope marker already reads "About both of you" on those screens for couples.
+- No matching (5.5), no therapist results (5.6), no checkout.
+
+---
+
+## Chunk 5.4 — Concern tags, gender preference and review
+
+**Status: Complete.** Nothing skipped. **The questionnaire is now walkable end to end on both branches.** Not seen rendered — see "Yours to check".
+
+Built:
+- `data/concernThemes.js` — the 27 tags grouped into five themes, canonical values, plus the search filter.
+- `components/questionnaire/ConcernPicker.jsx` — the emotional core.
+- `components/questionnaire/SelectionMarks.jsx` · `ReviewScreen.jsx`
+- `components/questionnaire/steps/StepConcerns.jsx` · `StepPreference.jsx`
+- Edits: `QuestionnaireIcons.jsx` (Cross, Search), `QuestionnaireFlow.jsx` (three screens plus the review path), `store/questionnaireSlice.js` (`atReview`, `selectReviewRows`), `data/questionnaireContent.js`, `server/test/constantsParity.test.js`.
+
+---
+
+### THE REGISTER, WHICH IS THE WHOLE JOB ON THIS SCREEN
+
+§24.7 says this screen deserves the most design care on the site. What that means in practice is that a grid of 27 clinical terms is the failure mode, and three things avoid it:
+
+**Grouping.** Five themes — the same five names the home page uses, so someone who read it meets the same organisation here. The reader scans five things, not twenty-seven.
+
+**Permission not to be sure.** *"You do not have to be certain. Your therapist will help you make sense of it."* The stakes are what make this screen hard, and lowering them is the design.
+
+**Your words gathering.** Chosen concerns collect in a panel at the top under *"What you have named"*. You watch your own answer assemble rather than watching checkboxes tick.
+
+**NO ICONS ON THE THEMES — a deliberate refusal, approved before building.** A pictogram for someone's depression or abuse is where this screen turns twee, and the clinical-cute register is exactly what §24.1 rules out. The visual investment went into the gathering panel and the marks instead, both of which are about *the person's answer* rather than illustrations of suffering.
+
+---
+
+### THE LIMIT, DRAWN RATHER THAN ENFORCED BY REFUSAL
+
+Four marks under the panel heading fill as concerns are chosen. **Deliberately unlabelled**: the therapist form labels its slots "Choice 1 / 2 / 3 / Optional" because that side genuinely requires three, and the same treatment here would tell someone with one concern they had answered wrong.
+
+One status line changes with where they are, so the ceiling is never discovered by being blocked:
+
+| State | Line |
+|---|---|
+| Nothing or three chosen | Choose up to four. One is enough. |
+| One or two chosen | You can add one or two more if others fit. |
+| Four chosen | That is four. Remove one to swap it. |
+
+**The floor is one, and Continue stays enabled at one.** 5.1 recorded the screen as "asking for 3–4"; this chunk softens that to an offer, because §6 says "3–4 (minimum 1)" and this chunk's brief says "1–4", and blocking someone who has one thing would be the wrong reading of both.
+
+At the ceiling the remaining tags recede rather than look broken — `bg-mist text-ink/60` at **4.56:1**, because the entire point of the locked state is that you can still *read* the tag to decide what to give up. Same fix chunk 3.4 had to make on the therapist side.
+
+---
+
+### SEARCH, AND THE WORD WE DO NOT HAVE
+
+Search sits above the grouped list — the developer's call, and it earns its place for anyone who already knows their word.
+
+**The case that mattered was the empty one.** Someone will search a term the fixed list does not carry, and **OCD is the obvious one** — it appears in the spec's older prose but was deliberately dropped from the approved 27. A bare "no results" there is a dead end on the one screen where a dead end is least acceptable. It now says we do not have that exact word, that the list is fixed so it will not cover everything, and that they can choose the closest **or describe it in their own words to their therapist** — which is true, and is what the mandatory first message (§7.1) is for.
+
+A test asserts that copy blames nobody: no "invalid", no "error", no "wrong".
+
+---
+
+### THE PREFERENCE SCREEN
+
+Three equal options, no icons, no ordering that implies a right answer. The line that does the work is true and removes the real fear:
+
+> *"Whatever you choose, you will still see every therapist who works with what you named. It changes the order, not who appears."*
+
+That is §15 exactly — a soft sort, never a filter. A test asserts no option is framed as recommended, best or most popular.
+
+---
+
+### THE REVIEW SCREEN
+
+Every answer in one place, each row jumping back to the step that owns it via the `stepJumped` action from 5.1 — **no second set of controls**, so there is one implementation of every question and nothing to keep in step.
+
+**`selectReviewRows` builds from the branch's own step list**, not a hardcoded order, so the couple path reviews two partners and the individual path one person, and neither can drift from the flow actually walked. Unanswered rows say *"Not answered yet"* rather than rendering blank.
+
+**The review is a flag, not a step index.** `atReview` sits beside `stepIndex` rather than letting the index run one past the end, so the progress bar keeps reading "7 of 7" and 5.1's clamping tests keep meaning what they say. Back from the review closes it rather than moving a step; editing, resetting and restoring a draft all clear it. Six checks cover those transitions.
+
+---
+
+### CONTRAST — 24 NEW PAIRS, 0 FAILURES
+
+Gathering panel: heading 16.25:1 · empty state `ink/60` on mist 4.56:1 · status `ink/70` 6.42:1 · at-limit `sage-deep` 4.93:1 · chosen chip 14.06:1 with a 4.27:1 cross. Marks: filled `sage-deep` against the `ink/12` empty mark **3.85:1**, and 4.93:1 against the ground. Search: text 18.06:1, placeholder and magnifier `ink/60` 4.74:1, border 3.43:1. List: theme heading 18.06:1, chips 15.46:1 and 18.06:1, **locked chip 4.56:1**. Review: label 6.74:1, value 19.67:1, pill 15.46:1.
+
+The two tightest are the **locked chip and the panel's empty state, both 4.56:1** — neither may be lightened. Decorative and exempt: the theme rule `sage/40` 1.53:1 and card borders `ink/12` 1.28:1.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **636 tests across 22 suites, all passing** (631 before, **5 new parity tests**).
+- **The grouping is now covered by the server parity test.** A tag missing from every theme errors nowhere — it simply cannot be chosen, while still driving matching on the therapist side. The test asserts all 27 present exactly once, byte-identical to the canonical list, and **explicitly asserts the home page's reworded prose labels are NOT used here** ("Panic attacks", "ADHD and attention issues") — those are safe only on a page that never sends a tag.
+- `oxlint` — 0 findings on every file this chunk touched. Client build passes, **779 modules**.
+- **57 new checks executed**: the grouping and its canonical values; search matching case-insensitively and mid-word, keeping group headings, dropping empty groups, and returning nothing for "ocd"; the 1–4 boundaries; all six review-flag transitions; review rows for both branches with correct step indices; and copy checks for register — permission to be uncertain, no clinical command language, no urgency, no invented timeline, no option framed as better.
+- Earlier suites re-run: **44 · 40 · 34 · 40**, all passing.
+- All eight icons re-bounds-checked against the 24×24 viewBox with the command-aware path parser, including the two new ones.
+- Detector — 0 findings, and **read that as a degraded 0**; the four parsing dependencies are still absent, so the measured table is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **Does the concerns screen feel calm or clinical?** That is the only question that matters on it, and it is the one I cannot answer from here.
+2. **The four marks** — do they read as "up to four" rather than "four required"? If they read as a target, they are wrong and should become a plain count.
+3. **The ceiling.** Choose four, then confirm the rest recede legibly rather than looking broken, and that the swap line explains it.
+4. **Search for "ocd"** — the empty state is the piece I would most like a second opinion on.
+5. **The review screen**, and that each Edit lands on the right step with your answer intact.
+6. **360px**, reduced motion, and keyboard through the chips (they are toggle buttons with `aria-pressed`, so Space and Enter should both fire and locked chips should be skipped).
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. The relationship-status list still wants Asad's confirmation (carried from 5.1).
+
+**Carried forward:**
+- The brief said "30+ concerns"; the approved list is **27** (§15). Built 27. `CLAUDE.md`, `docs/chunks.md` and the master spec all still say "30+" in places — stale, and worth a pass at some point.
+- `clientProfiles` has no timezone field, so slices 7 and 9 must convert session times using the browser's zone.
+- Slice 6's payload mapper must nest `partner1`/`partner2` under `coupleData` — the one shape difference between form state and API.
+- The `amount` euros-or-cents question (4.4); whether rejected applicants are emailed (4.3); `peace.jpg` still 5.6 MB.
+
+**Pre-launch blockers — unchanged, the list stands at 12.** No placeholder content: every concern on this screen is a real spec constant.
+
+**Not done (out of scope, by design):**
+- **No matching logic** (5.5) — the review's "See your matches" is rendered disabled and says where the flow will hand over.
+- No therapist results (5.6), no checkout, no submission. Nothing writes `clientProfiles` until the payment webhook in slice 6.
+
+---
+
+## Chunk 5.5 — Matching engine, plus seeded therapists
+
+**Status: Complete.** Nothing skipped. Verified live against the real Atlas cluster with 11 active therapists.
+
+Built:
+- `POST /api/v1/matching` — public, rate limited, read-only.
+- `services/matching.service.js` · `controllers/matching.controller.js` · `routes/matching.routes.js`
+- `validation/matching.schema.js` · `constants/matching.js`
+- `routes/matching.test.js` — 61 tests.
+- `scripts/seedTherapists.js` + `seedTherapists.data.js`, with `npm run seed:therapists` and `npm run seed:therapists:remove`.
+- Edit: `routes/index.js` (mount), `package.json` (two scripts).
+
+---
+
+### THE SEED SCRIPT — ADDED BECAUSE THE DEVELOPER ASKED THE RIGHT QUESTION
+
+Before building, the developer asked how any of this could be checked with **one therapist in the database**. The honest answer was that it could not: every scenario returns that one person, the gender sort is invisible with a single row, and — worst — **a match and the silent fallback look identical**. The rule the whole chunk is built around was the one rule that could not be observed. No chunk anywhere in `docs/chunks.md` planned seed data; only the admin seed from 1.1 exists. It would have fallen through.
+
+**Ten fake therapists**, designed so every scenario is observable: both genders inside every tag cluster (so the sort visibly reorders), differing overlap counts (so best-fit-first is visible), and wildly varied countries and orientations (proving neither filters).
+
+**Two safety properties, both deliberate:**
+1. **It refuses to run in production.** A fake therapist on the live site is a real person choosing someone who does not exist, and paying €200 for it.
+2. **It only ever touches its own records.** Every seeded account lives on `@seed.castofmind.test` — `.test` is reserved by RFC 2606 and can never be a real address — and the teardown deletes by that suffix alone. Real therapists cannot be caught by it. **Rehearsed:** the teardown removed exactly 10 users and 10 profiles and left the baseline of 2 users and 1 profile untouched, then a re-seed restored them.
+
+Photos are obvious grey placeholders, not portraits of real people. Blocker 11 exists because invented credentials were once attached to real faces; unmistakably fake is the honest choice for throwaway data.
+
+---
+
+### TWO REAL DEFECTS IN MY OWN SCRIPT, FOUND BY RUNNING IT
+
+**1. It created a half-account and then entrenched it.** The first run failed partway (two required fields I had missed), after writing a user but before its profile. The script skipped therapists whose user already existed — so every later run skipped that orphan **for ever**, leaving a user with no profile. That is precisely the half-created state §10 calls a serious failure.
+
+Rewritten to find-or-create **each document independently**, so a re-run repairs the orphan instead of stepping over it. It then did exactly that: `Repaired 1 user(s) left without a profile by an earlier partial run.`
+
+**2. It told the developer to use tags that were not actually free.** The script printed three tags "no therapist carries" so the fallback could be triggered. One of them — **Weight Loss** — is carried by the real therapist already in the cluster. So the documented fallback scenario quietly returned a genuine match of one, and the live check caught it as a failed assertion rather than as a passing test that proved nothing.
+
+Now **computed from the database at run time** rather than asserted from the seed file: it reads every active therapist's tags, subtracts them from the 27, and prints whatever is genuinely free. Correct whoever else is in the database. Today that is `Career Counselling | Speech Anxiety`.
+
+---
+
+### THE THREE RULES, MADE STRUCTURAL RATHER THAN REMEMBERED
+
+**1. Gender preference is a sort, never a filter.** There is **no gender condition in the query at all** — it is a `$sort` key computed in the aggregation, so it cannot accidentally become a filter. Tests assert the *same set* comes back under every preference, reordered only. **Mutation-checked: turning it into a hard filter broke 4 tests.**
+
+**2. The fallback is silent, and the response cannot say otherwise.** The payload is **shape-identical** on both paths — no `fallback`, no `matched`, no message. A future developer cannot build the banner the client rejected, because the API never hands them the fact. A test asserts the key sets match and that the words "fallback", "exact" and "message" appear nowhere. **Mutation-checked: making the fallback return an empty list broke 3 tests.**
+
+Being honest about the limit: a determined frontend could still compare returned `specialtyTags` against what it sent and infer a zero-overlap result. Perfect concealment is impossible while cards show specialties. What is guaranteed is that the API never states it.
+
+The service returns `usedFallback` **for the server only** — the controller writes one anonymous log line (a count, never the tags; therapy content must not reach a log file) and never puts it in the response. Worth having because "how often does nobody match" is a real signal about the roster.
+
+**3. Specialty tags only.** No country, timezone, availability or orientation in the query — and the endpoint **does not even accept those fields**. Unknown keys are stripped, so a future frontend cannot start sending a filter that a future backend then honours. A filter the endpoint cannot receive is one it can never apply.
+
+---
+
+### THE PUBLIC PROJECTION IS AN ALLOWLIST
+
+This endpoint is unauthenticated, so a denylist would leak any field added to `therapistProfiles` later by whoever forgot to update it. `PUBLIC_THERAPIST_FIELDS` names what may leave, and the `$project` is built from it.
+
+**The public id is the PROFILE id, not `userId`** — nothing hands a stranger a key into the `users` collection. A test asserts the two differ.
+
+Absent, each for a reason: email, street address, state, postcode, date of birth, taxpayer id, licence number, licensing status, disciplinary answers, insurance answers, certificate URLs, `applicationId`, `status`, education summary, current work situation, working hours. `city` is included where `streetAddress` is not — a city is professional context, a street address is where someone lives. **23 tests assert each absent field by name**, plus one that no secret *value* appears anywhere in the payload.
+
+---
+
+**Other decisions:**
+
+- **POST for a read, deliberately.** Concern tags in a query string land in access logs, browser history and `Referer` headers — that is someone's mental health data in three places it must not be. The body keeps it out of all of them.
+- **Ranking: preferred gender, then overlap count, then `_id`.** Overlap is still tags-only, just degree of fit; the `_id` tiebreak means a refresh does not reshuffle the list. Approved 2026-09-07. **A therapist matching three concerns still sits below a preferred-gender therapist matching one** — the spec says preferred gender sorts to the top, and a test pins that reading.
+- **Paging never excludes anyone.** The backend rule says every list paginates; §15 says return everyone. They reconcile as paging, not filtering — tests assert the total is unchanged across pages and that every therapist appears exactly once across them.
+- **Active therapists only, read from the profile's status.** Chunk 4.5 flips the user and the profile in one transaction, so the profile is the documented source. Noted: if those two ever drift, this engine trusts the profile.
+
+**Verified:**
+- `npm test -- --runInBand` — **697 tests across 23 suites, all passing** (636 before, 61 new).
+- `npm run lint` — clean.
+- **Mutation-checked twice**, as above: 4 tests for the gender filter, 3 for the empty fallback.
+- **LIVE against the real running server and Atlas — 23 checks, all passing**, across eight scenarios: overlap with no preference; the same tags preferring male and then female (same set, different leader, women and men both still present); the silent fallback returning all 11 with nothing said; the fallback still honouring the preference; a therapist in India returned to a request carrying no country; nothing sensitive in the payload; and validation rejecting unknown tags, five tags and none.
+- **The seed teardown was rehearsed**, not assumed: 10 removed, baseline of 2 users and 1 profile intact, then re-seeded.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **The seeded therapists are in your database now** — 10 of them, alongside your real one. Sign in as any with `SeedTherapist!2026`; emails are `firstname-lastname@seed.castofmind.test`.
+3. **Remove them any time with `npm run seed:therapists:remove`.** It deletes only the seeded records.
+4. **To see the silent fallback**, choose only `Career Counselling` or `Speech Anxiety` in the questionnaire — the script recomputes and prints this list each run, so trust its output over this note.
+5. **I left a stray `nodemon` running.** I started a dev server that hit `EADDRINUSE` because yours was already up; two nodemon processes are now alive and I could not tell mine from yours with certainty, so I did not kill either. Worth closing the spare terminal.
+
+**Carried forward:**
+- **The seeded therapists must be gone before launch** — the script refuses to run in production, but nothing stops a seeded record being carried into a production database by a restore or a copied connection string. **Run the teardown before any production cutover.**
+- Slice 6's payload mapper must nest `partner1`/`partner2` under `coupleData`.
+- `clientProfiles` has no timezone field, so slices 7 and 9 must use the browser's zone.
+- The `amount` euros-or-cents question (4.4); whether rejected applicants are emailed (4.3).
+
+**PRE-LAUNCH BLOCKERS — one added, the list now stands at 13:**
+
+13. **NEW — remove the seeded therapists before launch.** `npm run seed:therapists:remove`. Ten fake practitioners with placeholder photos and invented credentials sit in the development database. The script cannot run in production, but that guard does not protect a production database populated from a development one. A client choosing a therapist who does not exist, and paying €200 for it, is the failure this line exists to prevent.
+
+**Not done (out of scope, by design):**
+- **No matching UI** — the questionnaire's review screen still hands over nowhere. Therapist results and the detail page are chunk 5.6.
+- No checkout, no booking, no `clientProfiles` write. Nothing is created until the payment webhook in slice 6.
+- No "no match found" messaging of any kind, per §15.
+
+---
+
+## Chunk 5.6 — Therapist results and detail pages
+
+**Status: Complete.** Nothing skipped. **Slice 5 is finished** — the intake journey now runs from "Get started" to a chosen therapist. Verified live against the real cluster; the rendered pages are yours.
+
+Built — server:
+- `GET /api/v1/therapists/:id` — public, rate limited: `services/therapistDirectory.service.js` · `controllers/therapists.controller.js` · `routes/therapists.routes.js`.
+- `routes/therapists.test.js` — 32 tests.
+- Edits: `constants/matching.js` (detail projection), `routes/index.js`.
+
+Built — client:
+- `pages/Matches.jsx` · `pages/TherapistDetail.jsx`
+- `components/matches/TherapistCard.jsx` · `MatchesSkeleton.jsx`
+- `components/therapist/TherapistIdentity.jsx` · `WorkingHoursTable.jsx`
+- `lib/workingHours.js` · `lib/api/matchingApi.js` · `data/matchesContent.js`
+- Edits: `App.jsx` (two routes), `store/questionnaireSlice.js` (the selection), `QuestionnaireFlow.jsx` (the review now hands over), `components/portal/ClientPreviewCard.jsx` (see below).
+
+---
+
+### A SECOND ENDPOINT THE CHUNK DID NOT ASK FOR, AND WHY IT IS NEEDED
+
+The matching projection deliberately withholds `workingHours`, and this page must show them. Handing the therapist over from `/matches` through router state would have worked — right up until someone bookmarked, refreshed or shared `/therapist/:id`, which §5 lists as a real page. A page that only exists mid-flow is not a page.
+
+Same allowlist discipline as matching: `PUBLIC_THERAPIST_DETAIL_FIELDS` is matching's list **plus `workingHours` and nothing else**. `educationSummary` and `currentWorkSituation` were left out because they are not on this chunk's list and an unauthenticated endpoint should carry the least that does the job.
+
+**A malformed id and an unknown id return the identical 404**, so ids cannot be probed — and a test asserts the two response bodies match exactly. **Inactive therapists 404 too:** a client must never reach a profile they cannot actually be matched with.
+
+---
+
+### THE WARM FEATURE I DID NOT BUILD, AND WHY
+
+The obvious move on a results card is *"works with 3 of the concerns you named"*. **It is not there, deliberately.**
+
+On §15's silent-fallback path nothing overlaps, so every card would show zero — and the grid itself would become the "no exact match found" message the client rejected on user-psychology grounds. The rule would be breached without a single line of copy saying so.
+
+So: no match counts, no "best fit" badges, no ranking labels, and a heading that reads the same whether the list is a perfect match or the whole roster. The warmth has to come from the photography, the type and the bio rather than from scoring people. This is written at the top of `data/matchesContent.js` so the next person to reach for that feature meets the reason first.
+
+**No star ratings anywhere** — reviews are admin-only (§9.6). A test asserts the words "rating", "stars" and "review" appear nowhere in the payload.
+
+---
+
+### THE PIECE MOST LIKELY TO BE SILENTLY WRONG: HOURS ACROSS TIMEZONES
+
+Working hours are **recurring local times, not timestamps**, so §15's "store UTC, convert on display" does not apply directly. Three traps, all real:
+
+1. **The day rolls over.** A Perth therapist working Monday 09:00–17:00 is **Sunday 20:00 – Monday 04:00** in Toronto. Converting the clock and keeping the day label would be quietly wrong for half the world.
+2. **DST makes any weekly answer approximate.** A recurring schedule carries no date, so a reference date has to be chosen and the answer moves when either country changes its clocks.
+3. **A span can cross midnight** in the viewer's zone even when it did not in the therapist's.
+
+`lib/workingHours.js` converts against the current week using `Intl` only — the same choice `dateFormat.js` made, and it already knows every IANA zone and its DST rules. The wall-clock-to-instant conversion runs **two passes**, because a single pass leaves a residual error exactly on a DST boundary.
+
+**21 checks executed against fixed zones and fixed reference dates**, so the results are deterministic rather than dependent on today: Warsaw→Dublin in both winter and summer; **Perth→Toronto rolling back to Sunday**; **Toronto→Perth rolling forward to Tuesday**; a 22:00–02:00 span treated as ending next day rather than going backwards; India's **half-hour offset** (09:00 → 13:30); and malformed or missing hours degrading to "closed" instead of crashing.
+
+**Showing both columns turned out to be the safer choice**, not just the more transparent one — seeing what was converted *from* makes the daylight-saving caveat checkable instead of hiding it behind numbers the reader has no way to verify. Both zones are named under the table, and a row that crosses a day says so.
+
+---
+
+### KEEPING CHUNK 4.6 HONEST
+
+Chunk 4.6 shows a therapist a card captioned *"How you appear to someone choosing a therapist."* Building a separate client-facing card would have made that caption quietly false the first time either changed.
+
+`TherapistIdentity` — photo block aside, the name, credentials, professional title and specialty chips — is now **one component used by the results card, the detail hero and 4.6's preview**. Each context keeps its own container, tone and affordances; only the part that shows *the person* is shared. `ClientPreviewCard` was rewritten to use it, so the promise it makes is now structural rather than a coincidence.
+
+**No ink wash on therapist photographs.** Every other photo on this site sits under one, but §24.5 makes therapist portraits the explicit exception: these are real people and must be shown as real, warm, professional portraits.
+
+---
+
+### THE STATES THAT ARE NOT THE FALLBACK
+
+Three different empty-ish situations, deliberately distinguished:
+
+| Situation | What happens |
+|---|---|
+| Nothing overlaps | §15's fallback: every therapist, silently, no message |
+| **Roster genuinely empty** | An honest "no therapists available right now — this is on our side" |
+| **Arrived with no answers** | A shared link or fresh tab: sent to the questionnaire rather than firing a request with nothing |
+
+The middle one matters: it is **not** the no-match case and must not borrow its silence, because there is genuinely nothing to show and saying so is the honest thing.
+
+---
+
+**Other decisions:**
+
+- **Portrait-led cards, two up** (developer's choice). The photograph leads and takes real space, because §24.7 asks for enough warmth that choosing feels like a human decision — and a small avatar beside a row of fields is exactly the database lookup it warns against.
+- **Elevation declared once:** a hairline at rest; a genuine lift with a shadow on hover, when the card really is off the page.
+- **Specialties lead the detail page in their own sage panel; orientations are plain outline chips** with a line saying they describe *how* a therapist works, not what they treat, and play no part in matching. Two identical chip lists would imply both decide the match, and only one does (§15, §23).
+- **The choose panel stays in view while reading**, carrying the €200/month and what it includes — the price should not be a surprise that arrives only at checkout.
+- **The stagger is capped at five steps.** An uncapped index delay makes the last card sit visibly waiting, which reads as lag rather than rhythm (the chunk 2.2 lesson).
+- **Loading is derived, not set inside the effect** — the React Compiler objection, fixed the same way `useApi` was in chunk 0.6: a request key describes what is wanted, and "the stored result is for a different request" is what loading means. Both pages.
+- **Selection stores the id plus a small display snapshot.** **Slice 6 must re-verify the therapist is still active before taking payment** — a snapshot could be minutes or days old, and someone paying to reach a deactivated therapist is the failure to avoid.
+
+**Verified:**
+- `npm test -- --runInBand` — **729 tests across 24 suites, all passing** (697 before, 32 new).
+- `npm run lint` (server) clean; `oxlint` (client) 0 findings on everything this chunk touched. Client build passes, **788 modules**.
+- **32 contrast pairs computed, 0 failures** across the results grid, the detail hero, the specialty and approach panels, the hours table and the choose panel. Tightest are the closed-day dash at `ink/60` **4.74:1** and the choose button's border on mist at **3.35:1** — neither may be lightened.
+- **21 timezone checks**, as above.
+- **Live against the real running server and Atlas:** a real seeded therapist fetched by profile id, returning 18 fields with `workingHours` and `timezone` present, and **no `userId`, taxpayer id, licence number, street address, education summary or status anywhere**. Unknown id and malformed id both 404.
+- Every earlier client suite re-run: 57 · 44 · 40 · 40 · 34, all passing.
+- Detector — 0 findings, and **read that as a degraded 0**; the parsing dependencies are still absent, so the computed table is the compensation.
+
+**Yours to check — nothing here has been seen rendered:**
+1. **Run the whole flow.** Questionnaire → review → matches → a profile → Choose. This is the first time it goes end to end. Ten seeded therapists are in your database.
+2. **Do the cards feel like people rather than records?** That is the whole brief for this page and the one thing I cannot judge from here.
+3. **The hours table.** Priya (Asia/Kolkata) and Tom (Australia/Perth) are the interesting ones from Ireland — Perth should visibly roll the day back. Check the two columns read clearly and the day labels are not confusing.
+4. **The detail page's sticky choose panel** at desktop width, and that it stacks sensibly below `lg`.
+5. **360px** on both pages, and reduced motion (the stagger, the drift and the hover scale should all be absent).
+6. **Keyboard:** tab through the cards — each card is one link, so focus should move card to card and the ring must be visible on the mist ground.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. Nothing to configure — the seeded therapists from 5.5 make this immediately usable.
+
+**Carried forward:**
+- **Slice 6 must re-verify the chosen therapist is still active** before payment, and map `partner1`/`partner2` into `coupleData`.
+- `clientProfiles` has no timezone field. This chunk uses the browser's zone for the hours table, which works — but slices 7 and 9 will need the same approach for session times, so it is now a settled pattern rather than an open question.
+- Remove the seeded therapists before launch (blocker 13). The `amount` euros-or-cents question (4.4); whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created; every therapist shown comes from the database.
+
+**Not done (out of scope, by design):**
+- **No checkout and no payment** (slice 6). Choosing records the selection and says where the flow will continue.
+- No booking, no `clientProfiles` write — nothing is created until the payment webhook.
+- No ratings, no reviews, no admin-only fields anywhere on either page.
+
+---
+
+### Dev config — Vite proxy for cross-device testing (2026-09-07, developer)
+
+The developer configured `client/vite.config.js` with `server.host: true` and a proxy
+forwarding `/api` to `http://localhost:5000` (`changeOrigin: true`), and changed
+`client/.env` to `VITE_API_BASE_URL=/api/v1` (the absolute localhost URL is kept
+commented above it).
+
+**What it buys:** the site can be opened from a phone on the same Wi-Fi using the
+laptop's LAN address. Requests go to the same origin Vite is serving, so the browser
+never makes a cross-origin call — no CORS negotiation, and no machine IP hardcoded
+into a committed file.
+
+**`client/.env.example` still carries the absolute URL** and was deliberately left
+alone: it documents the shape a real deployment needs, where the API is on another
+host entirely and there is no dev proxy in front of it.
+
+**Carried to chunk 12.5 (deployment):** production has no Vite dev server, so
+`VITE_API_BASE_URL` must be set to the real API origin at build time. A relative
+`/api/v1` would resolve against the Vercel domain, where nothing is listening. This
+sits alongside the `sameSite` cookie note already parked for that chunk — both are
+"works locally, silently wrong in production" traps.
+

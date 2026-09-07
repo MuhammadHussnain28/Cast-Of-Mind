@@ -5,6 +5,10 @@ import authRoutes from './auth.routes.js';
 import contactRoutes from './contact.routes.js';
 import uploadRoutes from './upload.routes.js';
 import therapistApplicationRoutes from './therapistApplication.routes.js';
+import adminRoutes from './admin.routes.js';
+import therapistRoutes from './therapist.routes.js';
+import matchingRoutes from './matching.routes.js';
+import therapistsRoutes from './therapists.routes.js';
 import devRoutes from './dev.routes.js';
 
 const router = express.Router();
@@ -14,6 +18,12 @@ router.use('/auth', authRoutes);
 router.use('/contact', contactRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/therapist-applications', therapistApplicationRoutes);
+router.use('/admin', adminRoutes);
+router.use('/therapist', therapistRoutes);
+router.use('/matching', matchingRoutes);
+// Plural and public — the singular '/therapist' above is the authenticated
+// route where a therapist manages their own profile.
+router.use('/therapists', therapistsRoutes);
 
 // TODO: REMOVE BEFORE LAUNCH — see routes/dev.routes.js.
 //

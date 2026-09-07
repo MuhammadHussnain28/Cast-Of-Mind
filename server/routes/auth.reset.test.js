@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
 import request from 'supertest';
+import { createEmailServiceMock } from '../test/emailServiceMock.js';
 
 // The email service is replaced BEFORE anything imports it, so no real mail is
 // ever sent during `npm test` and the reset link can be read from the captured
@@ -8,13 +9,16 @@ import request from 'supertest';
 // import below it must be dynamic for the mock to take effect.
 const sentEmails = [];
 
-jest.unstable_mockModule('../services/email/email.service.js', () => ({
-  sendEmail: jest.fn(async () => ({ delivered: true })),
-  sendPasswordResetEmail: jest.fn(async (to, resetUrl) => {
-    sentEmails.push({ to, resetUrl });
-    return { delivered: true };
+// Every export is supplied by the shared factory, so adding a new sender to the
+// email service does not break this suite — see test/emailServiceMock.js.
+jest.unstable_mockModule('../services/email/email.service.js', () =>
+  createEmailServiceMock({
+    sendPasswordResetEmail: jest.fn(async (to, resetUrl) => {
+      sentEmails.push({ to, resetUrl });
+      return { delivered: true };
+    }),
   }),
-}));
+);
 
 const { default: app } = await import('../app.js');
 const { User } = await import('../models/User.js');

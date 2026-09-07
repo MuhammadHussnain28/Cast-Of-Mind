@@ -1,13 +1,15 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
+import { createEmailServiceMock } from '../test/emailServiceMock.js';
 
 // Email is faked, so the suite sends nothing real and the delivered payloads
 // can be inspected directly.
 const sendEmail = jest.fn();
-jest.unstable_mockModule('../services/email/email.service.js', () => ({
-  sendEmail,
-  sendPasswordResetEmail: jest.fn(),
-}));
+// Every export is supplied by the shared factory, so adding a new sender to the
+// email service does not break this suite — see test/emailServiceMock.js.
+jest.unstable_mockModule('../services/email/email.service.js', () =>
+  createEmailServiceMock({ sendEmail }),
+);
 
 const { default: app } = await import('../app.js');
 const { submitRateLimiter, statusRateLimiter } = await import('./therapistApplication.routes.js');

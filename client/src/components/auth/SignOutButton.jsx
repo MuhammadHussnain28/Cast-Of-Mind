@@ -2,18 +2,11 @@ import { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui'
-import { logout as logoutRequest } from '../../lib/api/authApi'
-import { clearAccessToken } from '../../lib/api/accessToken'
-import { sessionEnded } from '../../store/authSlice'
+import { endSession } from '../../lib/authSession'
 
 /**
- * Signs out.
- *
- * The local state is cleared whether or not the server call succeeds. If the
- * network is down, the person still expects the button to work — leaving them
- * apparently signed in on a shared computer because a request failed would be
- * the wrong way round. The server-side session is already gone or will expire
- * on its own.
+ * Signs out. The work itself lives in lib/authSession so this and the admin
+ * idle timeout cannot drift on what signing out means.
  */
 export default function SignOutButton() {
   const dispatch = useDispatch()
@@ -22,15 +15,8 @@ export default function SignOutButton() {
 
   async function handleSignOut() {
     setBusy(true)
-    try {
-      await logoutRequest()
-    } catch {
-      // Deliberately swallowed — see above.
-    } finally {
-      clearAccessToken()
-      dispatch(sessionEnded())
-      navigate('/login', { replace: true })
-    }
+    await endSession(dispatch)
+    navigate('/login', { replace: true })
   }
 
   return (

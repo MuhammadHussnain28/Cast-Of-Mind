@@ -19,12 +19,20 @@ const TONES = {
   error: 'border-clay/40 bg-clay/5 text-clay',
   // sage-deep, because plain sage fails contrast at text sizes.
   success: 'border-sage/40 bg-sage/10 text-sage-deep',
+  // Nothing went wrong — an explanation the page owes the reader. ink on mist
+  // is 16.25:1. Added chunk 4.1 for the admin inactivity sign-out.
+  notice: 'border-ink/12 bg-mist text-ink',
 }
 
-export default function FormAlert({ tone = 'error', className, children }) {
+/**
+ * `role` is a prop because the two cases differ. An error the user did not ask
+ * to see should interrupt a screen reader (`alert`); a notice that is simply
+ * present when the page loads should not (`status`).
+ */
+export default function FormAlert({ tone = 'error', role = 'alert', className, children }) {
   return (
     <p
-      role="alert"
+      role={role}
       className={cx(
         'rounded-xl border px-4 py-3 font-body text-ui',
         TONES[tone],

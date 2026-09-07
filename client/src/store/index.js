@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit'
 import authReducer from './authSlice'
+import questionnaireReducer from './questionnaireSlice'
 
 /**
  * The auth slice replaces the identity-function placeholder from chunk 0.6.
@@ -11,5 +12,6 @@ import authReducer from './authSlice'
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    questionnaire: questionnaireReducer,
   },
 })

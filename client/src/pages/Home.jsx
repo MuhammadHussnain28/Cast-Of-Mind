@@ -5,6 +5,7 @@ import HowItWorks from '../components/home/HowItWorks'
 import WhoWeHelp from '../components/home/WhoWeHelp'
 import Comparison from '../components/home/Comparison'
 import Faq from '../components/home/Faq'
+import Hero1 from '../components/home/Hero1'
 
 /*
  * ---------------------------------------------------------------------------
@@ -72,7 +73,8 @@ import Faq from '../components/home/Faq'
 export default function Home() {
   return (
     <>
-      <Hero />
+      {/* <Hero /> */}
+      <Hero1/>
       <Services />
       <Testimonials />
       <HowItWorks />

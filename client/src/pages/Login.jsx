@@ -105,6 +105,14 @@ export default function Login() {
       }
     >
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+        {/* Signed out by the admin portal's inactivity timer. Without this the
+            admin arrives here with no idea why, and assumes something broke. */}
+        {location.state?.reason === 'inactivity' && !formError && (
+          <FormAlert tone="notice" role="status">
+            You were signed out because the session was inactive for a while.
+          </FormAlert>
+        )}
+
         {formError && <FormAlert>{formError}</FormAlert>}
 
         <Input

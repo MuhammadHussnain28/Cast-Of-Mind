@@ -9,6 +9,8 @@ import {
   TREATMENT_ORIENTATIONS_MIN,
   TREATMENT_ORIENTATIONS_MAX,
 } from '../constants/treatmentOrientations.js';
+import { workingHoursSchema, validateWorkingHours } from './workingHours.js';
+import { fixedListValidator } from './fixedListValidator.js';
 
 // `therapistApplications` — a submitted 5-step application awaiting admin review.
 // Master spec Section 10.4, fields per Section 23.
@@ -47,67 +49,9 @@ export const MIN_APPLICANT_AGE = 18;
 // one source of truth, so the model and the form cannot disagree.
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/; // 24-hour HH:MM
 
-const DAYS = Object.freeze([
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-]);
-
-/**
- * Validator factory for the two fixed-list multi-selects.
- *
- * Checks three things, and the third is the one a naive implementation misses:
- * count, membership of the master list, and NO DUPLICATES. Without the duplicate
- * check, ['Anxiety','Anxiety','Anxiety'] satisfies "3 to 4 tags" while leaving
- * the therapist with effectively one specialty, quietly breaking matching.
- */
-function fixedListValidator({ allowed, min, max, label }) {
-  const allowedSet = new Set(allowed);
-
-  return {
-    validator(values) {
-      if (!Array.isArray(values)) return false;
-      if (values.length < min || values.length > max) return false;
-      if (new Set(values).size !== values.length) return false;
-      return values.every((value) => allowedSet.has(value));
-    },
-    message: `Select ${min} to ${max} different ${label}, each from the approved list.`,
-  };
-}
-
-// One day's availability. Times are wall-clock strings in the therapist's own
-// timezone (stored separately as an IANA identifier), NOT timestamps — so the
-// UTC storage rule does not apply here. "09:00 on Mondays" is a recurring local
-// intention, not a moment in time.
-const daySchema = new mongoose.Schema(
-  {
-    enabled: { type: Boolean, default: false },
-    start: { type: String, default: null },
-    end: { type: String, default: null },
-  },
-  { _id: false },
-);
-
-const workingHoursFields = DAYS.reduce((fields, day) => {
-  fields[day] = { type: daySchema, default: () => ({}) };
-  return fields;
-}, {});
-
-const workingHoursSchema = new mongoose.Schema(
-  {
-    ...workingHoursFields,
-    // Free text escape hatch, so no therapist is blocked by a rigid grid —
-    // overnight availability, alternating weeks, "by arrangement".
-    note: { type: String, trim: true, maxlength: 500, default: '' },
-  },
-  { _id: false },
-);
+// DAYS, the working-hours sub-schema and its validator are shared with
+// therapistProfiles — see models/workingHours.js.
 
 const therapistApplicationSchema = new mongoose.Schema(
   {
@@ -401,6 +345,12 @@ const therapistApplicationSchema = new mongoose.Schema(
     },
 
     reviewedAt: { type: Date, default: null },
+
+    // SPEC ADDITION (chunk 4.3, approved 2026-09-04). Not in §10.4.
+    //
+    // Why the applicant is not told: §16 lists no rejection email, so this is
+    // an internal note for the admin's own record, not a message anyone sends.
+    rejectionReason: { type: String, trim: true, maxlength: 1000, default: '' },
   },
   {
     // `submittedAt` is the spec's name for the creation time (Section 10.4), so
@@ -420,43 +370,9 @@ const therapistApplicationSchema = new mongoose.Schema(
 );
 
 // Working hours span several fields at once, so the checks live at document
-// level rather than on any single path.
-therapistApplicationSchema.pre('validate', function validateWorkingHours() {
-  const hours = this.workingHours;
-
-  if (!hours) {
-    this.invalidate('workingHours', 'Working hours are required.');
-    return;
-  }
-
-  const enabledDays = DAYS.filter((day) => hours[day]?.enabled);
-
-  if (enabledDays.length === 0) {
-    this.invalidate('workingHours', 'Select at least one day you are available.');
-    return;
-  }
-
-  for (const day of enabledDays) {
-    const { start, end } = hours[day];
-
-    if (!TIME_PATTERN.test(start ?? '') || !TIME_PATTERN.test(end ?? '')) {
-      this.invalidate(
-        `workingHours.${day}`,
-        `Enter a start and end time for ${day} in 24-hour format, for example 09:00.`,
-      );
-      continue;
-    }
-
-    // Rejecting end <= start catches the common typo. Availability that genuinely
-    // crosses midnight goes in the note field, and the message says so rather
-    // than leaving the applicant stuck.
-    if (end <= start) {
-      this.invalidate(
-        `workingHours.${day}`,
-        `End time must be after start time on ${day}. For hours that cross midnight, use the notes field.`,
-      );
-    }
-  }
+// level rather than on any single path. Shared with therapistProfiles.
+therapistApplicationSchema.pre('validate', function checkWorkingHours() {
+  validateWorkingHours(this);
 });
 
 // Admin review list: pending applications, oldest first.

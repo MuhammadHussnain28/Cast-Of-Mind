@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 import env from '../../config/env.js';
 import { passwordResetEmail } from './templates/passwordReset.js';
+import { therapistWelcomeEmail } from './templates/therapistWelcome.js';
+import {
+  emailChangedOldAddress,
+  emailChangedNewAddress,
+} from './templates/emailChanged.js';
 
 // Sending layer — master spec §16.
 //
@@ -63,4 +68,41 @@ export async function sendPasswordResetEmail(to, resetUrl) {
   const { subject, html, text } = passwordResetEmail({ resetUrl });
 
   return sendEmail({ to, subject, html, text });
+}
+
+/**
+ * Welcome a newly approved therapist.
+ *
+ * Carries NO password. They set their own on the application form and it
+ * carries over unchanged (§11) — see the note in templates/therapistWelcome.js.
+ */
+export async function sendTherapistWelcomeEmail(to, { firstName }) {
+  const loginUrl = `${env.clientOrigin}/login`;
+  const { subject, html, text } = therapistWelcomeEmail({ firstName, loginUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/**
+ * Tell both addresses that a therapist's sign-in email changed.
+ *
+ * Both, deliberately: the old inbox is the one that could raise an alarm, and
+ * the new one needs to know it is now the sign-in address. Sent in parallel;
+ * one failing must not stop the other.
+ */
+export async function sendEmailChangedNotices({ previousEmail, newEmail, firstName }) {
+  const loginUrl = `${env.clientOrigin}/login`;
+
+  const old = emailChangedOldAddress({ firstName, newEmail, loginUrl });
+  const fresh = emailChangedNewAddress({ firstName, newEmail, loginUrl });
+
+  const results = await Promise.allSettled([
+    sendEmail({ to: previousEmail, subject: old.subject, html: old.html, text: old.text }),
+    sendEmail({ to: newEmail, subject: fresh.subject, html: fresh.html, text: fresh.text }),
+  ]);
+
+  return {
+    oldAddressNotified: results[0].status === 'fulfilled',
+    newAddressNotified: results[1].status === 'fulfilled',
+  };
 }

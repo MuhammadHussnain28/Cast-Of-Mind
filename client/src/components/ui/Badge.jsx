@@ -9,6 +9,10 @@ const TONES = {
   accent: 'bg-gold/20 text-ink border-gold/50',
   success: 'bg-sage/15 text-sage-deep border-sage/45',
   danger: 'bg-clay/10 text-clay border-clay/35',
+  // For DARK surfaces. The light tones above put sage-deep or clay on a pale
+  // tint; over ink-deep that is dark on dark — the success tone measures 3.05:1
+  // there and fails. Caught by computing it, chunk 4.5.
+  inverse: 'bg-paper/10 text-paper border-paper/25',
 }
 
 export default function Badge({ tone = 'neutral', className, children, ...rest }) {

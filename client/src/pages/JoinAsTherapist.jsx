@@ -50,6 +50,18 @@ export default function JoinAsTherapist() {
         <div className="grid gap-12 lg:grid-cols-12 lg:items-start lg:gap-16">
           {/* ============ LEFT (5) — the case for practising here ============ */}
           <div className="lg:col-span-5">
+
+            <motion.div {...settle(0)} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-paper/5 border border-paper/10 mb-6">
+              <span className="h-2 w-2 rounded-full bg-gold animate-pulse" />
+              <span className="text-[11px] font-mono tracking-wider text-paper/80 uppercase font-medium">
+                Licensed Practitioners Only
+              </span>
+            </motion.div>
+
+
+
+
+
             <motion.div {...settle(0)}>
               <Heading level={1} size="hero" tone="inverse" className="max-w-[15ch]">
                 {intro.heading}

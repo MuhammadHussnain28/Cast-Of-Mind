@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { apiClient } from '../lib/api/client'
 import { useApi } from '../lib/useApi'
 import { LoadingState, ErrorState } from '../components/states'
+import DataTable from '../components/admin/DataTable'
 import {
   Badge, Button, Card, Checkbox, Heading, Input, Modal,
   RadioGroup, Select, Spinner, Text, Textarea, useToast,
@@ -43,6 +44,60 @@ function ApiCheck() {
     <Text size="ui" tone="success">
       Success: <code data-numeric>{JSON.stringify(data)}</code>
     </Text>
+  )
+}
+
+/**
+ * Chunk 4.1 verification helper. The DataTable lives here rather than on an
+ * admin screen because 4.1's brief forbids building a management screen, and
+ * demo rows sitting on /admin/therapists would read as real data.
+ *
+ * TODO: PLACEHOLDER — these rows are obvious nonsense and go with /styleguide.
+ */
+const DEMO_ROWS = Array.from({ length: 23 }, (_, i) => ({
+  id: `demo-${i + 1}`,
+  name: `Demo row ${i + 1}`,
+  country: ['Ireland', 'Germany', 'Spain', 'Portugal'][i % 4],
+  clients: (i * 7) % 13,
+}))
+
+const DEMO_COLUMNS = [
+  { key: 'name', header: 'Name', sortable: true, priority: 'primary' },
+  { key: 'country', header: 'Country', sortable: true },
+  { key: 'clients', header: 'Clients', sortable: true, align: 'end' },
+]
+
+function DataTableDemo() {
+  const [state, setState] = useState('rows')
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        {['rows', 'loading', 'empty', 'error'].map((option) => (
+          <Button
+            key={option}
+            size="sm"
+            variant={state === option ? 'secondary' : 'ghost'}
+            onClick={() => setState(option)}
+          >
+            {option}
+          </Button>
+        ))}
+      </div>
+
+      <DataTable
+        caption="Demo data for the styleguide"
+        columns={DEMO_COLUMNS}
+        rows={state === 'rows' ? DEMO_ROWS : []}
+        loading={state === 'loading'}
+        error={state === 'error' ? 'We could not load this list.' : null}
+        onRetry={() => setState('rows')}
+        searchLabel="Search demo rows"
+        searchPlaceholder="Search demo rows"
+        emptyTitle="Nothing here yet"
+        emptyBody="Rows will appear here once there are any."
+      />
+    </div>
   )
 }
 
@@ -206,6 +261,10 @@ export default function Styleguide() {
 
       <Row title="API check">
         <ApiCheck />
+      </Row>
+
+      <Row title="Admin DataTable">
+        <DataTableDemo />
       </Row>
 
       <Row title="Type scale">

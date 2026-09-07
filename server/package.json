@@ -10,7 +10,9 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "eslint .",
     "seed:admin": "node scripts/seedAdmin.js",
-    "cleanup:tokens": "node scripts/cleanupRefreshTokens.js"
+    "cleanup:tokens": "node scripts/cleanupRefreshTokens.js",
+    "seed:therapists": "node scripts/seedTherapists.js",
+    "seed:therapists:remove": "node scripts/seedTherapists.js --remove"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
