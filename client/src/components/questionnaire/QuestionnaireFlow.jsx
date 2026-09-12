@@ -30,16 +30,10 @@ import {
   stepWentBack,
   stepJumped,
   reviewOpened,
-  draftRestored,
   questionnaireReset,
 } from '../../store/questionnaireSlice'
 import { validateStep } from '../../lib/validation/questionnaire'
-import {
-  readQuestionnaireDraft,
-  writeQuestionnaireDraft,
-  clearQuestionnaireDraft,
-  hasAnyAnswer,
-} from '../../lib/questionnaireDraft'
+import { clearQuestionnaireDraft } from '../../lib/questionnaireDraft'
 import { screens, nav, review } from '../../data/questionnaireContent'
 
 /**
@@ -84,20 +78,13 @@ export default function QuestionnaireFlow() {
   const headingRef = useRef(null)
   const isFirstRender = useRef(true)
 
-  // Read once, during render, via a lazy initialiser — reading a ref or setting
-  // state during render is what the React Compiler rule objects to.
-  const [savedDraft] = useState(readQuestionnaireDraft)
-
-  useEffect(() => {
-    if (savedDraft) dispatch(draftRestored(savedDraft))
-  }, [dispatch, savedDraft])
-
-  // The hasAnyAnswer guard is load-bearing: without it this fires on mount with
-  // the still-empty answers and overwrites the draft the effect above restores.
-  useEffect(() => {
-    if (!hasAnyAnswer(answers)) return
-    writeQuestionnaireDraft(answers, stepIndex)
-  }, [answers, stepIndex])
+  // NEITHER RESTORING NOR SAVING HAPPENS HERE ANY MORE — both live in
+  // store/index.js.
+  //
+  // Restoring moved because an effect lands one render too late for the guards
+  // on /checkout. Saving moved because the therapist is chosen on
+  // /therapist/:id, where this component is not mounted, so an effect here
+  // could never have seen that choice at all.
 
   // Focus the question on each step change, so a screen reader lands on the new
   // screen rather than where the old Continue button used to be. First render is

@@ -239,10 +239,13 @@ export default function TherapistDetail() {
                 {detail.chooseNote}
               </Text>
 
+              {/* Choosing records the selection; this is the way onward. It
+                  appears only once a therapist is chosen, so the panel never
+                  offers a step that would land on a redirect. */}
               {isChosen && (
-                <Text size="caption" tone="muted" className="mt-3" role="status">
-                  {detail.nextStepPending}
-                </Text>
+                <Button as={Link} to="/checkout" variant="secondary" className="mt-3 w-full">
+                  {detail.continueToCheckout}
+                </Button>
               )}
             </div>
           </aside>

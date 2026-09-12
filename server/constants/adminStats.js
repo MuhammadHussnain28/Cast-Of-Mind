@@ -4,11 +4,15 @@
 // suite." Nothing here computes a rate, a projection or a cohort.
 
 /**
- * Collections that do not exist yet, read through the raw driver.
+ * Collections read through the raw driver rather than a model.
  *
  * MongoDB returns 0 and [] for a collection that has never been created, so
  * these figures read zero today and start reporting on their own the moment
  * their slice creates documents — no code change needed.
+ *
+ * `bookings` and `subscriptions` have had models since chunk 6.1, but nothing
+ * writes them until the payment webhook in 6.4, so the raw reads stay correct
+ * and are left alone. Model tests pin these names against the real collections.
  *
  * THESE NAMES MUST MATCH WHAT MONGOOSE WILL PLURALISE TO, or the dashboard will
  * silently report 0 for ever, which is far worse than an error. Mongoose
@@ -23,18 +27,10 @@ export const FUTURE_COLLECTIONS = Object.freeze({
   clientProfiles: 'clientprofiles', // slice 6
 });
 
-// Subscription states, from §13's state machine. Duplicated here rather than
-// imported because the subscriptions model does not exist yet; slice 6 should
-// import ITS values from wherever it defines them and delete these.
-export const SUBSCRIPTION_STATUS = Object.freeze({
-  ACTIVE: 'active',
-  PAST_DUE: 'past_due',
-  CANCELLED: 'cancelled',
-  EXPIRED: 'expired',
-});
-
-// §2: billing currency is EUR, one plan only.
-export const BILLING_CURRENCY = 'EUR';
+// Re-exported from the canonical home, created in chunk 6.1. These were
+// duplicated here while the subscriptions model did not exist; existing callers
+// keep importing them from this file rather than being rewritten.
+export { SUBSCRIPTION_STATUS, BILLING_CURRENCY } from './payments.js';
 
 // A year reads as a trend without becoming an analytics view.
 export const TREND_MONTHS = 12;

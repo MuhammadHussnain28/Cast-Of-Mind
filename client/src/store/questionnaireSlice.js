@@ -1,5 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit'
 import { emptyAnswers } from '../lib/validation/questionnaire.js'
+import { readQuestionnaireDraft } from '../lib/questionnaireDraft.js'
 // .js extensions so this module also loads in plain Node, which is how its
 // reducer logic is executed and checked. Vite resolves either form.
 import {
@@ -43,6 +44,33 @@ const initialState = {
   // request. SLICE 6 MUST RE-VERIFY the therapist is still active before
   // taking payment — a snapshot taken now could be minutes or days old.
   selectedTherapist: null,
+}
+
+/**
+ * The slice's starting state, with a saved draft already in it.
+ *
+ * READ ONCE AT MODULE LOAD, BEFORE REACT RENDERS — not in an effect.
+ *
+ * An effect restores AFTER the first render, and the guards on /checkout and
+ * /checkout/cancel run during that first render. They would see an empty store,
+ * redirect, and the restore would land on a page nobody is looking at any more.
+ * That is the same ordering trap chunk 1.6 hit with the login page flash, and
+ * seeding the store removes it rather than working around it.
+ *
+ * Returns a COMPLETE slice state: preloadedState replaces initialState, it does
+ * not merge into it, so every key has to be present.
+ */
+export function buildInitialQuestionnaireState() {
+  const draft = readQuestionnaireDraft()
+  if (!draft) return initialState
+
+  return {
+    ...initialState,
+    answers: { ...emptyAnswers, ...draft.answers },
+    stepIndex: draft.stepIndex ?? 0,
+    selectedTherapist: draft.selectedTherapist ?? null,
+    restoredFromDraft: true,
+  }
 }
 
 const questionnaireSlice = createSlice({
@@ -106,6 +134,7 @@ const questionnaireSlice = createSlice({
     draftRestored(state, action) {
       state.answers = { ...emptyAnswers, ...action.payload.answers }
       state.stepIndex = action.payload.stepIndex ?? 0
+      state.selectedTherapist = action.payload.selectedTherapist ?? null
       state.restoredFromDraft = true
       state.atReview = false
     },

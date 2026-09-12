@@ -3394,3 +3394,771 @@ host entirely and there is no dev proxy in front of it.
 sits alongside the `sameSite` cookie note already parked for that chunk — both are
 "works locally, silently wrong in production" traps.
 
+
+---
+
+## Chunk 6.1 — Payment models
+
+**Status: Complete.** Nothing skipped. **Slice 6 has started.** Models and tests only — nothing writes these collections until the webhook in 6.4.
+
+Built:
+- `constants/payments.js` — the canonical home for every payment value.
+- `models/Booking.js` · `models/Booking.test.js` (14 tests)
+- `models/Subscription.js` · `models/Subscription.test.js` (22 tests)
+- `models/PaymentEvent.js` · `models/PaymentEvent.test.js` (28 tests)
+- Edits: `constants/adminStats.js` (re-exports instead of duplicating), `client/src/lib/dashboardFormat.js` (the cents change).
+
+---
+
+### THE OPEN ITEM FROM CHUNK 4.4 IS NOW CLOSED: MONEY IS STORED IN CENTS
+
+§10.6 types `amount` as a bare Number and never says which unit. Chunk 4.4 flagged it and said it could not be wrong yet but would be very wrong later. **Decided 2026-09-07: minor units. €200.00 is `20000`, never `200`.**
+
+Three reasons, and the second decided it:
+
+1. **Stripe speaks cents.** The webhook hands us `20000`, so nothing converts between the platform and our ledger — and a conversion is exactly where a ×100 bug lives.
+2. **`paymentEvents.amount` must match Stripe exactly**, because it is the dispute record. If `subscriptions` held euros and the ledger held cents, two fields with the same name in the same slice would mean different things. That is precisely the silent bug 4.4 was warning about.
+3. **Integers never lose a cent.** Floats eventually do, once proration or partial refunds produce values like 66.666.
+
+**The cost, and it was paid in this chunk rather than deferred:** chunk 4.4's dashboard would otherwise have shown **€20,000** for a single subscription. `client/src/lib/dashboardFormat.js` now divides by 100 and its doc comment states the unit contract. That is one line in a file from another chunk — flagged rather than slipped in, and safe to change today only because no subscription exists yet. **Deferring it is how it would have been forgotten.**
+
+`formatMinorUnits()` in `constants/payments.js` is the server-side equivalent, so the welcome email (6.4) and the renewal reminders (11.6) do not each divide by hand. A test pins `SUBSCRIPTION_AMOUNT_MINOR === 20000` and pins the model default to it — if that ever reads 200, every money figure is out by a factor of 100 and nothing else would fail.
+
+---
+
+### THE APPEND-ONLY GUARD, AND THE ONE HOLE IT DOES NOT CLOSE
+
+The chunk asked for "a model-level guard that prevents updates." A guard on `save()` alone would have been theatre — most accidental edits arrive through `Model.updateOne` or `findOneAndUpdate`, which never touch document middleware.
+
+Blocked, each proven by its own test rather than trusted: `updateOne` · `updateMany` · `findOneAndUpdate` · `findOneAndReplace` · `replaceOne` · `deleteOne` · `deleteMany` · `findOneAndDelete` · `doc.deleteOne()` · re-saving an existing document · `bulkWrite` · an aggregation carrying `$out` or `$merge`. Creating, reading and ordinary aggregation are untouched.
+
+`updateOne` and `deleteOne` exist as **both** query and document middleware, so both are registered with `{ document: true, query: true }` — a hook registered for only one form lets the other straight through.
+
+**THE HOLE, STATED PLAINLY:** the raw driver (`mongoose.connection.db.collection('paymentevents').updateOne(...)`) does not pass through Mongoose and cannot be blocked from a schema. This guard stops accidents, not somebody deliberately going around it. **Closing it properly needs a database user without update or delete rights on this collection — a deployment concern, carried to chunk 12.5.** The test suite's own `clearCollections` helper goes through the raw driver, which is why this suite can clean up after itself at all; that is the hole demonstrating itself.
+
+**A REAL BUG WAS CAUGHT BY RUNNING THE TESTS, AND IT WOULD HAVE BROKEN CREATION.** The guards were first written in the classic `function (next) { next(err) }` style. Mongoose 9 did not hand the `save` hook a `next`, so `next()` threw `TypeError: next is not a function` **on every insert** — 24 of 28 tests failed, including plain creation. Rewritten as zero-argument hooks that `throw`, which Kareem turns into a rejected promise. Recorded because the failure looked like a guard problem and was actually a middleware-signature problem: **a hook that looks registered is not the same as a hook that fires correctly.**
+
+---
+
+### WHAT MAY BE MISSING ON A PAYMENT EVENT, AND WHY
+
+**`subscriptionId` and `clientId` are both optional, and that is not an oversight.** The backend rules require every webhook to be logged *before* it is acted on. On a first payment neither the user nor the subscription exists yet — 6.4 creates them *from* that webhook. Requiring either field would make the first event of a client's life impossible to log, which is the one event a dispute is most likely to be about. 6.4 links them on the way out.
+
+**`eventType` is free text, not an enum.** An enum would reject any event type we had not anticipated, and the rule is to log every webhook and handle unknown types gracefully. A validation error would drop the record rather than store it, so the ledger would be missing precisely the surprising events worth investigating.
+
+**`currency` is free on the ledger but EUR-only on `subscriptions`.** A deliberate asymmetry: the subscription records what we charge, the ledger records what actually arrived. A payment in an unexpected currency is something to investigate, not something to refuse to write down.
+
+**`rawPayload` is `select: false` and stripped from `toJSON`.** A webhook body carries payment details, which are on the never-log list and have no business reaching a response. Storing it is the audit trail the spec requires; that is not the same as exposing it. A test confirms it is genuinely stored while being absent from both an ordinary query and the serialised form.
+
+---
+
+### DECISIONS MADE
+
+- **The unique index is compound — `{ platform, platformEventId }`, approved 2026-09-07.** The brief said `platformEventId` alone. If PayPal is ever added and one of its event ids collided with a Stripe one, a single-field index would silently refuse a real payment event — a lost row on the one collection that must never lose one. Duplicate detection is unaffected, because a resent webhook carries the same platform and the same id. **CONTRACT FOR CHUNK 6.3: look duplicates up on BOTH fields, never on `platformEventId` alone.**
+- **Two "one live row" partial unique indexes — spec additions, approved 2026-09-07.** Neither is in §10.5 or §10.6; same footing as the reset-token fields added in 1.5 and the two fields added in 4.3.
+  - `bookings`: one **active** booking per client. §6 gives a client exactly one therapist and reassignment is deferred to v2. Without it, a re-subscribe that failed to reuse the existing booking would create a second active one and the client portal would silently pick whichever came back first. Ended bookings are exempt, so history survives — and a test confirms one therapist may still hold many active bookings, since getting that index the wrong way round would break the platform.
+  - `subscriptions`: one **active** subscription per booking. Cancelled and expired rows are exempt so a re-subscribe keeps its history. **Lower confidence than the booking one — if slice 11 ever genuinely needs two live rows on one booking, this is the index to drop.**
+- **`platformSubscriptionId` uses a partial index on string values, not `sparse`.** `sparse` only skips a *missing* field; several rows explicitly holding `null` would still collide, and `null` is exactly what a careless insert writes. A test covers all three cases — absent, null, and undefined.
+- **`sessionsRemaining` has `max: 4`.** §13's no-carry-over rule becomes impossible to break by construction rather than something to remember. A client with 2 unused sessions can never reach 6.
+- **Shape guards on both records.** A booking cannot link a person to themselves; an ended booking must carry an end date and an active one must not. A subscription's period cannot end before it starts, and a cancelled one must record when it was cancelled. `cancelledAt` deliberately **survives** the later move to `expired` (§13), and a test pins that — losing it would destroy the only stamp saying why the subscription ended, which is why 4.4's churn figure falls back to `updatedAt`.
+- **`bookings` carries no `updatedAt`** (§10.5 defines only `matchedAt` and `endedAt`); `subscriptions` carries both (§10.6 lists them); `paymentEvents` carries neither, only `receivedAt` — nothing there is ever updated, so an `updatedAt` could only ever lie.
+- **`SUBSCRIPTION_STATUS` and `BILLING_CURRENCY` now live in `constants/payments.js`.** `constants/adminStats.js` re-exports them, so its existing callers were not rewritten. Its own comment asked slice 6 to do exactly this.
+- **Collection names pinned by tests** against `FUTURE_COLLECTIONS` — the chunk 5.1 precedent. Chunk 4.4 reads `bookings` and `subscriptions` through the raw driver, and a rename would make the dashboard report 0 for ever, silently. The raw reads in `adminStats`, `adminTherapists` and `therapistProfile` were left alone: they still work, and switching them to models is cleanup for 6.4 or later, not this chunk.
+
+---
+
+### A PRE-EXISTING DEFECT FOUND, FIXED ONLY IN THE NEW FILES
+
+**Mongoose does not substitute a `{VALUES}` token in an enum message.** A test expecting the real list got back the literal string `"Only {VALUES} is billed."`
+
+There are **15 occurrences** in the codebase. The 4 in this chunk's models now build the list explicitly with a template literal. **The other 11 are pre-existing and were left alone** — 2 in `User.js` (chunk 1.1), 5 in `ClientProfile.js` (5.1), 4 in `TherapistApplication.js` (3.1). Touching three shipped models is outside this chunk.
+
+**Impact is low but real:** these are model-level validators, the last line of defence, and the user-facing 422 messages come from the Zod layer — so a literal `{VALUES}` only surfaces if something bypasses validation. It is cosmetic, not a safety issue. **One line each to fix whenever the developer wants it done.**
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **793 tests across 27 suites, all passing** (729 from earlier chunks, 64 new).
+- `npm run lint` (server) clean; `oxlint` (client) 0 findings on everything this chunk touched. Client build passes.
+- **Mutation-checked three times.** Emptying the query-hook list broke **8** tests; reducing the compound index to `platformEventId` alone broke **1** (the cross-platform case, which is the whole reason the index is compound); removing the one-active-booking index broke **1**. All three restored and the full suite re-run.
+- The money path was checked arithmetically end to end: 20000 → €200, 140000 → €1,400, 0 → €0, and null/undefined → €0 rather than NaN.
+- Standalone in-memory Mongo, not a replica set — there are no transactions in this chunk, so the suite stays fast. `Model.init()` is called before every unique-index test, per the chunk 1.1 lesson that an index is enforced on write and not by a validator.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts.**
+2. **Nothing to configure.** Nothing writes these collections yet, so your Atlas cluster is unchanged — no indexes are built until the first document is inserted in 6.4.
+
+**Carried forward:**
+- **Chunk 6.3 must match webhooks on `{ platform, platformEventId }`**, not on the id alone.
+- **Chunk 12.5: restrict the production database user's rights on `paymentevents`** to close the raw-driver hole in the append-only guard.
+- The 11 remaining `{VALUES}` enum messages, if the developer wants them fixed.
+- Slice 6 still needs to re-verify the chosen therapist is active before payment, and to nest `partner1`/`partner2` under `coupleData` (5.6, 5.3).
+- Remove the seeded therapists before launch (blocker 13). Whether rejected applicants are emailed (4.3). Education summary and current work situation are still frozen (4.6).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No payment endpoints of any kind**, per the chunk's own "Do NOT" — no checkout session (6.2), no webhook handler (6.3), no four-document transaction (6.4), no checkout UI (6.5).
+- No Stripe or PayPal SDK, and no decision on which platform is used. §21 still lists that as an open item for Asad.
+- Nothing writes `bookings`, `subscriptions` or `paymentEvents`. The admin dashboard still reads honest zeroes.
+
+---
+
+## Chunk 6.2 — Checkout session creation
+
+**Status: Complete.** Nothing skipped. Verified live end to end against the real Stripe **test** account and the real Atlas cluster — 22 checks, all passing. **One thing is yours: opening the URL and looking at it.**
+
+Built — server:
+- `config/stripe.js` — the SDK client, required in production, optional in development.
+- `constants/checkout.js` · `validation/checkout.schema.js`
+- `models/PendingCheckout.js` · `models/PendingCheckout.test.js` (11 tests)
+- `services/checkout.service.js` · `controllers/checkout.controller.js` · `routes/checkout.routes.js`
+- `routes/checkout.test.js` — 33 tests
+- Edits: `config/env.js` (Stripe vars + two guards), `routes/index.js` (mount), `.env.example`, `routes/roleGuards.test.js` (see the ripple below).
+
+**Package installed:** `stripe` (^22.6.1) in `/server`. No other new dependency.
+
+---
+
+### THE PLATFORM: STRIPE, AND WHAT THAT DOES NOT SETTLE
+
+Stripe is now integrated in test mode. §12 recommends it as primary because this platform is entirely monthly recurring billing, and §21 still lists the final platform choice as an open item for Asad — **that question is not closed by this chunk.** Nothing here depends on him: test keys need no business verification. If he later wants PayPal as well, §12 is explicit that it is a **second, separate integration**, not a configuration change.
+
+---
+
+### A FIFTEENTH COLLECTION — `pendingCheckouts`
+
+§10 fixes the schema at 14 collections, so this is a spec addition, **approved 2026-09-07** on the same footing as the reset-token fields in 1.5 and the two fields in 4.3.
+
+**Why it has to exist.** §12's golden rule puts account creation behind webhook confirmation. The questionnaire is answered minutes earlier in a browser and has to survive until then.
+
+**The alternative was rejected on two grounds.** Stripe's Checkout Session `metadata` caps values at 500 characters, which a couple's answers would breach — and, the real objection, it would put somebody's mental health concerns on a third party's servers for no reason. **A test asserts no questionnaire data reaches Stripe at all**, and the live run confirmed the same against the real session Stripe stored.
+
+**THE TTL INDEX, AND WHY IT IS NOT THE CHUNK 1.3 MISTAKE.** That entry warned never to put a TTL index on `refreshTokenExpiresAt`, and it was right: that field lives *on* the `users` record, so TTL would have deleted entire client and therapist accounts, silently. **This is the opposite case — the whole document is the disposable thing, so deleting all of it is precisely the intent.** The distinction is the field's owner, not the index: TTL is correct exactly when the document is disposable. Written into the model, and a test asserts there is exactly one TTL index and it sits on `expiresAt`.
+
+**26 hours, and the margin is deliberate.** Stripe sessions expire at 24 hours, so the draft must outlive the session it belongs to — otherwise someone paying near the end of the window arrives at a webhook with no answers behind them. A test pins that the draft TTL is strictly longer than the session TTL, so the two cannot be edited into the wrong order.
+
+**Privacy, stated plainly:** this collection holds concern tags for people who have not paid and may never become clients. It is never logged, never returned by any endpoint, stripped from `toJSON`, deleted outright on success at 6.4, and gone within 26 hours otherwise.
+
+---
+
+### DECISIONS MADE
+
+- **Inline pricing, not a dashboard price id — developer's decision, 2026-09-07.** `price_data` carries `unit_amount: SUBSCRIPTION_AMOUNT_MINOR`, `currency: 'eur'`, `recurring: { interval: 'month' }`. The amount Stripe charges and the amount stored at 6.4 therefore come from **one line of code**, so they cannot silently diverge the way a dashboard price and a code constant can. It also removes a manual setup step and the `STRIPE_PRICE_ID` variable entirely.
+
+  **The cost, recorded because it will show:** `product_data` creates a **new Stripe Product on every checkout**, so the dashboard's product list grows one row per attempt. Tolerable at this volume and invisible to clients. If it ever becomes annoying, the fix is one line — create a single Product once and pass `product: 'prod_...'` beside `price_data` instead of `product_data`.
+
+- **A registered email is refused BEFORE payment, with one unified 409.** The same message whether the address belongs to a client, a therapist or the admin — the chunk 3.2 pattern, approved on the same grounds. It concedes the address is known to us but never what kind of record it is, and on this platform "this address belongs to a client" is the sensitive half. A test loops all three roles and asserts the words "client", "therapist" and "admin" appear in none of the replies.
+
+  **The alternative was letting them pay and failing at the webhook**, which means taking €200 from someone who then cannot be given an account. Refusing early is worth the mild enumeration signal, and the rate limit is what keeps that signal small.
+
+- **The questionnaire is validated TWICE, and the second pass is the useful one.** Zod checks the shape; then the service builds a real `ClientProfile` in memory and runs the model's own validators without saving. The model carries rules Zod does not — the fixed-list duplicate check, the cross-branch guard, the enum lists — so this guarantees **we can never take €200 for answers that would fail to persist at 6.4**, which would leave a paying client with no account and a webhook that cannot succeed.
+
+- **Write order: draft first, then Stripe, then the session id back.** If the Stripe call fails we are left with an orphan draft that expires on its own — harmless. The reverse order could leave a **paid** session with no questionnaire behind it, stranding someone already charged. A test asserts the orphan is left to expire rather than deleted. The write-back is non-fatal by design, because `client_reference_id` already reaches the webhook, so 6.4 can find the draft either way.
+
+- **The therapist is re-verified as existing and active before any money moves** — closing the item carried from 5.6, where the log noted the client's selection is a snapshot that could be days old. **6.4 must check again**, because a therapist can be deactivated while the Stripe page is open.
+
+- **The API takes partners NESTED under `coupleData`**, matching §10.2 and `clientProfiles` exactly. This is the contract 6.5's mapper must meet, and it closes the shape question the log has carried since 5.3.
+
+- **§13's auto-renewal disclosure is on Stripe's own page**, via `custom_text.submit.message`. §13 calls checkout "the most important" of the three places it must appear, and Stripe's page is the last screen before a card is charged. 6.5 states it in our UI as well.
+
+- **The Stripe API version is pinned to the one this SDK ships with** (`2026-08-26.dahlia` for stripe 22.6.1). Pinning to a version the SDK does not expect is worse than not pinning, because the request and the types disagree — my first draft guessed a different string and would have done exactly that.
+
+- **Nothing from the request body is logged.** It carries an email, concern tags and, for a couple, two people's names and ages.
+
+- **Stripe's own error text never reaches the caller** — a 502 with a fixed message. A test asserts an internal Stripe string does not appear in the response.
+
+---
+
+### THE APPLICATION NEVER TOUCHES CARD DETAILS
+
+No card field is accepted, and none could be: the schema strips unknown keys. A test posts `cardNumber` and `cvc` alongside a valid payload and asserts neither is stored nor forwarded to Stripe. **There is deliberately no Stripe publishable key anywhere in this project** — the browser is redirected to Stripe's hosted page by URL, so no Stripe.js runs in our frontend.
+
+---
+
+### THE MOCK RIPPLE, FOR THE FOURTH TIME — AND IT WAS PREDICTED
+
+Making `STRIPE_SECRET_KEY` required in production broke `roleGuards.test.js`, which boots a real `NODE_ENV=production` child process to prove the dev routes are unmounted. The child exited at startup.
+
+**This is the identical pattern to chunks 1.5 and 2.6, and the 2.6 entry named it in advance:** "a production-only env check is invisible until something actually boots production." Fixed the same way — the child is given a value, because that test is about route mounting rather than payment configuration. It needs a **non-test-looking** key, because production now refuses an `sk_test_` key outright.
+
+**Two startup guards were added, and the second is the one that matters:**
+1. Production refuses to start without `STRIPE_SECRET_KEY` — without it nobody can subscribe, which is the only way a client account is ever created.
+2. **Production refuses to start with an `sk_test_` key.** A test key in production would accept real subscriptions and never charge a card — the business would be giving therapy away and would not find out until the money failed to arrive.
+
+---
+
+### TWO BUGS CAUGHT BY RUNNING THINGS
+
+1. **`validateSync()` is deprecated in Mongoose 9 and removed in 10.** The suite printed a deprecation warning; switched to `await draft.validate()`, which does the same job and survives the next major.
+2. **The test fixture was missing `applicationId`**, which chunk 4.3 made required on `therapistProfiles`. Every test failed on the seed rather than on anything it was testing.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **837 tests across 29 suites, all passing** (793 from earlier chunks, 44 new).
+- `npm run lint` — clean.
+- **Mutation-checked three times.** Removing the pre-payment email check broke **2** tests; removing the active-therapist check broke **2**; leaking the questionnaire into Stripe's metadata broke **2**, including the privacy assertion. All restored and the full suite re-run.
+  - Worth recording: my first reading of the second mutation's output was wrong — a truncated log made it look like a broad failure. Re-run properly it was exactly 2, and the failure was the deactivated-therapist case returning 201 instead of 409.
+- **LIVE against the real running code, the real Stripe test account and real Atlas — 22 checks, all passing:**
+  - the endpoint returned **201** with a real `checkout.stripe.com` URL;
+  - Stripe's own record of the session confirmed **mode `subscription`, `amount_total` 20000, currency `eur`, `recurring.interval` month, price type `recurring`** — the money, read back from Stripe rather than from our own arguments;
+  - the renewal disclosure was present on the session, both return URLs correct, the email prefilled, and `client_reference_id` matching our stored draft;
+  - **neither the concern tags nor the client's name appeared anywhere in Stripe's stored session**;
+  - **THE GOLDEN RULE HELD: zero users, zero client profiles, zero bookings, zero subscriptions created** — checked against a baseline taken before the run;
+  - the run then expired its session, deleted its draft, and **the cluster was confirmed byte-for-byte back to baseline** (12 users, 0 bookings, 0 subscriptions, 0 profiles, 0 drafts).
+
+**Yours to check — the one thing I cannot do from here:**
+
+A second session was created deliberately and **left open** so it can be opened by hand. There is no browser on this machine, per the standing decision of 2026-08-27.
+
+> Open the URL printed at the end of the chunk-6.2 run and confirm Stripe's page shows **€200.00 per month**, the product name, and the renewal sentence above the pay button.
+
+Nothing needs cleaning up afterwards: Stripe expires the session at 24 hours and the draft TTLs out at 26. **That is the expiry design demonstrating itself.** If you would rather it were gone now, say so and I will remove both.
+
+**Manual steps for the developer:**
+1. **`STRIPE_SECRET_KEY` is already set** in `server/.env` and was confirmed to be an `sk_test_` key, 107 characters. Nothing else to do for this chunk.
+2. **`STRIPE_PRICE_ID` is NOT needed** — the inline-pricing decision removed it. If you created a Product and Price in the dashboard while reading the plan, they are unused and can be deleted.
+3. **`STRIPE_WEBHOOK_SECRET` is for chunk 6.3** and is deliberately not enforced yet. For local work it comes from the Stripe CLI (`stripe listen`), not the dashboard — exact instructions will come with 6.3.
+4. **No publishable key, ever.** Documented in `.env.example` so nobody adds one later thinking it was forgotten.
+
+**Carried forward:**
+- **Chunk 6.4 must re-check the therapist is still active** at webhook time, and must **delete the pending draft on success**.
+- Chunk 6.3 must match webhooks on `{ platform, platformEventId }`, not the id alone (from 6.1).
+- **`/welcome` and `/checkout` do not exist yet.** The success and cancel URLs point at routes 6.6 and 6.5 build, so a real redirect will 404 until then. Expected.
+- Chunk 12.5: restrict the production database user's rights on `paymentevents` (from 6.1); and the Stripe dashboard will hold one Product per checkout unless the `product:` id change above is made.
+- The 11 remaining `{VALUES}` enum messages (6.1). Remove the seeded therapists before launch (blocker 13). Whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No webhook handler** (6.3) and **no account creation** (6.4). Nothing in this chunk writes a user, a client profile, a booking or a subscription, and a test asserts exactly that.
+- **No checkout UI** (6.5) and no `/welcome` page (6.6). The endpoint is reachable only by a direct request today.
+- No PayPal. No refund logic — §12 puts refunds in Asad's dashboard for v1.
+
+---
+
+## Chunk 6.3 — Webhook handler and idempotency
+
+**Status: Complete.** Nothing skipped. Verified: 864 tests passing across 30 suites.
+
+Built — server:
+- `constants/webhooks.js` — Stripe event types, billing reasons, tolerance window (300s), rate limit config.
+- `services/stripeWebhook.service.js` — raw body HMAC signature verification, atomic insert idempotency, event routing stubs.
+- `controllers/webhook.controller.js` · `routes/webhook.routes.js` — `POST /api/v1/webhooks/payment` with failure-only rate limiting.
+- `routes/webhook.test.js` — 27 tests (signatures, raw body preservation, concurrency, duplicates, routing, ledger writes).
+- Edits: `app.js` (raw body parser mounted ahead of `express.json()`), `config/env.js` (`STRIPE_WEBHOOK_SECRET` required in production), `middleware/rateLimiter.js` (`skipSuccessfulRequests`), `routes/index.js`, `routes/roleGuards.test.js`, `.env.example`.
+
+---
+
+### RAW BODY MOUNTING & SIGNATURE VERIFICATION
+- `stripe.webhooks.constructEvent()` verifies an HMAC over the exact bytes sent by Stripe. `app.use('/api/v1/webhooks', express.raw({ type: '*/*', limit: '1mb' }))` is mounted **before** `express.json()` in `app.js` so bytes are preserved uncorrupted.
+
+---
+
+### ATOMIC IDEMPOTENCY VIA THE COMPOUND UNIQUE INDEX
+- Rather than a race-prone read-then-write check (`findOne` then `create`), the handler attempts `PaymentEvent.create()`.
+- MongoDB's compound unique index on `{ platform, platformEventId }` (from Chunk 6.1) atomically accepts the first write and throws code `11000` on any duplicate, returning `200 { received: true, duplicate: true }` cleanly without race conditions.
+
+---
+
+### EVENT ROUTING & THE INITIAL INVOICE TRAP
+- Handlers stubbed for `checkout.session.completed` (chunk 6.4), `invoice.payment_succeeded` (slice 11), `invoice.payment_failed` (slice 11), `customer.subscription.deleted` (slice 11), and `customer.subscription.updated` (slice 11).
+- `billing_reason === 'subscription_create'` guards `invoice.payment_succeeded` so the first invoice is never double-processed as a renewal.
+- Unknown event types are logged and return `200` without crashing or triggering unnecessary Stripe retries.
+
+---
+
+**Verified:**
+- `node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand` — **864 tests across 30 suites, all passing** (837 from earlier chunks, 27 new).
+- ESLint clean across all touched files.
+- Mutation-checked: raw body ordering, atomic unique index gate, replay tolerance units, and mock production env.
+
+**Manual steps for the developer:**
+1. **Local webhook testing:** When running local tests with Stripe CLI:
+   - Run `stripe listen --forward-to localhost:5000/api/v1/webhooks/payment`.
+   - Copy the printed `whsec_...` into `server/.env` as `STRIPE_WEBHOOK_SECRET`.
+2. **Production:** Set `STRIPE_WEBHOOK_SECRET` in the production environment from the Stripe Dashboard Webhooks section.
+
+**Carried forward:**
+- **Chunk 6.4:** Build account creation (`User` + `ClientProfile` + `Booking` + `Subscription`) triggered by `checkout.session.completed`. Ensure effect-level idempotency on `client_reference_id` and delete pending draft on success.
+- **`/welcome` and `/checkout` do not exist yet** (chunks 6.6 and 6.5).
+- Pre-launch blockers stand at 13, unchanged.
+
+
+---
+
+## Chunk 6.4 — Account creation transaction
+
+**Status: Complete.** Nothing skipped. **882 tests across 31 suites, all passing.** The four-document transaction now runs from a verified webhook, and a newly created client can genuinely sign in with the password they were emailed.
+
+Built — server:
+- `services/clientOnboarding.service.js` — the transaction, the idempotency guard, the period-end lookup.
+- `services/email/templates/clientWelcome.js` — the only email on the platform that carries a password.
+- `routes/webhookAccountCreation.test.js` — 18 tests against a **real replica set**.
+- Edits: `utils/password.js` (`generateTemporaryPassword`), `models/Subscription.js` (`platformCustomerId`), `services/email/email.service.js` (`sendClientWelcomeEmail`), `constants/email.js`, `test/emailServiceMock.js`, `services/stripeWebhook.service.js` and `controllers/webhook.controller.js` (the handler is now real and awaited), plus two stale test premises corrected (see below).
+
+**No new packages, no new environment variables.**
+
+---
+
+### THE GAP 6.3 LEFT OPEN IS NOW CLOSED
+
+Chunk 6.3 recorded the risk plainly: the ledger row is written *before* the handler runs, so if the handler fails, Stripe's retry is recognised as a duplicate **event** and skipped — and a payment would never be acted on. The ledger cannot be its own guard.
+
+**The guard lives at the effect instead.** Before doing anything, the service asks whether a `subscriptions` record already exists for this `platformSubscriptionId`. That record exists only if the whole transaction committed, so its presence is proof the work is done — and its absence means the work is still outstanding, whatever the ledger says.
+
+Underneath it, 6.1's partial unique index on `platformSubscriptionId` is the atomic backstop for two retries arriving together, exactly as the ledger's compound index was in 6.3.
+
+**Two tests pin it, and the second is the one that matters:** an identical replayed event, and — more importantly — a *different event id carrying the same subscription*, which is precisely the case a ledger-based duplicate check would let straight through.
+
+---
+
+### THE TRANSACTION, AND WHAT WAS ACTUALLY PROVEN
+
+Four documents in one `withTransaction`: `users`, `clientProfiles`, `bookings`, `subscriptions` — plus the `pendingCheckouts` draft consumed **inside** the same transaction, so a rollback puts it back and a retry can still succeed. Deleting it afterwards would strand a failed attempt with no questionnaire left to rebuild from.
+
+**Tested against a real replica set** (`startMemoryReplSet`, the chunk 4.3 precedent). On a standalone instance transactions do not exist, every write simply succeeds, and a rollback test would pass while proving nothing.
+
+The rollback test fails on the **last** of the four, so the first three have genuinely been written and must be undone. It asserts each of the four is back to zero individually, and that the draft survives. A second test then proves a retry succeeds cleanly afterwards.
+
+**Mutation-checked twice:** taking the writes out of the transaction broke **2** tests (both rollback assertions); removing the idempotency lookup broke **1**.
+
+---
+
+### DECISIONS MADE
+
+- **`platformCustomerId` added to `subscriptions`** — spec addition, approved 2026-09-09. §10.6 does not list it. Slice 11 needs the Stripe customer to let a client update a failed card or open the billing portal; reaching it through `platformSubscriptionId` would mean an extra API call every time. **Deliberately not unique** — Stripe reuses one customer across a cancel-and-resubscribe, so the same id legitimately appears on more than one of our records.
+
+- **`currentPeriodEnd` is read from Stripe, with a +1 month fallback** — approved 2026-09-09. The brief said "+1 month"; Stripe's own `current_period_end` is used instead because that date is shown to the client as "Next payment" and drives slice 11's reminder emails. A hand-computed date drifts from Stripe's real schedule, and then we tell people the wrong day and email them on it. **The fallback is deliberate and tested:** if the Stripe call fails, the account is still created with an approximately-right date, because refusing an account somebody has paid for would be far worse.
+
+- **The therapist's USER id goes on the booking, not their profile id.** §10.5 links two users, and both portals query it that way. A test pins it — using the profile id would look fine until the therapist portal returned nothing.
+
+- **A couple is one user and one profile.** The questionnaire is already stored in exactly the `clientProfiles` shape with partners nested under `coupleData`, so it passes straight through with no reshaping. A test asserts one of each document and that no individual `name` leaked onto the profile.
+
+- **The welcome email is sent after the commit, never inside it**, and a failure never undoes the account. An email sent from inside a transaction that then aborts tells somebody their account is ready when it is not. Two tests: the account survives a failed send, and **nothing is sent when the transaction rolls back**. Same call as chunk 4.3, where it fired for real.
+
+- **A deactivated therapist aborts the whole thing**, re-checked here as well as at checkout — a therapist can be deactivated while the Stripe page is open. The draft is deliberately **kept** so the payment can be resolved by hand rather than lost.
+
+- **A missing draft with no existing account fails loudly with a 500.** That means the 26-hour TTL expired before the webhook arrived, so the questionnaire is genuinely gone and no retry can fix it. It surfaces as a failed delivery in Stripe's dashboard rather than disappearing silently, and the ledger's `rawPayload` holds everything needed to rebuild it by hand. Somebody has paid €200; silence would be the wrong failure.
+
+- **`routeEvent` is now awaited.** It was not, and it did not matter while every handler was a synchronous stub. It matters now: an un-awaited promise would return 200 to Stripe before the transaction finished, so a failure would be invisible and the request would look successful.
+
+---
+
+### THE TEMPORARY PASSWORD
+
+A client never chooses a password — there is no password field anywhere in the questionnaire, because no account exists until the money does (§12). So one is generated here and emailed, per §16 ("Welcome + login credentials"). This is the opposite of the therapist welcome email, which deliberately carries no password because they chose their own on the application form (§11) — the two are different on purpose.
+
+- **`crypto.randomInt`, not `randomBytes % length`.** The modulo version is biased toward the start of the alphabet whenever 256 does not divide evenly, which quietly shrinks the keyspace.
+- **The alphabet omits `0 O 1 l I`.** This password is read by a person out of an email, not by a machine.
+- 16 characters of a 55-character alphabet — about 92 bits, and still retypable.
+- **It is never logged**, and exists in exactly two places: the email, and the bcrypt hash.
+
+**THE STRONGEST TEST IN THE CHUNK:** the emailed password is fed to the real `POST /auth/login` endpoint and must return 200 with `role: client`. Everything else could pass while the emailed password did not match the stored hash, and nobody would find out until a real person was locked out of something they had paid for. A second test confirms the stored document holds a `$2b$12$` hash and that the plaintext appears nowhere in it.
+
+**A SECURITY NOTE, RECORDED RATHER THAN ACTED ON.** A password sitting in an inbox is a standing credential until it is changed, and nothing forces a change. The stronger pattern reuses the reset-token machinery from chunk 1.5 — create the account with a random hash nobody knows, and email a single-use, 30-minute "set your password" link instead. Same number of steps for the client, no password ever transmitted. Raised before building; the developer chose the briefed approach, which the spec supports. **Worth revisiting at chunk 12.3 (security hardening).** The email itself asks the client to change the password after signing in.
+
+---
+
+### THE MOCK RIPPLE DID NOT HAPPEN, AND THAT IS THE POINT
+
+Adding `sendClientWelcomeEmail` to the email service is the fifth time a sender has been added. The first four (chunks 1.5, 2.6, 4.3 and 4.5) each broke several unrelated suites with an opaque ESM link error.
+
+This time it was **one line** in `test/emailServiceMock.js`, and `emailMockParity.test.js` would have named the missing function had it been forgotten. The root fix from chunk 4.5 worked exactly as intended.
+
+---
+
+### TWO STALE TEST PREMISES CORRECTED
+
+Both were tests asserting things that used to be true and quietly stopped being true. Neither was a code defect — the behaviour under test is unchanged.
+
+1. **`adminStats.test.js` asserted the `subscriptions` collection did not exist.** It does now: chunk 6.1 added the model, and Mongoose builds indexes on connect, which creates the empty collection. The dashboard still reports zero for every figure — that part is unchanged and still asserted. The assertion now covers only `sessions` and `reviews`, which genuinely have no model yet. Keeping the old claim would have pinned an accident of when a model happened to be written.
+
+2. **`webhook.test.js` defaulted its events to `checkout.session.completed`.** That event now really creates an account, which needs a draft that suite deliberately does not seed — so six transport tests started failing with a 500. The default is now a non-account event type, and the routing matrix sends an *unpaid* checkout session. **That suite is about the transport** — signatures, raw bytes, the ledger, idempotency — and account creation now has its own suite against a replica set. The separation is clearer than it was.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **882 tests across 31 suites, all passing** (864 from earlier chunks, 18 new).
+- `npm run lint` — clean.
+- **Mutation-checked twice**, as above: the transaction (2 tests) and the idempotency guard (1 test).
+- Tests cover everything the brief asked for and several things it did not: the four documents and the consumed draft, rollback leaving zero of each, a couple as one account, a deactivated therapist, a duplicate webhook, **the emailed password logging in for real**, the amount stored as 20000, both Stripe identifiers recorded, the period end taken from Stripe and the fallback when it cannot be, no email on rollback, and the account surviving a failed email.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, nothing to configure.**
+2. **The live end-to-end run is still outstanding**, and it is the one thing worth doing before 6.5. It needs the Stripe CLI, which was set up but never used — `STRIPE_WEBHOOK_SECRET` is still absent from `server/.env`. See below.
+
+**THE LIVE CHECK NOT YET RUN — carried from 6.3, and now more valuable:**
+
+The whole pipe can be proven in one pass once `stripe listen` is running:
+
+1. `stripe listen --forward-to localhost:5000/api/v1/webhooks/payment`, copy the `whsec_` into `server/.env`, restart the API.
+2. Create a real checkout session (chunk 6.2's endpoint), pay it with Stripe's test card `4242 4242 4242 4242`.
+3. Confirm in Atlas: one `users`, one `clientprofiles`, one `bookings`, one `subscriptions`, the `pendingcheckouts` draft **gone**, and one `paymentevents` row.
+4. Sign in at `/login` with the emailed password.
+
+**Step 4 will not work until pre-launch blocker 7 is done** — `EMAIL_FROM` is still the Resend test sender, so the welcome email only reaches the Resend account owner's address. The account is created regardless, which every test proves.
+
+**Carried forward:**
+- **Slice 11** now has real records to act on: renewal extends `currentPeriodEnd` and resets `sessionsRemaining` to 4; failure moves to `past_due`; cancellation keeps access to period end. All four handlers are still stubs.
+- **Chunk 12.3:** consider replacing the emailed password with a set-password link; and restrict the production database user's rights on `paymentevents` (from 6.1).
+- Chunk 6.5 (checkout UI) must map `partner1`/`partner2` into `coupleData`; `/welcome` and `/checkout` still do not exist.
+- The 11 remaining `{VALUES}` enum messages (6.1). Remove the seeded therapists before launch (blocker 13). Whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No renewal, failed-payment or cancellation handling** — slice 11. Those three handlers still log and return.
+- No checkout UI (6.5), no `/welcome` page (6.6), no forced password change on first login.
+- No PayPal. No refund logic — §12 puts refunds in Asad's dashboard for v1.
+
+---
+
+## Chunk 6.5 — Checkout UI and renewal disclosure
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check". The intake journey now runs from "Get started" all the way to Stripe's hosted payment page.
+
+Built — client:
+- `pages/Checkout.jsx` · `pages/CheckoutCancelled.jsx`
+- `components/checkout/` — `TherapistSummary` · `IncludedGrid` · `RenewalDisclosure` · `BillingRhythm` · `CheckoutIcons`
+- `data/checkoutContent.js` · `lib/toCheckoutPayload.js` · `lib/api/checkoutApi.js`
+- Edits: `App.jsx` (two routes), `data/matchesContent.js` (the "built in slice 6" copy was stale), `pages/TherapistDetail.jsx` (Choose now continues to checkout).
+
+Edited — server:
+- `services/checkout.service.js` — `cancel_url` now points at `/checkout/cancel`, and its test asserts the full path.
+
+**No new packages, no new environment variables.**
+
+---
+
+### THE DESIGN PROBLEM, AND THE THESIS
+
+The default build is a price, a bulleted list of inclusions, a yellow warning panel and a button. It is inert, and the yellow is banned anyway — gold on a light surface is 1.63:1.
+
+**The person leads, the price supports.** Every other checkout puts the order summary first. Here there is no form to fill — Stripe's hosted page collects the card — so the page's only jobs are *who you are starting with*, *what it costs*, and *the terms, unmissably*. Leading with the therapist follows §24.7's "enough warmth to make a human choice feel possible", and it is the one moment in the flow where the commitment stops being abstract.
+
+**The frame is the split already used by `/contact`, `/join-as-therapist` and `/questionnaire`** — dark `ink-deep` aside with a soft sage radial wash, light column beside it. Four pre-account form surfaces, one product. No vertical band gradients anywhere.
+
+---
+
+### THE DISCLOSURE — WHAT THE CHUNK TURNS ON
+
+§13 calls checkout the most important of the three places the renewal terms appear, and the brief says it must be impossible to miss.
+
+**It sits on an `ink` panel on a `paper` page, and that inversion IS the mechanism.** Prominence comes from contrast, not from an alarm colour — `clay` or amber would signal that something is wrong, and nothing is wrong. The dark ground also makes gold legible at **11.08:1**, which it can never be on paper, so the accent finally earns a job here.
+
+Two things, together:
+
+1. **The required sentence, quoted verbatim from §13**, at body size and never in a caption. It is a commitment to the person paying, not copy to tighten. `data/checkoutContent.js` says so at the field.
+2. **The billing rhythm, drawn.** Four marks on a rule: the first filled gold and labelled "Today", the next three outlined and fading, the rule itself dissolving to transparent at the right edge — because the billing does not stop either. Caption: *Every month, until you cancel.*
+
+That second piece is transparency rather than decoration: it makes the recurring nature **more** visible, which is the opposite of burying it. The marks are `aria-hidden`, so the caption has to stand alone for a screen reader, and it does.
+
+---
+
+### THE MOBILE FOLD — THE BRIEF'S OWN VERIFY STEP
+
+"Visible without scrolling on mobile" is a real constraint, and it drove a real layout decision: **`IncludedGrid` is hidden below `lg` in the aside and rendered after the button instead.** Four descriptions in the aside would have pushed the disclosure under the fold on a 360×640 screen.
+
+Budget at 360×640: navbar 72 + therapist row ~96 + heading and intro ~110 + price ~76 + disclosure ~230 ≈ 584px, so the disclosure ends on screen and the button sits just below it.
+
+**That arithmetic is a model, not a measurement.** It is the first item in "Yours to check".
+
+**No DOM duplication** — exactly one copy of the inclusions is in the layout at a time via `hidden` / `lg:block`, which resolves to `display:none` and leaves the accessibility tree with one. The chunk 2.3 comparison table set that precedent.
+
+---
+
+### DECISIONS MADE
+
+- **`/checkout/cancel` is a page, not a query-param mode.** Chunk 6.2 set `cancel_url` to `/checkout?status=cancelled`; this brief asks for `/checkout/cancel`, so the server constant moved. **A server edit inside a UI chunk, flagged rather than slipped in** — one line plus its test assertion, which was tightened from `/checkout` to the full path so the two cannot drift apart again.
+
+- **The cancel page carries NO retention pressure.** No "are you sure", no discount, no countdown, no guilt. §24.1 rules out dark patterns and this is precisely where a lesser product puts one. Somebody who backed out of a €200 commitment may be deciding whether they can afford help at all: the page says nothing was charged, says their answers and their therapist are still there, and offers two plain ways forward.
+
+- **The submit button does not re-enable on success.** Only on failure. The page is navigating to Stripe anyway, and re-enabling would let a second click burn another of the ten attempts an hour the 6.2 rate limiter allows.
+
+- **Every error names the problem AND the way out.** `EMAIL_IN_USE` links back to the questionnaire, `THERAPIST_UNAVAILABLE` links to `/matches`, everything else shows the server's own message with a plain retry. A 409 on a checkout screen with no route onward is a dead end at the worst possible moment.
+
+- **Guards redirect rather than fail.** No answers sends you to `/questionnaire`; no chosen therapist sends you to `/matches`. A shared link or a fresh tab would otherwise fire a request with nothing in it and collect a 422.
+
+- **The inclusions are threaded on one hairline rail, not four cards.** Same-size cards of icon-plus-heading-plus-text as the page structure is the category default, and it turns four different things into four rectangles. The marks sit *on* the rail so the list reads as one thread.
+
+- **Five drawn icons at 1.5 stroke**, matching the existing How It Works / Contact / Join sets. The lock beside the Stripe note is deliberately a plain padlock — a shield would overclaim.
+
+- **No ink wash on the therapist photograph.** §24.5 makes therapist portraits the explicit exception to the site's photo treatment: real people, shown as real people.
+
+- **`sessions do not roll over` is stated before payment, not after.** §13's rule, and someone who discovered it afterwards would be entitled to be annoyed.
+
+- **One authored motion moment** — the billing marks settle in on arrival, ~450ms each on a 110ms stagger, exponential ease-out. The column itself does one quiet 8px settle. Both gated on `useReducedMotion`, and under reduced motion the marks are simply present. Nothing on a page about money should feel like pressure.
+
+---
+
+### THE PAYLOAD MAPPER — A CARRIED ITEM SINCE 5.3 CLOSES
+
+`lib/toCheckoutPayload.js` nests `partner1` / `partner2` under `coupleData` and drops the flat individual fields. The Redux slice holds partners flat because that is what a form binds to; §10.2 stores them nested. **Without this, every couple would 422 — the exact class of bug chunk 3.5 shipped on the therapist form**, where every correctly-filled application was rejected until a mapper was written.
+
+It is kept free of React so it can be executed directly, and it was — **against the REAL server Zod schema, not a copy. 14 checks, all passing**: both branches accepted, ages coerced from string to number on the individual and on both partners, email lowercased and trimmed, no `coupleData` on an individual, no individual fields on a couple, no flat partner keys leaking through either, and the top-level key set exactly `email` / `therapistProfileId` / `questionnaire`.
+
+**The check that proves the mapper is doing work:** the raw un-mapped Redux answers are **rejected** by the same schema. If that ever starts passing, the mapper has become a no-op.
+
+---
+
+### CONTRAST — 21 PAIRS COMPUTED, 0 FAILURES
+
+The detector still runs degraded on this machine and evaluates no contrast at all, so every pair was calculated against the real hex values.
+
+| Pair | Ratio | | Pair | Ratio |
+|---|---|---|---|---|
+| therapist name, paper on ink-deep | 19.67:1 | | disclosure sentence, paper on ink | 18.06:1 |
+| section labels, paper/70 | 9.65:1 | | cadence caption, paper/80 | 11.78:1 |
+| included detail, paper/70 | 9.65:1 | | gold billing mark | 11.08:1 |
+| included icon, sage | 5.78:1 | | outlined mark, paper/45 | 4.50:1 |
+| h1 and price, ink on paper | 18.06:1 | | intro and legal, ink/70 | 6.74:1 |
+| lock icon, sage-deep | 5.48:1 | | error text, clay | 5.48:1 |
+
+**The tightest pair is the outlined billing mark at 4.50:1 against a 3:1 graphic floor** — comfortable, and it must not be lightened further or the fading marks stop being visible at all.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` (server) — **882 tests across 31 suites, all passing**, including the tightened `cancel_url` assertion. Unchanged in count by this chunk, which is a frontend one.
+- Client build passes. `oxlint` — **0 findings** on every file this chunk touched. (The two remaining warnings, in `Matches.jsx` and `Home.jsx`, are the developer's own and predate this work.)
+- **Impeccable detector — `[]`, a genuinely empty result** on all seven new files. Still read it as a degraded pass: the parsing dependencies are absent, so it evaluates no contrast. The table above is the compensation.
+- **The mapper executed against the real server schema — 14 checks, all passing** (above).
+- Generated CSS confirmed to carry every new value the page depends on: the `2.75rem` price figure, `calc(100dvh - 72px)`, both ambient blurs, `animate-drift`, and the rule's gradient.
+- The `<main>` landmark trap was caught during the build and fixed: both new pages first rendered their own `<main>` inside `PublicLayout`'s, which is invalid — the same defect chunk 4.1 caught on the admin 404.
+- The `StepIcons` non-component-export trap was caught again in `CheckoutIcons` and fixed at the root — the lookup is built where it is used rather than exported from the icon file.
+
+**YOURS TO CHECK — nothing here has been seen rendered:**
+
+1. **The mobile fold, and it is the brief's own verify step.** At 360px the renewal disclosure must be readable without scrolling. My budget says it lands with room, but that is arithmetic, not a screenshot. **If it falls below the fold, the fix is to move the price above the heading** — one block swap.
+2. **The billing rhythm.** Does the row of marks read as "this happens again every month", or as decoration? This is the piece the chunk was built around, and it is the one thing I most want a second opinion on.
+3. **The disclosure panel overall** — does a dark panel on a light page read as *important* rather than as *a warning*? That distinction is the whole design bet.
+4. **The full flow, now unbroken:** questionnaire → matches → a therapist → Choose → Continue to checkout → Continue to payment → Stripe. This is the first time it runs end to end.
+5. **Cancel from Stripe's page** and confirm you land on `/checkout/cancel` with your therapist still chosen.
+6. **360px on both pages**, reduced motion on (the marks should be present and still), and keyboard through the button and both legal links.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no new colour or type tokens.**
+2. **Restart the API server** if it is running — the `cancel_url` change is read at session-creation time.
+
+**Carried forward:**
+- **`/welcome` does not exist yet** (chunk 6.6), so the success redirect still 404s. Expected.
+- The live Stripe CLI run is still outstanding, and this chunk makes it worth more: the whole pipe — checkout UI → session → payment → webhook → four documents → login — can now be proven in one pass. `STRIPE_WEBHOOK_SECRET` is still absent from `server/.env`.
+- Chunk 12.3: the emailed password versus a set-password link (6.4); the production database user's rights on `paymentevents` (6.1).
+- The 11 remaining `{VALUES}` enum messages (6.1). Remove the seeded therapists before launch (blocker 13). Whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created: every word on both pages is spec-sourced, and the price, inclusions and renewal terms all trace to §2 and §13.
+
+**Not done (out of scope, by design):**
+- **No card fields of any kind.** Stripe's hosted page owns that, and the schema strips unknown keys so one could not be sent even by accident.
+- No `/welcome` page (6.6). No portal (slice 7).
+- No PayPal option — §21 still lists the platform choice as open.
+
+---
+
+### Chunk 6.5 follow-up — the cancel flow bounced to /questionnaire (2026-09-10)
+
+**A bug I shipped in 6.5, found by the developer testing the real Stripe cancel button.** Pressing Stripe's back arrow landed on `/questionnaire` instead of `/checkout/cancel`.
+
+**Their diagnosis was right, and it was worse than the cancel page.**
+
+Redux lives in memory and is never persisted — `store/index.js` says so deliberately. So **any full page load starts it empty**: not just returning from Stripe, but pressing F5 anywhere. Stripe was not doing anything special.
+
+Two gaps had to combine for the symptom:
+
+1. **`selectedTherapist` was saved nowhere.** `writeQuestionnaireDraft` persisted `{ answers, stepIndex }` and nothing else, and `draftRestored` restored the same two. The therapist was written by one reducer, read by two selectors, and never touched storage.
+2. **The restore only ran on one route.** `readQuestionnaireDraft` was called in exactly one file — `QuestionnaireFlow.jsx`, which mounts on `/questionnaire` alone. `/matches`, `/therapist/:id`, `/checkout` and `/checkout/cancel` restored nothing, not even the answers.
+
+So: leave for Stripe → JS context destroyed → return to `/checkout/cancel` → Redux blank → my guard `if (!therapist?.id) return <Navigate to="/questionnaire" />` fires → `/questionnaire` mounts and restores the ANSWERS, which is why it looked like being dumped back to the start with everything still filled in.
+
+**Where the original build went wrong:** the guard was written for a cold visitor on a shared link, which is a real case. It did not account for the page being reached by a **cross-origin round trip** — the one situation where a memory-only store is guaranteed to be empty. The two look identical to a guard and need different answers.
+
+---
+
+**THE FIX — three parts, and the second is the one that matters.**
+
+**1. The draft carries the therapist.** `VERSION` bumped to 2, so a v1 draft is discarded rather than restored: restoring one would put the answers back with no therapist, which is exactly the half-state this removes. The snapshot is a name, photo and professional title — all public on `/matches`, adding no sensitivity to a record that already holds concern tags.
+
+**2. The store is SEEDED, not restored in an effect.** `configureStore({ preloadedState })` reads the draft once at module load, before React renders anything.
+
+This is the part worth remembering: **an effect restores one render too late.** The guards on `/checkout` and `/checkout/cancel` run during the first render, so an effect-based restore would redirect first and land the state on a page nobody is looking at. That is the same ordering trap chunk 1.6 hit with the login-page flash, where it needed an explicit `bootstrapping` status. Seeding removes the race rather than working around it.
+
+**3. Persistence moved to the store as well, and this was a second real defect.** The save effect lived in `QuestionnaireFlow` — but the therapist is chosen on `/therapist/:id`, where that component is not mounted. **An effect there could never have seen the choice at all**, so even adding the field to the draft would not have fixed it. Both directions now live in `store/index.js`: preload on creation, `store.subscribe` on change. Blank state still writes nothing, so opening the flow and leaving stores no health answers.
+
+**4. `/checkout/cancel` no longer redirects, ever.** A tab closed at Stripe still loses the draft, and **"nothing was charged" is the one thing that page exists to say** — true either way, and worth saying before anything else. It now degrades: with a therapist it offers Back to checkout and Choose a different therapist; without one it says plainly that we could not pick up where you left off and no account exists, and offers Start again. Redirecting somebody who has just backed out of a payment is confusing and faintly alarming.
+
+**Verified:**
+- **13 checks executed against the real modules**, simulating the actual round trip — write the draft, destroy the module context, rebuild the store from storage alone. Covers: the therapist surviving, both page guards no longer firing, every slice key present (`preloadedState` replaces rather than merges), a v1 draft discarded, a cold visitor blank, a 25-hour-old draft dropped, and **a private window that throws on every storage call not crashing the app**.
+- **Mutation-checked.** Dropping the therapist from the restore — the original bug — broke **3** checks and reproduced the reported symptom exactly: `selectedTherapist` null, guard redirects. Restored and re-run.
+- Client build passes; `oxlint` 0 findings on every touched file; detector clean on the changed page.
+- Server suite re-run: **882 tests across 31 suites, all passing** — untouched by this fix.
+
+**Worth knowing:** the version bump discards any draft currently open in a tab. Only affects testing.
+
+**Still not covered, and it is a real limit:** sessionStorage is per tab. If the payment page were ever opened in a NEW tab, the draft would not be there. It is not today — `window.location.assign` navigates the same tab — but anything that later opens checkout in a new tab would reintroduce this.
+
+---
+
+## Chunk 6.6 — Welcome page and payment tests
+
+**Status: Complete.** Nothing skipped. **Slice 6 (payments) is finished.** The intake journey now runs from "Get started" to a live account. **Not seen rendered** — see "Yours to check".
+
+Built — server:
+- `GET /api/v1/checkout/session-status` — read-only, one key out.
+- `routes/paymentJourney.test.js` — 9 tests walking the whole path in one file.
+- Edits: `models/Subscription.js` (`checkoutSessionId`), `services/clientOnboarding.service.js` (records it), `services/checkout.service.js` · `controllers/checkout.controller.js` · `routes/checkout.routes.js` · `constants/checkout.js` · `validation/checkout.schema.js`.
+
+Built — client:
+- `pages/Welcome.jsx` · `components/checkout/OutcomeCard.jsx` · `components/checkout/OutcomeMarks.jsx`
+- Edits: `pages/CheckoutCancelled.jsx` (rebuilt on the shared card), `lib/api/checkoutApi.js`, `data/checkoutContent.js`, `App.jsx`.
+
+**No new packages, no new environment variables.**
+
+---
+
+### THE PAGE REPORTS. IT DOES NOT CREATE.
+
+§12's golden rule is the whole constraint here, and it pulls against the brief's other requirement — a "setting up your account" state means the page has to *know* whether the account exists.
+
+Resolved by making the page a pure reader. `GET /checkout/session-status?sessionId=cs_...` answers with **one word**:
+
+| Answer | Meaning |
+|---|---|
+| `ready` | a subscription exists for this session — the transaction committed |
+| `processing` | the pending draft is still there — the webhook has not been through |
+| `unknown` | neither: expired, or invented |
+
+**Nothing else ever leaves it.** No email, no therapist, no amount, no name — the same discipline chunk 3.2 applied to the application-status endpoint, and for the same reason: a payment confirmation page is a link people paste and screenshot.
+
+**`unknown` deliberately does not separate "never existed" from "expired"**, so the endpoint cannot be used to probe for valid session ids.
+
+**The subscription is what it checks, not the draft.** A subscription exists only if the whole four-document transaction committed, so its presence means the work is genuinely finished rather than merely started.
+
+**A test asserts the endpoint creates nothing** — counts unchanged after repeated calls.
+
+**Query string, not path.** `requestLogger` logs `req.path` and deliberately never the query string (chunk 4.1), and a payment session id has no business in our own logs.
+
+**Rate limit is deliberately loose** — 120 per 15 minutes, against the checkout endpoint's 10 per hour. The page polls every 2s for under a minute, and throttling an honest visitor moments after they paid €200 would be the worst possible time to show them an error.
+
+---
+
+### `checkoutSessionId` ON `subscriptions` — spec addition, approved 2026-09-10
+
+§10.6 does not list it. It is the **only** link from the id Stripe puts in the `/welcome` URL back to the account that was created: 6.4 deletes the pending draft inside the transaction, so nothing else survives to join on.
+
+Without it the poll would need either a Stripe API round trip **on every request**, or a scan inside `paymentEvents.rawPayload`, which is `select: false` and unindexed. One indexed field makes it a single fast lookup, which is what polling needs.
+
+---
+
+### THE TEST SUITE — AND AN HONEST ACCOUNTING
+
+The brief asks for a comprehensive suite covering six areas. **Five were already covered**, and rewriting them would have inflated the count without adding safety:
+
+| Area | Already covered in |
+|---|---|
+| Checkout session creation | 33 tests (6.2) |
+| Webhook signature verification | 27 tests (6.3) |
+| Idempotency | 6.3 (ledger) and 6.4 (effect) |
+| Four-document transaction and rollback | 18 tests (6.4) |
+| Couple account creation | 6.4 |
+| Email dispatch on success | 6.4 |
+
+**What genuinely did not exist was a test of the SEAMS between them.** Each chunk tested its own piece against fixtures it built itself. Nothing proved that the session the checkout endpoint creates is the one the webhook can find, that the reference handed to Stripe is the one the draft is keyed by, or that `/welcome` can then see the result.
+
+`routes/paymentJourney.test.js` walks the real path in one file — real signatures, real transaction, real replica set, only Stripe's network faked. It covers the brief's own verify step directly: **complete once, abandon once, replay once, and confirm exactly one account exists from the completed attempt only.**
+
+It also carries the harder replay case: **the same payment reported under a NEW event id.** The ledger cannot catch that one — only 6.4's effect-level guard can — and it asserts two ledger rows but one account and one email.
+
+**A bug in my own test helper, caught by running it.** `createSessionMock.mock.results.at(-1).value` resolves to the whole session object, not the id, so `session.id` arrived as an object and Mongoose threw on the cast — 6 of 9 tests failing with a 500. The helper now takes `.id` off the resolved session.
+
+---
+
+### THE UI — A GROUNDED CARD AND ONE MARK
+
+Developer's requirement, and it was the right call: bare centred paragraphs on an empty page read as an error screen, not as a considered end to something.
+
+Both outcome pages now share `OutcomeCard` — a `paper` card on a `mist` ground with a soft sage wash behind it, radius 16px. **Elevation declared once**: a real shadow with offset and blur, and no border beneath it. A hairline under a soft shadow is the ghost card the craft floor names.
+
+**One drawn mark each, 48px, 1.5 stroke, on its own sage-tinted plate:**
+
+- **`/welcome` — a ring that CLOSES around a check.** The ring draws first and the check follows it in, so the mark reads as something being *finished*, which is what has just happened. Same path-tracing language as the How It Works connector and the 6.5 billing rhythm. Deliberately not a filled green success badge.
+- **`/checkout/cancel` — a bookmark ribbon.** Chosen over a pause mark because a bookmark says *your place is kept*, which is exactly what that page means. A pause reads mechanical; a cross would read as failure when nothing failed. **Static — nothing there is being celebrated.**
+
+Both gated on `useReducedMotion`: the ring is simply present, complete, when motion is reduced.
+
+**Four states on `/welcome`, each with its own honest copy:**
+
+| State | What it says |
+|---|---|
+| `processing` | payment went through, account being made, safe to leave the page |
+| `ready` | account open, check your email, and what to do first |
+| `slow` (after ~40s) | **honest, not reassuring** — payment is safe, account still being set up, contact us if nothing arrives within an hour |
+| no `session_id` | **never claims a payment happened** — a bookmark or direct visit gets a neutral message |
+
+**A failed status check is never reported as a payment failure.** It says nothing about whether the money moved, and telling somebody their payment failed because a poll timed out would be the worst error this page could make.
+
+**One privacy detail:** on `ready`, the sessionStorage draft is cleared. The account exists now, so leaving someone's concern tags in storage until they close the tab is retention with no purpose left.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **891 tests across 32 suites, all passing** (882 from earlier chunks, 9 new).
+- `npm run lint` (server) clean; `oxlint` (client) 0 findings on every file this chunk touched. Client build passes.
+- **Impeccable detector — `[]`** on all four new/changed UI files.
+- **Contrast computed, 0 failures.** Card heading 18.06:1 · body `ink/70` 6.74:1 · **the mark, `sage-deep` on its `sage/12` plate, 4.86:1** against a 3:1 graphic floor.
+
+**YOURS TO CHECK — nothing here has been seen rendered:**
+1. **The two marks.** Does the closing ring read as *completion* rather than a tick badge, and does the bookmark read as *your place is kept*? These are the two pieces the UI requirement was about.
+2. **The card on both pages** — grounded and premium, or still floating?
+3. **The processing state.** Easiest way to see it without racing the webhook: stop `stripe listen`, pay, and watch it sit on "setting up" and then fall through to the honest "taking longer than usual" after ~40 seconds.
+4. **360px** on both, and reduced motion (the ring should be present and complete, not animating).
+
+---
+
+### MANUAL TEST CHECKLIST — the four scenarios
+
+Run with both dev servers up and `stripe listen --forward-to localhost:5000/api/v1/webhooks/payment` in a third terminal, with the printed `whsec_` in `server/.env`. Test card **4242 4242 4242 4242**, any future expiry, any CVC.
+
+**Before each run**, note the baseline: `users`, `clientprofiles`, `bookings`, `subscriptions`, `pendingcheckouts`, `paymentevents`.
+
+**1. Successful payment**
+- Questionnaire → matches → a therapist → Choose → Continue to checkout → Continue to payment → pay.
+- Expect: redirected to `/welcome`, briefly "Setting up your account", then "You are all set".
+- Atlas: **+1** user (role `client`), **+1** clientProfile, **+1** booking, **+1** subscription, **+1** paymentEvent, and the `pendingcheckouts` draft **gone**.
+- Subscription: `amount` **20000**, `currency` EUR, `sessionsRemaining` **4**, `checkoutSessionId` set.
+- Sign in at `/login` with the emailed password. **Blocked by pre-launch blocker 7 until the Resend domain is verified** — the account is created regardless.
+
+**2. Abandoned payment**
+- Reach Stripe's page, press the back arrow.
+- Expect: `/checkout/cancel`, "Nothing was charged", your therapist still shown, Back to checkout works.
+- Atlas: **no** new user, profile, booking or subscription. The draft is still there and expires on its own.
+
+**3. Duplicate webhook**
+- After a successful run, take the event id from the CLI output and `stripe events resend evt_...`.
+- Expect: 200 again. Atlas: **exactly one** `paymentevents` row for that id, **still one** account, and **no second welcome email**.
+
+**4. Already-registered email**
+- Run the questionnaire again using the email from scenario 1.
+- Expect: **409 before Stripe is ever called**, with the neutral "an account already exists" message and a link back to change it.
+- Atlas: no new draft, and the Stripe dashboard shows **no** new checkout session.
+
+---
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **Restart the API server** — the new route and the `checkoutSessionId` field are read at startup.
+3. **`STRIPE_WEBHOOK_SECRET` is still absent from `server/.env`**, so the live run above is still outstanding. It is now the single most valuable thing left in this slice: it proves checkout → webhook → four documents → `/welcome` → login in one pass.
+
+**Carried forward:**
+- Slice 11 owns renewal, failed payment and cancellation — all three handlers are still stubs.
+- Chunk 12.3: the emailed password versus a set-password link (6.4); the production database user's rights on `paymentevents` (6.1).
+- **sessionStorage is per tab** (from the 6.5 follow-up): if checkout were ever opened in a new tab, the draft would not be there.
+- The 11 remaining `{VALUES}` enum messages (6.1). Remove the seeded therapists before launch (blocker 13). Whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No account creation on `/welcome`** — the endpoint it calls is read-only, and a test asserts it writes nothing.
+- No portal behind the sign-in button (slice 7). No renewal, past-due or cancellation handling (slice 11).
+- No PayPal — §21 still lists the platform choice as open.

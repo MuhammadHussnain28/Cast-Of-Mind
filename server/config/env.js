@@ -97,6 +97,38 @@ function loadEnv() {
     process.exit(1);
   }
 
+  // Stripe. Required in production: without it nobody can subscribe, which is
+  // the only way a client account is ever created. Optional in development so
+  // someone working on chat or matching need not hold payment credentials — the
+  // checkout endpoint returns a clear 503 when it is unset.
+  //
+  // STRIPE_WEBHOOK_SECRET belongs to chunk 6.3 and is deliberately not enforced
+  // here yet; adding it now would stop the server booting for a key that
+  // nothing reads.
+  if (isProduction && !process.env.STRIPE_SECRET_KEY) {
+    console.error('Missing STRIPE_SECRET_KEY.');
+    console.error('Without it no client can subscribe, so no client account can be created.');
+    process.exit(1);
+  }
+
+  // Without the signing secret the webhook cannot verify anything, so it would
+  // refuse every event — payments would succeed at Stripe while no account was
+  // ever created, and the only symptom would be silence.
+  if (isProduction && !process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error('Missing STRIPE_WEBHOOK_SECRET.');
+    console.error('Without it no payment webhook can be verified, so no client account is created.');
+    process.exit(1);
+  }
+
+  // A test key in production would take real subscriptions and never charge a
+  // card — the business would be giving therapy away and would not find out
+  // until the money did not arrive.
+  if (isProduction && process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+    console.error('STRIPE_SECRET_KEY is a TEST key, but NODE_ENV is production.');
+    console.error('Real payments would never be collected. Use the live key.');
+    process.exit(1);
+  }
+
   if (isProduction && !process.env.EMAIL_FROM) {
     console.error('Missing EMAIL_FROM.');
     console.error('Set it to a sender on a domain verified in Resend,');
@@ -127,6 +159,14 @@ function loadEnv() {
     // Contact form destination. Null in development falls through to the
     // terminal fallback in sendEmail.
     contactTo: process.env.CONTACT_TO || null,
+
+    // Stripe. Null in development disables the checkout endpoint with a 503
+    // rather than failing deeper with an opaque authentication error.
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY || null,
+
+    // The webhook signing secret. From `stripe listen` locally, from the
+    // dashboard endpoint in production — they are different values.
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || null,
 
     // Cloudinary. All three or none — enforced above.
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || null,

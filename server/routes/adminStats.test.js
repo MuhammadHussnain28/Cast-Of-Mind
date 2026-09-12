@@ -89,13 +89,19 @@ describe('the empty database — the chunk\'s verify step', () => {
   });
 
   test('reads collections that do not exist yet without crashing', async () => {
-    // subscriptions, sessions and reviews have never been created. MongoDB
-    // answers 0 and [] rather than throwing, which is what lets these figures
-    // switch on by themselves when their slice ships.
+    // `sessions` and `reviews` still have no model, so these collections have
+    // never been created. MongoDB answers 0 and [] rather than throwing, which
+    // is what lets these figures switch on by themselves when their slice ships.
+    //
+    // UPDATED IN CHUNK 6.4. This test used to assert `subscriptions` was absent
+    // too. It no longer is: chunk 6.1 added the model, and Mongoose builds its
+    // indexes on connect, which creates the (empty) collection. The dashboard
+    // behaviour is unchanged — every figure below still reads zero — but the
+    // premise "the collection does not exist" stopped being true, so asserting
+    // it would only pin an accident of when a model happened to be written.
     const names = (await mongoose.connection.db.listCollections().toArray()).map(
       (c) => c.name,
     );
-    expect(names).not.toContain('subscriptions');
     expect(names).not.toContain('sessions');
     expect(names).not.toContain('reviews');
 

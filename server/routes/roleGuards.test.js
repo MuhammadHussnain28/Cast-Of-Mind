@@ -216,6 +216,13 @@ describe('the dev routes are not mounted in production', () => {
           // Required in production since chunk 2.6. This test is about route
           // mounting, not email configuration, so it just supplies a value.
           CONTACT_TO: process.env.CONTACT_TO || 'test@example.com',
+          // Required in production since chunk 6.2, and it must NOT look like a
+          // test key — production refuses an sk_test_ key outright, because one
+          // would take real subscriptions and never charge a card. This value is
+          // never used: the child only boots and answers /health.
+          STRIPE_SECRET_KEY: 'sk_live_placeholder_never_used_by_this_test',
+          // Required in production since chunk 6.3 so webhooks can verify signatures.
+          STRIPE_WEBHOOK_SECRET: 'whsec_placeholder_never_used_by_this_test',
         },
       },
     );

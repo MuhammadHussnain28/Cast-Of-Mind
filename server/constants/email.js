@@ -32,5 +32,6 @@ export const SUPPORT_EMAIL = 'support@castofmind.com';
 export const EMAIL_SUBJECTS = Object.freeze({
   passwordReset: 'Reset your Cast of Mind password',
   therapistWelcome: 'Your Cast of Mind therapist account is ready',
+  clientWelcome: 'Welcome to Cast of Mind — your account is ready',
   emailChanged: 'Your Cast of Mind sign-in email has changed',
 });

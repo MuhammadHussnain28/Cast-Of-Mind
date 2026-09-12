@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import env from '../../config/env.js';
 import { passwordResetEmail } from './templates/passwordReset.js';
 import { therapistWelcomeEmail } from './templates/therapistWelcome.js';
+import { clientWelcomeEmail } from './templates/clientWelcome.js';
 import {
   emailChangedOldAddress,
   emailChangedNewAddress,
@@ -90,6 +91,25 @@ export async function sendTherapistWelcomeEmail(to, { firstName }) {
  * the new one needs to know it is now the sign-in address. Sent in parallel;
  * one failing must not stop the other.
  */
+/**
+ * Welcome a client whose payment has just been confirmed.
+ *
+ * CARRIES THE TEMPORARY PASSWORD — the one place a readable copy exists. The
+ * value must never be logged here or anywhere upstream.
+ */
+export async function sendClientWelcomeEmail(to, { name, temporaryPassword, therapistName }) {
+  const loginUrl = `${env.clientOrigin}/login`;
+  const { subject, html, text } = clientWelcomeEmail({
+    name,
+    email: to,
+    temporaryPassword,
+    loginUrl,
+    therapistName,
+  });
+
+  return sendEmail({ to, subject, html, text });
+}
+
 export async function sendEmailChangedNotices({ previousEmail, newEmail, firstName }) {
   const loginUrl = `${env.clientOrigin}/login`;
 

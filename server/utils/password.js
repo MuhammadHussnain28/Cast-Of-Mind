@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 
 // bcrypt password hashing — master spec Sections 11 and 18.
@@ -68,4 +69,39 @@ export async function comparePassword(plain, hash) {
     // bcrypt throws on an unparseable hash string. Treat it as "does not match".
     return false;
   }
+}
+
+/**
+ * A temporary password for a newly paid client.
+ *
+ * A client never chooses a password — there is no password field anywhere in
+ * the questionnaire, because no account exists until the money does (§12). So
+ * one is generated here and emailed to them (§16: "Welcome + login credentials").
+ *
+ * `crypto.randomInt` rather than `randomBytes % length`: the modulo version is
+ * biased toward the first characters of the alphabet whenever 256 does not
+ * divide evenly, which quietly shrinks the keyspace.
+ *
+ * The alphabet omits characters that are misread when copied out of an email —
+ * 0/O, 1/l/I — because this password is read by a person, not a machine.
+ *
+ * NEVER LOG THE RETURN VALUE. It is a live credential until the client changes
+ * it, and it exists in exactly two places: the email, and the bcrypt hash.
+ */
+const TEMPORARY_PASSWORD_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+// 16 characters of a 55-character alphabet is about 92 bits of entropy — far
+// beyond anything guessable, and still short enough to retype by hand.
+export const TEMPORARY_PASSWORD_LENGTH = 16;
+
+export function generateTemporaryPassword(length = TEMPORARY_PASSWORD_LENGTH) {
+  let password = '';
+
+  for (let i = 0; i < length; i += 1) {
+    password += TEMPORARY_PASSWORD_ALPHABET[
+      crypto.randomInt(TEMPORARY_PASSWORD_ALPHABET.length)
+    ];
+  }
+
+  return password;
 }

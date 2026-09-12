@@ -12,17 +12,24 @@ export const formatCount = (value) => counts.format(value ?? 0)
 /**
  * §2: billing is EUR, €200/month.
  *
- * OPEN ITEM for slice 6: §10.6 types `amount` as a Number without saying
- * whether it holds euros or cents. This formats it as whole euros. When slice 6
- * decides, check this — it cannot be wrong today because there are no
- * subscriptions, and it would be very wrong later.
+ * TAKES MINOR UNITS — CENTS. €200.00 arrives as 20000.
+ *
+ * Resolved in chunk 6.1, closing the open item 4.4 recorded: money is stored in
+ * cents everywhere, because Stripe speaks cents and the payment ledger has to
+ * match Stripe exactly for disputes. This is the one place in the client that
+ * knows about the 100.
+ *
+ * Fractions are dropped because every figure on this dashboard is a whole-euro
+ * subscription total; a stray ".00" on a headline number reads as noise.
  */
-export function formatMoney(value, currency = 'EUR') {
+const MINOR_UNITS_PER_MAJOR = 100
+
+export function formatMoney(minorUnits, currency = 'EUR') {
   return new Intl.NumberFormat('en-IE', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
-  }).format(value ?? 0)
+  }).format((minorUnits ?? 0) / MINOR_UNITS_PER_MAJOR)
 }
 
 /**

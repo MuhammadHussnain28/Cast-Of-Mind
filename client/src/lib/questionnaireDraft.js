@@ -15,10 +15,28 @@
  * Every read and write is wrapped: storage throws outright in some private-window
  * modes, and a saved draft is a convenience that must never be the reason the
  * questionnaire fails to load.
+ *
+ * IT CARRIES THE CHOSEN THERAPIST TOO, since 2026-09-10.
+ *
+ * Redux lives in memory and is never persisted, so ANY full page load starts it
+ * empty — a refresh, or coming back from Stripe's hosted checkout. Without the
+ * therapist in here, returning from Stripe's cancel button landed on a page
+ * whose guard saw no selection and bounced the visitor to /questionnaire.
+ *
+ * sessionStorage survives leaving to another origin and returning, because it
+ * is scoped to the tab and the checkout redirect keeps the same tab.
+ *
+ * The therapist snapshot is a name, a photo and a professional title — all
+ * public on /matches. It adds no sensitivity to a record that already holds
+ * concern tags.
  */
 
 const KEY = 'com.castofmind.questionnaire.draft'
-const VERSION = 1
+
+// 2 since 2026-09-10, when `selectedTherapist` joined the draft. A v1 draft is
+// discarded rather than restored, because restoring one would put the answers
+// back with no therapist — the exact half-state this version exists to fix.
+const VERSION = 2
 
 // A tab can stay open for days. Short by design — these are health answers.
 const MAX_AGE_MS = 24 * 60 * 60 * 1000
@@ -33,17 +51,28 @@ export function readQuestionnaireDraft() {
     if (!saved.savedAt || Date.now() - saved.savedAt > MAX_AGE_MS) return null
     if (!saved.answers || typeof saved.answers !== 'object') return null
 
-    return { answers: saved.answers, stepIndex: saved.stepIndex ?? 0, savedAt: saved.savedAt }
+    return {
+      answers: saved.answers,
+      stepIndex: saved.stepIndex ?? 0,
+      selectedTherapist: saved.selectedTherapist ?? null,
+      savedAt: saved.savedAt,
+    }
   } catch {
     return null
   }
 }
 
-export function writeQuestionnaireDraft(answers, stepIndex) {
+export function writeQuestionnaireDraft(answers, stepIndex, selectedTherapist = null) {
   try {
     window.sessionStorage.setItem(
       KEY,
-      JSON.stringify({ version: VERSION, savedAt: Date.now(), stepIndex, answers }),
+      JSON.stringify({
+        version: VERSION,
+        savedAt: Date.now(),
+        stepIndex,
+        answers,
+        selectedTherapist,
+      }),
     )
   } catch {
     // Quota exceeded or storage blocked. Silent by design.
@@ -58,7 +87,10 @@ export function writeQuestionnaireDraft(answers, stepIndex) {
  * form. And it means simply opening the page stores nothing at all, which is the
  * right default when the thing being stored is a list of health concerns.
  */
-export function hasAnyAnswer(answers) {
+export function hasAnyAnswer(answers, selectedTherapist = null) {
+  // A chosen therapist is worth saving on its own — it is the thing that was
+  // being lost on the way back from Stripe.
+  if (selectedTherapist?.id) return true
   if (!answers) return false
   if (answers.concernTags?.length) return true
 

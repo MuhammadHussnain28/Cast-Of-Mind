@@ -9,6 +9,8 @@ import adminRoutes from './admin.routes.js';
 import therapistRoutes from './therapist.routes.js';
 import matchingRoutes from './matching.routes.js';
 import therapistsRoutes from './therapists.routes.js';
+import checkoutRoutes from './checkout.routes.js';
+import webhookRoutes from './webhook.routes.js';
 import devRoutes from './dev.routes.js';
 
 const router = express.Router();
@@ -24,6 +26,9 @@ router.use('/matching', matchingRoutes);
 // Plural and public — the singular '/therapist' above is the authenticated
 // route where a therapist manages their own profile.
 router.use('/therapists', therapistsRoutes);
+router.use('/checkout', checkoutRoutes);
+// Raw-bodied — see the parser mounted for this path in app.js.
+router.use('/webhooks', webhookRoutes);
 
 // TODO: REMOVE BEFORE LAUNCH — see routes/dev.routes.js.
 //

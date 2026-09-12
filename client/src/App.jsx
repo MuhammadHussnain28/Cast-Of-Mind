@@ -15,6 +15,9 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Questionnaire from './pages/Questionnaire'
 import Matches from './pages/Matches'
+import Checkout from './pages/Checkout'
+import CheckoutCancelled from './pages/CheckoutCancelled'
+import Welcome from './pages/Welcome'
 // Aliased: pages/admin/TherapistDetail is the admin's view of a therapist.
 // This is the public profile a client reads while choosing one.
 import PublicTherapistDetail from './pages/TherapistDetail'
@@ -70,6 +73,12 @@ export default function App() {
               <Route path="/questionnaire" element={<Questionnaire />} />
               <Route path="/matches" element={<Matches />} />
               <Route path="/therapist/:id" element={<PublicTherapistDetail />} />
+              <Route path="/checkout" element={<Checkout />} />
+              {/* Where Stripe returns someone who closed the payment page. */}
+              <Route path="/checkout/cancel" element={<CheckoutCancelled />} />
+              {/* Shown after a successful payment. It REPORTS only — the
+                  account is created by the webhook, never by this page. */}
+              <Route path="/welcome" element={<Welcome />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/refund" element={<Refund />} />

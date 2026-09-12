@@ -88,5 +88,5 @@ export const detail = {
     'They may no longer be taking new clients. The others are still here.',
   notFoundCta: 'Back to therapists',
   // 5.7 / slice 6 wires the checkout; until then the CTA records the choice.
-  nextStepPending: 'Checkout is built in slice 6 — your choice is saved until then.',
+  continueToCheckout: 'Continue to checkout',
 }
