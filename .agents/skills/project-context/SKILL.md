@@ -14,11 +14,12 @@ When this command is called, perform a fast, clean synchronization:
 
 2. **Acknowledge Key Project Constraints:**
    - Strict Read-Only Mode (explain, review, and plan; do not edit source files directly).
+   - Permission Required (you are strictly not allowed to touch or modify the codebase without explicit permission).
    - Easy English responses (no complex jargon).
    - Visual-first UI design (NO vertical black-to-white band gradients; soft ambient radial glows only).
 
 3. **Status Report to User:**
    - State: *"Context synced successfully! ⚡"*
    - State the current Chunk we are on (from `docs/ongoing.md`).
-   - Confirm backend test count (381 tests passing).
+   - Confirm backend test count.
    - Ask: *"I am ready! What would you like to build next?"*

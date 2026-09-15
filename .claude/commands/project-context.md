@@ -7,8 +7,8 @@ Perform a fast context sync for the Cast of Mind project.
 
 ## 1. Read the core context files
 
-- `Cast_of_Mind_Master_Spec.md` — the product specification and single source of truth.
-- `docs/ongoing.md` — **read the whole file, start to finish.** It is long , and reading
+- `Cast_of_Mind_Master_Spec.md` — the product specification and single source of truth (noting that during the project, some items may evolve or change).
+- `docs/ongoing.md` — **read the whole file, start to finish.** It is long, and reading
   only the end is how past decisions get contradicted: the SHA-256 refresh-token choice, the
   "never put a TTL index on `refreshTokenExpiresAt`" warning, and the parallel-test flake are all
   in early entries, not recent ones.
@@ -23,6 +23,7 @@ Perform a fast context sync for the Cast of Mind project.
   impeccable detector runs degraded on this machine and evaluates no contrast at all.
 - **Code hygiene.** Comments stay short and high-signal. Durable reasoning belongs in
   `docs/ongoing.md`, not in file headers.
+- **Database safety.** NEVER delete, drop, wipe, or modify any existing data or collections in the database without explicit permission from the user.
 - **Plan first.** Show the implementation plan and get approval before writing any code.
 - **Verify.** Run `npm test -- --runInBand` in `/server` (parallel runs flake on this machine), and
   update `docs/ongoing.md` when a chunk is complete.
@@ -35,4 +36,5 @@ Keep it to a few lines, in plain English:
 - The current active chunk, and what the last completed one was.
 - The passing test count.
 - Any open blockers that would affect the next piece of work.
+- Explicit confirmation that database safety rules are acknowledged.
 - "Ready for the next chunk instructions. What are we building?"

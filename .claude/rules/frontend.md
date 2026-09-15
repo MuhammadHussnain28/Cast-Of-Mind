@@ -93,6 +93,27 @@ Use Framer Motion.
 
 ---
 
+## The standing bar for every screen — client directive, 2026-09-13
+
+**This applies to every screen in the project, forever. It does not need restating per chunk.**
+
+> Make the UI genuinely premium, polished and consistent. **Do not put plain text inside bare boxes.** Use real visual language — considered hierarchy, drawn icons, subtle graphics, elegant styling — so the platform feels high-end, beautiful and visually engaging rather than merely correct.
+
+**What this rules out**, because these are the shapes "correct but flat" actually takes:
+
+- A heading, a paragraph and a bordered rectangle, repeated down the page. If a screen is a stack of same-shaped boxes, it is not finished.
+- Text doing a job a drawn element would do better. A sequence should look like a sequence; a limit should be visible; a relationship should be drawn. Carry the idea visually — **text is the caption, not the payload**.
+- Unstyled defaults anywhere: bare `<ul>` bullets, browser form controls, default focus rings, untouched scrollbars, undesigned empty and loading states.
+- One flat depth across a whole screen. Real surfaces, real elevation, real seams.
+
+**What it asks for** — all already permitted by §24.9 below, and now expected rather than tolerated: drawn icons at one stroke weight, authored SVG where it clarifies, soft ambient washes, spatial layering, considered type hierarchy, and states (hover, focus, loading, empty, error) that look designed.
+
+**The floor is unchanged and still wins over all of it:** every contrast ratio computed rather than eyeballed, `prefers-reduced-motion` respected, 360px, visible keyboard focus, 44×44px targets, semantic HTML, 150–250ms functional interactions, sentence case, no dark patterns, and the eight palette tokens. Premium never means decorated — §24.9's line holds: **natural, not decorated.**
+
+Portals are included. §24.8 makes them denser and quieter than the marketing pages; it does not make them plainer.
+
+---
+
 ## Visual Latitude — read this before deciding something is not allowed
 
 **Added 2026-08-29.** The first home page build followed every rule here and still landed flat: horizontal bands, each a rectangle of solid colour with a heading, a paragraph and a grid. Nothing overlapped, nothing had depth, nearly every animation was the same fade-and-rise. The cause was that this file was written almost entirely as prohibitions and was therefore read defensively.

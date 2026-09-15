@@ -1,0 +1,88 @@
+import { cx } from '../../../../lib/cx'
+import { timeIn } from '../../../../lib/chat/groupMessages'
+import { MESSAGE_STATUS } from '../../../../lib/chat/messageStore'
+import { chat } from '../../../../data/chatContent'
+import { UnsentIcon } from './ChatIcons'
+
+/**
+ * One run of messages from one person.
+ *
+ * CLUSTERED, NOT STACKED. Five separate bubbles each carrying their own
+ * timestamp is what turns a conversation into a spreadsheet. A run shares one
+ * timestamp and one tail, which is also how the eye reads it.
+ *
+ * The tail is a single tightened corner on the last bubble rather than a drawn
+ * arrow — the shape tells you who spoke without an applied decoration.
+ *
+ * Elevation is declared once: each bubble has a ground and neither a border nor
+ * a shadow. A tinted rectangle with a hairline under a shadow is the ghost card.
+ */
+export default function MessageCluster({ cluster, timeZone, onRetry }) {
+  const { mine, messages } = cluster
+  const last = messages[messages.length - 1]
+
+  return (
+    <div className={cx('flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
+      {messages.map((message, index) => {
+        const isLast = index === messages.length - 1
+        const sending = message.status === MESSAGE_STATUS.SENDING
+
+        return (
+          <div
+            key={message.id ?? message.clientMessageId}
+            className={cx(
+              'max-w-[85%] px-4 py-2.5 sm:max-w-[75%]',
+              'font-body text-ui leading-relaxed',
+              // Long words and pasted URLs must wrap rather than force the
+              // whole thread to scroll sideways.
+              'whitespace-pre-wrap wrap-break-word',
+              mine ? 'bg-ink text-paper' : 'bg-paper text-ink-deep',
+              // 16px radius, with the corner nearest the speaker tightened on
+              // the final bubble of the run.
+              'rounded-2xl',
+              isLast && (mine ? 'rounded-br-md' : 'rounded-bl-md'),
+              sending && 'opacity-70',
+            )}
+          >
+            {message.text}
+          </div>
+        )
+      })}
+
+      {/* One timestamp for the run, not one per message. */}
+      <div className={cx('flex items-center gap-2 px-1', mine ? 'flex-row-reverse' : 'flex-row')}>
+        <time
+          dateTime={last.createdAt}
+          className="font-body text-caption tabular-nums text-ink/70"
+        >
+          {last.status === MESSAGE_STATUS.SENDING
+            ? chat.sending
+            : timeIn(last.createdAt, timeZone)}
+        </time>
+      </div>
+
+      {/* A failure sits BELOW the bubble on the page ground, never inside it:
+          clay on ink would not clear contrast, and the message itself is not
+          the thing that went wrong. The text stays exactly where it was. */}
+      {messages
+        .filter((m) => m.status === MESSAGE_STATUS.FAILED)
+        .map((m) => (
+          <p
+            key={`failed-${m.clientMessageId}`}
+            className="flex items-center gap-2 px-1 font-body text-caption text-clay"
+            role="status"
+          >
+            <UnsentIcon />
+            <span>{chat.failed}</span>
+            <button
+              type="button"
+              onClick={() => onRetry?.(m.clientMessageId)}
+              className="min-h-11 rounded-lg px-2 font-medium text-clay underline decoration-clay/40 underline-offset-4 transition-colors duration-200 hover:decoration-clay"
+            >
+              {chat.retry}
+            </button>
+          </p>
+        ))}
+    </div>
+  )
+}

@@ -23,6 +23,11 @@ import Welcome from './pages/Welcome'
 import PublicTherapistDetail from './pages/TherapistDetail'
 import PortalLayout from './pages/portal/PortalLayout'
 import PortalHome from './pages/portal/PortalHome'
+import PortalChat from './pages/portal/client/Chat'
+import PortalWorksheets from './pages/portal/client/Worksheets'
+import PortalJournal from './pages/portal/client/Journal'
+import PortalSessions from './pages/portal/client/Sessions'
+import PortalAccount from './pages/portal/client/Account'
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import Applications from './pages/admin/Applications'
@@ -86,11 +91,19 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
 
-            {/* Clients and therapists share this route; the content branches on
-                role inside. Its own shell, not the marketing layout — a navbar
-                and footer wrapped round a signed-in surface was the same mistake
-                the admin portal fixed in 4.1. Slice 8 replaces the body with the
-                therapist inbox and slice 7 fills the client side. */}
+            {/* Clients and therapists share this route; PortalLayout picks the
+                shell by role. Its own chrome, not the marketing layout — a
+                navbar and footer wrapped round a signed-in surface was the same
+                mistake the admin portal fixed in 4.1.
+
+                The five child routes are the client's features (§7). A
+                therapist never sees them: they land on the index, which renders
+                their profile until slice 8 builds the inbox.
+
+                Guarding the LAYOUT covers every child, so a feature added in a
+                later chunk cannot ship unprotected. The server enforces both the
+                role and the subscription on every /api/v1/client request; this
+                only decides what renders. */}
             <Route
               path="/portal"
               element={
@@ -100,6 +113,11 @@ export default function App() {
               }
             >
               <Route index element={<PortalHome />} />
+              <Route path="chat" element={<PortalChat />} />
+              <Route path="worksheets" element={<PortalWorksheets />} />
+              <Route path="journal" element={<PortalJournal />} />
+              <Route path="sessions" element={<PortalSessions />} />
+              <Route path="account" element={<PortalAccount />} />
               <Route path="*" element={<NotFound />} />
             </Route>
 

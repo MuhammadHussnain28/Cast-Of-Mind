@@ -5,6 +5,7 @@ import {
   requireTherapist,
   requireAdmin,
 } from '../middleware/requireRole.js';
+import { requireActiveSubscription } from '../middleware/requireActiveSubscription.js';
 
 // TODO: REMOVE BEFORE LAUNCH — development-only routes.
 //
@@ -33,5 +34,17 @@ router.get('/any', requireAuth, whoami);
 router.get('/client', requireAuth, requireClient, whoami);
 router.get('/therapist', requireAuth, requireTherapist, whoami);
 router.get('/admin', requireAuth, requireAdmin, whoami);
+
+// The subscription access gate (§13), so it can be tried by hand: set a
+// client's subscription to `expired` in the database and this flips from 200 to
+// 403 SUBSCRIPTION_ENDED. No real client route is gated yet — chat (7.2) is the
+// first — and this is the only way to exercise it outside the test suite.
+router.get('/client-gated', requireAuth, requireClient, requireActiveSubscription, (req, res) => {
+  res.status(200).json({
+    message: 'Guard passed.',
+    user: { id: req.user.id, role: req.user.role },
+    access: req.portalAccess,
+  });
+});
 
 export default router;

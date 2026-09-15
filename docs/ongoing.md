@@ -4162,3 +4162,753 @@ Run with both dev servers up and `stripe listen --forward-to localhost:5000/api/
 - **No account creation on `/welcome`** — the endpoint it calls is read-only, and a test asserts it writes nothing.
 - No portal behind the sign-in button (slice 7). No renewal, past-due or cancellation handling (slice 11).
 - No PayPal — §21 still lists the platform choice as open.
+
+---
+
+## Chunk 7.1 — Client portal shell and access gate
+
+**Status: Complete.** Nothing skipped. **Slice 7 has started.** Verified live against the real Atlas cluster with a throwaway client created and then deleted; the rendered screens are yours.
+
+Built — server:
+- `middleware/requireActiveSubscription.js` — the gate, plus `resolveAccess` and `findCurrentSubscription`.
+- `services/clientPortal.service.js` · `controllers/clientPortal.controller.js`
+- `routes/client.routes.js` — `GET /api/v1/client/me`, then the gate.
+- `constants/clientPortal.js`
+- `routes/clientPortal.test.js` — 34 tests.
+- Edits: `routes/index.js` (mount), `routes/dev.routes.js` (one gated route, see below).
+
+Built — client:
+- `pages/portal/ClientPortalShell.jsx` — the client's chrome.
+- `pages/portal/client/` — `Chat` · `Worksheets` · `Journal` · `Sessions` · `Account`.
+- `components/portal/client/` — `ClientRail` · `ClientTabBar` · `TherapistPresence` · `AccessNotice` · `SubscriptionEnded` · `PortalSkeleton` · `ScreenScaffold` · `ClientPortalIcons` · `navIcons`.
+- `lib/therapistAvailability.js` · `lib/clientPortalContext.js` · `lib/api/clientPortalApi.js` · `data/clientPortalContent.js`
+- Edits: `App.jsx` (five child routes), `pages/portal/PortalLayout.jsx` (branches by role), `pages/portal/PortalHome.jsx`, `lib/workingHours.js` (two helpers exported).
+
+**An edge case closed before it shipped:** the five child routes belong to the client, and `Account` reads the client portal context — which the therapist's shell does not provide, so a therapist who typed `/portal/account` would have hit a thrown error and a blank screen rather than something merely odd. `PortalLayout` now sends a non-client on any child path back to `/portal`, which is the same "redirected, not refused" call `ProtectedRoute` makes.
+
+**No new packages, no new environment variables, no new colour tokens.**
+
+---
+
+### THE DECISION THE CHUNK TURNS ON: /client/me IS NOT BEHIND THE GATE
+
+Everything else under `/api/v1/client` is. `router.use(requireActiveSubscription)` sits *after* the `/me` route, so chat (7.2), worksheets (8.5), the journal (8.6) and the session hub (9.4) are all gated by default, and a new route would have to be deliberately mounted above that line to escape it — the same router-level discipline as the admin mount in 4.1.
+
+`/me` is exempt because **it is the endpoint that reports access**. Behind the gate it would return a bare 403, and the browser could not tell "your subscription ended" from "something broke" — leaving slice 12's re-subscribe screen with nothing to render and an anxious person looking at an error. It leaks nothing: their own account, their own answers, the therapist they already chose, the state of their own subscription.
+
+Two tests pin it, and the live run confirmed it against a genuinely expired record.
+
+---
+
+### THE STATE MACHINE, AND THE CASE WORTH READING TWICE
+
+| Stored status | Resolved access | Gated routes |
+|---|---|---|
+| `active` | `active` | open |
+| `past_due` | `past_due` | **open** — §13 gives a ~3-day grace period with a banner, not a lockout |
+| `cancelled`, period still running | `ending` | **open** — §13: never cut off mid-paid-period |
+| `cancelled`, period passed | `ended` | 403 `SUBSCRIPTION_ENDED` |
+| `expired` | `ended` | 403 |
+| no subscription at all | `ended` | 403 — fails closed |
+
+The cancelled case is the one that bites. A client who cancels keeps everything until the end of the period they already paid for; cutting them off early would be a refund problem as well as a broken promise. Slice 11 will flip the stored status on that same boundary, and this comparison is what keeps the two in step in the meantime.
+
+**The gate FAILS CLOSED**, as `requireRole` does: no `req.user` means 401, never a pass-through. A guard that waves requests through when it is misused is worse than no guard, because the route still looks protected in the code.
+
+**Mutation-checked twice.** Making a cancelled subscription always allowed broke **3** tests; making the gate never refuse broke **4**. Both restored and the suite re-run.
+
+---
+
+### DECISIONS MADE
+
+- **The response carries BOTH the resolved access and the stored status.** `access: "ending"` decides what renders; `subscription.status: "cancelled"` is what the screen says out loud. One without the other means either the UI guesses or the copy lies.
+- **The therapist projection is an allowlist**, not a denylist — a denylist leaks whatever a later chunk adds to `therapistProfiles`. Every field on it is already public on `GET /api/v1/therapists/:id`, which the client read before paying, so nothing new is exposed. `workingHours` and `timezone` are included because §7.1 needs them at the top of the chat, which saves 7.4 a second endpoint.
+- **The therapist's PROFILE id goes out, never their user id.** A test asserts the two differ and that the user id appears nowhere in the payload.
+- **The Stripe identifiers are withheld.** `platformSubscriptionId`, `platformCustomerId` and `checkoutSessionId` have no use in a browser; slice 11 will open Stripe's billing portal server-side rather than handing the customer id to the page.
+- **`privateNotes` is never imported, queried or joined by the portal service**, and the file carries a comment marking that boundary. §8.5 requires the separation to be architectural, not a filter on a response.
+- **One temporary route, `GET /api/v1/dev/client-gated`.** No real client route is gated yet — 7.2's chat is the first — so this is the only way to exercise the gate by hand. It went into `dev.routes.js`, which exists for exactly this (1.4), is mounted only outside production, and is already pre-launch blocker 6, so it adds no new debt.
+
+---
+
+### THE UI
+
+**The frame is the one the site already has.** `/contact`, `/join-as-therapist`, `/questionnaire` and `/checkout` all use a dark ink aside with a soft sage wash beside a light work area. The portal is the fifth surface in that family rather than a new place the client has been moved to. Content sits on `mist` with `paper` panels — warmer than the admin's flat paper, which is the difference §24.8 asks for. Flat seams and radial glows only; no vertical band gradients.
+
+The rail is dark for an accessibility reason rather than a stylistic one: gold is 1.63:1 on a light surface and is never permitted as text or an indicator there, so ink is the only ground in a portal where the accent can mark the current section (11.08:1).
+
+**The rail opens with the therapist, not with a product name.** Photo, name, credentials, and one factual line built from the working hours — *"In clinic today · Until 12:30"* or *"Next in clinic: Monday, 9:00 AM"* (wording revised 2026-09-13, see the follow-up below). A client has exactly one therapist (§7) and that is what their portal is about.
+
+**It is NOT presence, and that is deliberate.** §7.1 rules out any "unavailable" barrier and says a message simply waits. There is no online dot, nothing is greyed out, and the line gates nothing — it reports published hours so someone knows roughly when to expect a reply.
+
+**The phone gets a bottom tab bar, not a drawer.** Five items is what a thumb-reachable bar is for, and every section is one tap from every other. The admin's drawer suits dense tables; this suits a client. Exactly one of the bar and the rail is in the DOM at a time, so a screen reader never meets the same navigation twice. The active item is marked three ways — gold icon, weight, and a rule above it — so it never depends on colour alone.
+
+**The placeholder screens are designed and carry things that are already TRUE**, rather than describing software that does not exist: the journal leads with §7.3's transparency note (your therapist reads every entry), the worksheets screen draws §7.2's real four-step loop, sessions states that your therapist schedules them and you cannot move one yourself (§7.4). **No timelines anywhere** — none has been agreed, and a missed date reads worse than saying nothing, the same call made on the application confirmation screen (3.5).
+
+Each also carries one quiet line saying that part is not switched on yet. A screen that describes a feature warmly and then does nothing reads as broken software, and someone paying €200 a month is entitled to know which it is.
+
+**`/portal/account` is a read-only summary** — developer's decision, 2026-09-12. Status, plan, sessions left with the no-carry-over rule (§13), next payment with §13's required "cancel before this date" sentence, and the client's own details. **No cancel button and no payment-method controls**: 11.3 and 11.5 own those, and the screen says so rather than leaving someone hunting for a control that does not exist.
+
+**The expired screen carries NO reactivate button.** Slice 12 builds that flow; a button that goes nowhere is worse than none, particularly for someone who may have let the subscription lapse because money is tight. The mark is a bookmark — their place is kept, which is exactly what §13 promises.
+
+**No retention pressure on the ending notice.** No discount, no "are you sure", no warning about what they will lose. Dark patterns on cancellation are excluded outright, and this is precisely where a lesser product puts one.
+
+---
+
+### A REAL CONTRAST FAILURE, FOUND BY MEASURING
+
+| What | Was | Now |
+|---|---|---|
+| Past-due notice title, `clay` on `clay/8` over **mist** | **4.42:1 FAIL** | `clay` on `clay/8` over **paper** — **4.90:1** pass |
+
+A tint composites over whatever is behind it, and the content ground is mist. Putting the notice on a paper base lifts the title to 4.90:1 and its body copy to 6.01:1. It looked entirely reasonable in the source.
+
+**43 pairs computed, 0 failures after the fix.** The three tightest, none of which may be lightened: the past-due title at **4.90:1**, the worksheet step numeral and the past-due button label at **5.48:1**.
+
+Selected: rail name 18.06:1 · rail credentials and hours 9.20:1 · active nav label 13.75:1 · active nav icon 8.44:1 · tab bar gold 11.08:1 · screen heading on mist 16.25:1 · screen lead 6.41:1 · journal panel heading 15.08:1 and body 5.95:1 · account value 19.67:1 · ended mark 4.85:1. Decorative and exempt: the sage rails at 1.49:1 and the `ink/12` dividers at 1.28:1.
+
+---
+
+### ONE DEVIATION FROM THE TYPE SCALE, FLAGGED RATHER THAN SLIPPED IN
+
+The tab bar labels are **11px**, below the scale's 14px caption floor. At 360px each tab has about 64px of usable width and "Worksheets" does not fit at 14px. The icon carries the meaning and the label confirms it, which is the standard tab-bar relationship. Same footing as the `--text-ui` step added in 0.4 — if it should instead be 14px with shorter labels, that is one line here plus the labels in `data/clientPortalContent.js`.
+
+---
+
+### THE HOURS LINE WAS EXECUTED, NOT ASSUMED
+
+Recurring working hours are the piece most likely to be silently wrong, so `lib/therapistAvailability.js` reuses the DST-safe two-pass conversion from `workingHours.js` (5.6, 21 tests) rather than carrying a second copy — two screens disagreeing about a Perth therapist's Monday is exactly what a duplicate causes. Two helpers were exported from that module for it.
+
+**22 checks executed against fixed zones and fixed instants**, so the results do not depend on today: Kolkata to Dublin inside hours and before hours; after hours rolling to tomorrow; **a Friday evening correctly finding next Monday** (the reason the search window is two weeks — a one-week window answers "never"); **Perth to Toronto**, where the day rolls back; a 22:00–02:00 span treated as ending next day rather than going backwards; India's half-hour offset preserved; **the same schedule either side of a DST change**, where the viewer's end time moves and nothing is hardcoded; and every degradation path — no hours, no zone, all days disabled, malformed times, and an unrecognised IANA zone — returning "unknown" instead of throwing.
+
+**A real improvement came out of running it.** `hour: 'numeric'` rendered "4:30" in a 24-hour locale, which is ambiguous with no am/pm to disambiguate it. `timeStyle: 'short'` is idiomatic in both conventions — en-GB "12:30", en-US "7:30 AM", de-DE "13:30" — and all three were checked.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **925 tests across 33 suites, all passing** (891 from earlier chunks, 34 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched. The six remaining warnings are the developer's own in `home/Hero.jsx`, `home/Services.jsx`, `pages/Home.jsx`, `pages/Matches.jsx` and `about/WhyCardsDeck.jsx`, open since 2.2.
+- Client build passes. Generated CSS confirmed to carry every new value the shell depends on: the 272px rail column, `env(safe-area-inset-bottom)`, `blur(130px)`, `motion-safe:animate-pulse`, `backdrop-blur`, the 11px label and the card shadow.
+- **43 contrast pairs computed, 0 failures** (table above).
+- **22 availability checks executed** (above).
+- Impeccable detector — an empty result, and **read that as a degraded empty**: `htmlparser2`, `css-select`, `css-tree` and `domutils` were re-checked this chunk and are all still absent, so it evaluates no contrast at all. The computed table is the compensation.
+- **Mutation-checked twice** on the gate, as above.
+
+**LIVE AGAINST THE REAL SERVER AND REAL ATLAS — 31 checks, all passing.** Authorised by the developer, 2026-09-12. A throwaway client was created **through the real onboarding transaction** (`createClientAccount`, the same path the webhook uses) against a **seeded** therapist, never the real one:
+- all four documents created, the pending draft consumed inside the transaction;
+- the client signed in at `/api/v1/auth/login` and reached `/client/me` with the therapist, their working hours and timezone, `amount` 20000 and `sessionsRemaining` 4;
+- **no bcrypt hash, no Stripe id, no taxpayer id or street address, and the therapist's user id nowhere in the payload**;
+- the gate opened for `active`, `past_due` and cancelled-inside-period, and returned **403 `SUBSCRIPTION_ENDED`** for cancelled-past-period and for **expired — the chunk's own verify step**;
+- **`/client/me` still answered 200 while expired**, reporting `ended` and still naming the therapist;
+- restoring to active reopened the gate.
+- **Everything created was deleted and the cluster confirmed byte-identical to its baseline**: 14 users, 2 client profiles, 2 bookings, 2 subscriptions, 3 drafts before and after, with zero throwaway records left.
+
+**This also proved chunk 6.4 live for the first time** — that entry's end-to-end run had never been done. The welcome email failed, as expected (blocker 7), and the account was created regardless, which is the behaviour 6.4 designed for.
+
+**Worth knowing: two real client accounts now exist in Atlas** (`testclient1@example.com` and `muhammadhussnainrauf000@gmail.com`), each with a booking and an active subscription. The developer completed the live Stripe run since the 6.6 entry was written. **You can sign in as either and see this portal against real data.**
+
+**Yours to check — nothing here has been seen rendered:**
+1. **The therapist at the top of the rail.** Does the hours line read as warm and useful, or as clutter? It is the piece the shell was built around, and the one thing I cannot judge from here.
+2. **The bottom tab bar at 360px** — five labels at 11px, and whether the gold rule above the active icon reads as a marker rather than a stray line.
+3. **The past-due banner.** Does it read as unmissable and calm, or as an alarm? That distinction is the whole design bet.
+4. **The expired screen** — sign in as a real client, set their subscription to `expired` in Atlas, and confirm the portal is replaced by it. Set it back afterwards.
+5. **360px throughout**, and reduced motion on (the skeleton should not pulse, the ended card should not rise).
+6. **Keyboard**: tab through the rail and the tab bar, and confirm the focus ring is visible and gold on the ink ground.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables, no external accounts, no new colour or type tokens.**
+2. **Restart the API server** — the `/api/v1/client` mount and the new dev route are read at startup.
+3. To try the gate by hand: `GET /api/v1/dev/client-gated` with a client's token, then flip that client's subscription to `expired` in Atlas and call it again. 200 becomes 403.
+
+**Carried forward:**
+- **The four placeholder screens are replaced by 7.2–7.6 and slice 9.** Each says plainly it is not switched on; none may ship in that state.
+- **Slice 11 must flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the gate compares against**, or the two readings drift apart.
+- Slice 12 replaces `SubscriptionEnded` with the real re-subscribe flow; 11.3 adds cancellation and 11.5 the payment-method controls the account screen currently says are unavailable.
+- `clientProfiles` has no timezone field, so the portal uses the browser's zone — the settled pattern since 5.6.
+- Chunk 12.3: the emailed password versus a set-password link (6.4); the production database user's rights on `paymentevents` (6.1). The 11 remaining `{VALUES}` enum messages (6.1). Whether rejected applicants are emailed (4.3).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created: every word in `data/clientPortalContent.js` is a spec fact or a description of a screen. **Blocker 6 now also covers `GET /api/v1/dev/client-gated`**, added to the same file.
+
+**Not done (out of scope, by design):**
+- **No re-subscribe screen** (slice 12), per the chunk's own "Do NOT".
+- **No feature content** — no chat, no worksheet upload or download, no journal writing, no session list. Those are 7.2–7.6, 8.5 and slice 9.
+- No cancellation and no payment-method management (11.3, 11.5).
+- The therapist portal is untouched — slice 8 replaces its shell with the inbox.
+
+---
+
+### Chunk 7.1 follow-up — clinic language on the availability line (2026-09-13, developer)
+
+**The wording changed.** *"Back tomorrow at 12:00 PM your time"* read as a closed door and wrapped onto two lines in a 272px rail. Replaced with clinic language:
+
+| State | Line |
+|---|---|
+| In hours | `In clinic today · Until 12:30 PM` |
+| Later today | `Next in clinic: Today, 4:30 PM` |
+| Tomorrow | `Next in clinic: Tomorrow, 12:00 PM` |
+| Beyond | `Next in clinic: Monday, 9:00 AM` |
+
+Measured across locales the new lines run **28–32 characters**, against 34–35 before, so they sit on one line in the rail.
+
+**The `your time` suffix was dropped, on instruction, and the trade-off is worth recording.** Every time on this line is still converted into the reader's own zone — that logic did not change — but the line no longer says so. A Dublin client reading a Kolkata therapist's hours now has no on-screen cue that the conversion already happened, and §15's whole premise is that neither party does the arithmetic. **The chat header (7.2) is where that reassurance now lives** and it must carry it; the copy below does. If the rail ever needs it back, it is one string in `availabilityLabel`.
+
+**Two icons instead of one, following the intent of the spec rather than its glyphs.** The wording spec sketched 🕒 for "next" and 🌿 for "in clinic". Emoji are banned as an icon system by the craft rules — they render in a different style on every platform, which is the exact problem the one-stroke-weight set exists to solve — so a **drawn `SproutIcon`** was added beside the existing clock, at the same 1.5 stroke. Something growing when they are here, a clock when they are not. Bounds-checked against the 24 viewBox including stroke: x 4.5–18.9, y 6.25–21.25, comfortably inside.
+
+**Verified:** the 22 availability checks re-run against the new strings, **all passing** — every timezone, rollover, overnight and DST case is unchanged, only the wording moved. Client build passes, `oxlint` 0 findings, detector empty (degraded, as always). No server change, so the suite is untouched at **925 across 33**.
+
+**Not seen rendered.** Worth a glance at whether `In clinic today · Until 12:30 PM` holds one line at 272px with a long therapist name above it.
+
+---
+
+### CARRIED TO CHUNK 7.2 — the chat header transparency note
+
+Approved wording, to sit at the top of the chat area (§7.1 already requires the therapist's working hours there; this is the reassurance around them):
+
+> Feel free to message [Therapist name] anytime — whenever thoughts or feelings arise. They typically review messages during their regular hours ([Hours]), but read and reply as soon as they are available. Take all the time you need to write.
+
+Three notes for whoever builds it:
+
+1. **The pronoun must not be hardcoded.** The developer's draft read "She typically reviews". Therapists are any gender, and `therapistProfiles.gender` exists — but a template that switches on it will read wrong for anyone it does not fit. Neutral "they" above is the safe default and needs no lookup.
+2. **It pairs with, and does not replace, the hours display §7.1 requires.** `[Hours]` is the therapist's own published hours; the rail already converts them, and `lib/therapistAvailability.js` is there to reuse.
+3. **It makes no promise about reply speed** — "as soon as they are available", never a number. Consistent with every other surface: no invented timelines anywhere on this platform.
+
+---
+
+### Standing directive — every screen must look premium (2026-09-13, client)
+
+Recorded in `.claude/rules/frontend.md` (its own section, ahead of Visual Latitude) and summarised in `CLAUDE.md`, so it loads every session and does not need restating per chunk.
+
+> Make the UI genuinely premium, polished and consistent. **Do not put plain text inside bare boxes.** Use real visual language — considered hierarchy, drawn icons, subtle graphics, elegant styling — so the platform feels high-end, beautiful and visually engaging rather than merely correct.
+
+The rules file spells out what that rules out, because "correct but flat" has recognisable shapes: a heading-paragraph-rectangle stack repeated down a page, text doing a job a drawn element would do better, unstyled defaults, and one flat depth across a whole screen. **Portals are included** — §24.8 makes them denser and quieter, not plainer. The accessibility floor and the eight palette tokens still outrank all of it, and §24.9's line holds: natural, not decorated.
+
+---
+
+## Chunk 7.2 — Messages model and chat REST endpoints
+
+**Status: Complete.** Nothing skipped. Verified live against the real Atlas cluster using the two real client accounts, with every message created then deleted.
+
+Built:
+- `models/Message.js` · `models/Message.test.js` (11 tests)
+- `services/chat.service.js` · `controllers/chat.controller.js`
+- `routes/chat.routes.js` · `validation/chat.schema.js` · `constants/chat.js`
+- `routes/chat.test.js` — 36 tests.
+- Edits: `routes/index.js` (mount), `middleware/requireActiveSubscription.js` (a clients-only variant).
+
+**No new packages, no new environment variables.**
+
+---
+
+### WHERE IT MOUNTS, AND THE FOUR LAYERS
+
+Chat is the one surface both roles share, so it belongs under neither `/client` (client-only, gated) nor `/therapist`. New mount at **`/api/v1/chat`**, with four layers that each do a different job:
+
+1. `requireAuth` — who is this
+2. `requireRole(CLIENT, THERAPIST)` — **the admin is refused outright.** §11 records that an admin conversation viewer was proposed and the client decided against building it; refusing by role means there is no route through which chat content could reach them by mistake. Two tests pin it.
+3. `requireActiveSubscriptionForClients` — §13, clients only (below)
+4. **Membership, per request, in the service** — the layer that actually protects a conversation
+
+---
+
+### THE AUTHORISATION, AND WHY EVERY REFUSAL IS A 404
+
+The `bookingId` comes from the URL, so it is attacker-controlled. Membership is proved against the stored booking — `clientId` or `therapistId` must be the caller — and never inferred from role.
+
+**A booking that does not exist, a malformed id, and somebody else's booking all return the identical 404.** A 403 for the third case would confirm the id is real, which is all that is needed to enumerate booking ids by comparing responses. A test asserts all three response bodies are byte-identical.
+
+**Mutation-checked: removing the membership check broke 5 tests.**
+
+---
+
+### THE SUBSCRIPTION GATE CLOSES ON ONE SIDE ONLY
+
+Developer's decision, 2026-09-13. An expired client loses the conversation along with the rest of their portal (§13). **The therapist keeps read access**, because the thread is their clinical record of the relationship and taking it away because somebody else's card failed penalises the wrong party.
+
+Implemented as `requireActiveSubscriptionForClients`, which wraps the existing gate rather than copying its logic — one source of truth for what "expired" means. A `past_due` client still passes, as everywhere else.
+
+---
+
+### DECISIONS MADE
+
+- **CURSOR PAGINATION, NOT OFFSET — and the reason is the whole point.** A conversation grows at the end while it is being read. With `?page=2`, a message arriving between two requests shifts every row down, so page 2 re-serves a message page 1 already showed and eventually skips one. A cursor means "the thirty before this exact point", which is the same answer however much has arrived since. `createdAt` is not unique, so the cursor carries `_id` as the tiebreak and the compound index serves the pair. **A test proves it directly: it reads page one, sends a message, then reads page two and asserts no overlap, nothing skipped, and the new message absent.**
+- **`type` IS FORCED SERVER-SIDE, NEVER READ FROM THE REQUEST.** A caller who could set `type: "system"` could forge *"Session scheduled for Thursday at 6pm"* in the other party's voice. System messages are written by the platform alone (9.3). Unknown keys are stripped rather than refused, so the attempt has no effect instead of returning a probe-friendly error — two tests, one over the wire and one reading the stored document.
+- **NO RAW `senderId` GOES OVER THE WIRE.** A booking has exactly two participants, so "who sent this" is fully answered by `senderRole` plus a `mine` flag — which means no id from the `users` collection reaches either browser. A test asserts neither user id appears anywhere in the payload.
+- **NO `read` FLAG ON A MESSAGE EITHER, and that is a decision rather than an omission.** Returning it on your own messages is a read receipt. §14 does not ask for one, nobody requested it, and on this platform it would be actively harmful: *"she read it four hours ago and has not replied"* is precisely the thought an anxious client does not need. The flag still drives the recipient's unread badge, which is the job §14 gives it.
+- **Participants are resolved once per request, not per message.** Names live on the profile collections rather than on `users` (the store-IDs-only rule), so populating a sender per row would be one lookup per message — the N+1 the backend rules name for this exact screen. Two lookups serve a page of any size. **A couple is labelled with both partners** ("Marta and Joris"), because one account is two people (§6).
+- **`read` is a single boolean, and that only works because chat is strictly 1:1.** Commented at the model: if a third party ever joined a booking this breaks silently, because the first reader would clear the flag for everyone.
+- **Writing to an ended booking is refused (409), reading it is not.** Nothing sets a booking to `ended` yet — slice 11 and the deferred reassignment do — so this is a guard ahead of that rather than a path reachable today.
+- **Text is capped at 5,000 characters and sending at 30 a minute** — both approved 2026-09-13. The rate limit is deliberately loose: someone in distress types in short bursts, and a person who hits a wall mid-sentence on a mental health platform is a product failure, not a protected system. It is set to stop automation, not people.
+- **`GET /chat/unread-count` returns a total and a per-booking breakdown.** A client has one booking; a therapist has many and §8.1 needs a badge per client. One endpoint, one aggregation, serves both portals.
+
+---
+
+### PRIVACY
+
+**Message text is never logged from anywhere in this code.** It is on the never-log list and a chat message here is the most sensitive text in the product; `requestLogger` already records only method, path and status, and no service or error path echoes the body. A test asserts a refused cross-booking read returns nothing of the other conversation's content.
+
+`privateNotes` is not imported, queried, or reachable from any of this.
+
+---
+
+### A TEST THAT PASSED WHILE PROVING TOO LITTLE, CAUGHT BY MUTATING
+
+Removing `senderId: { $ne: me }` from the unread aggregation — the condition §14 defines the badge by — broke only **1** test. The "badge drops to zero" case seeded only therapist messages, so there were no messages of the client's own to be wrongly counted; it would have stayed green with the exclusion deleted.
+
+Fixed by seeding a reply from the client into that test, so "zero" now proves the exclusion rather than proving `markRead` cleared the booking. **The same mutation now breaks 2 tests**, and the test also asserts the therapist still has that reply waiting.
+
+This is the third false-confidence test the project has caught (1.3, 4.2, now this), and all three came from a test setting up the wrong fixture rather than asserting the wrong thing.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **972 tests across 35 suites, all passing** (925 from earlier chunks, 47 new).
+- `npm run lint` — clean.
+- **Mutation-checked twice:** the membership check broke 5 tests; the unread sender exclusion broke 2 after the test above was strengthened.
+- Tests cover everything the brief names and more: both parties reading and writing, cross-booking reads, writes and mark-read all refused, the identical-404 rule, the admin refused, an expired client blocked and their therapist not, a forged `type` and a forged `read` and a forged `senderId` all ignored, the length boundary at exactly 5,000, oldest-first ordering, an empty thread, a couple's label, cursor stability under a concurrent send, an invalid cursor, an absurd limit, unread excluding your own messages, mark-read touching only the right booking, and idempotent marking.
+
+**LIVE AGAINST THE REAL SERVER AND REAL ATLAS — 25 checks, all passing.** Using the two real client accounts and their real therapists, writing only messages:
+- a real exchange both directions, returned oldest-first with the therapist named once in `meta` and their working hours carried for the 7.4 chat header;
+- **no user id and no read flag anywhere in the payload**;
+- a forged `type: "system"` stored as `text`;
+- client A refused from booking B on read and on write, with nothing written there, and therapist A refused too;
+- the unread breakdown correct from both sides, clearing on mark-read while the other party's reply stayed waiting;
+- **an expired client shut out with 403 while their therapist still read the thread** — the decision above, proven on a real subscription;
+- restoring the subscription reopened it.
+- **Cleanup confirmed:** the cluster held 0 messages before and 0 after, the three created messages were deleted by id, the temporary password hashes were restored to all three accounts, and the subscription status was put back.
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **Restart the API server** — the `/api/v1/chat` mount is read at startup.
+3. Nothing to configure. The endpoints are usable now with any real client or therapist token.
+
+**Carried forward:**
+- **Chunk 7.3 (Socket.io) must persist first and emit second.** §14 makes the database the record and sockets delivery only; the REST path built here is what a dropped socket falls back to.
+- **Chunk 7.4's chat header** carries the transparency note recorded in the 7.1 follow-up, and `meta.participants.therapist.workingHours` is already on the response for it.
+- **Chunk 7.5** adds the mandatory first message on top of these endpoints — nothing here blocks it.
+- **Chunk 9.3** writes the `type: "system"` message when a session is scheduled. It is the only writer of that type, and the send endpoint cannot produce one.
+- Slice 11 must flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the gate compares against (from 7.1).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No Socket.io** (7.3) and **no chat UI** (7.4), per the chunk's own "Do NOT".
+- No system messages written by anything (9.3).
+- No notifications (10.4); no admin visibility of any kind (§11).
+
+---
+
+## Chunk 7.3 — Socket.io real-time layer
+
+**Status: Complete.** Nothing skipped. Verified live against the real Atlas cluster with two real socket clients on an actual booking; every message created was deleted afterwards.
+
+Built:
+- `realtime/socketServer.js` — the Socket.io server and its middleware chain.
+- `realtime/socketAuth.js` — handshake auth, role and subscription gates, room joining.
+- `realtime/socketHandlers.js` — the event surface, send limiter and typing.
+- `realtime/emitter.js` — the one place that knows how to push to a socket.
+- `constants/socket.js`
+- `realtime/socket.test.js` — 38 tests against a real server on an ephemeral port.
+- Edits: `server.js` (explicit `http.Server` + socket attach + ordered shutdown), `services/chat.service.js` (emit after persist, `after` cursor), `controllers/chat.controller.js` and `validation/chat.schema.js` (`after` on REST).
+
+**Packages installed:** `socket.io` (^4.8.3, dependency) and `socket.io-client` (^4.8.3, devDependency — tests only). The client app gets its own copy in 7.4.
+
+---
+
+### ONE WRITE PATH, TWO TRANSPORTS
+
+`message:send` is a thin socket wrapper over the **same `sendMessage` service the REST route uses**. Membership, the forced `type`, the ended-booking guard and the 5,000-character limit therefore exist once, not twice. A socket send is a transport, not a second set of rules — and the suite proves it by asserting that an empty message, an oversized one and a forged `type: "system"` are refused identically over both.
+
+After the write commits, the service calls `emitMessage`. That emitter **no-ops when no socket server is attached**, which is why all 972 earlier tests kept passing untouched and why graceful degradation is structural rather than a fallback mode: there is one write path and delivery is simply switched off. A test asserts REST still sends and stores with the socket server explicitly detached.
+
+---
+
+### A REAL RACE, FOUND BY THE TESTS AND FIXED PROPERLY
+
+Six typing tests failed on the first run. The cause was not the typing code.
+
+`joinOwnRooms` was `await`ed inside `io.on('connection')`. **The client's `connect` event fires as soon as the handshake completes** — before that database query resolves. So a client could believe it was connected, send immediately, and have the message emitted to a room the recipient had not joined yet: persisted correctly, never delivered, and nothing anywhere reporting a problem. The fast tests won the race; the slower ones did not.
+
+**Room joining is now middleware**, which completes before the connection is established, so by the time either side sees "connected" both are already in their rooms. The `connection` handler is now synchronous as well, because an async body there drops the first events a keen client sends — the same class of race one layer up.
+
+This is exactly the silent-failure shape this project keeps looking for, and it would have been miserable to diagnose from a UI in 7.4.
+
+---
+
+### THE SOCKET THAT OUTLIVES ITS TOKEN — CLOSED
+
+An access token lives ~15 minutes; a socket can stay open for hours. Verifying once at connect — which is what most implementations do — means a user whose token expired, or whose account was deactivated, keeps a live privileged socket indefinitely, quietly undoing the short-token design §11 is built on.
+
+So the expiry is **re-checked before every inbound event**. It is a comparison against the already-decoded `exp`, not a database hit, so it costs nothing. On expiry the socket is told why and disconnected, and the client reconnects with a fresh token exactly as the REST interceptor already refreshes.
+
+---
+
+### DECISIONS MADE
+
+- **Four middleware layers, each refusing the CONNECTION rather than an event:** authenticate, role, subscription, rooms. A rejected user never reaches a room at all.
+- **THE ADMIN GETS NO SOCKET.** §11 records that an admin conversation viewer was proposed and the client decided against building it. Refusing by role at the handshake means there is no transport through which chat content could reach them, not merely no endpoint.
+- **The subscription gate closes on one side only**, consistent with 7.2: an expired client gets no real-time connection; their therapist still does, because the thread is their clinical record.
+- **The server decides the rooms, always.** A socket cannot ask to join a booking — membership is read from the database at connect. This is the socket equivalent of never trusting a `bookingId` from a request, and **mutation-checked: joining every booking instead of the user's own broke 4 tests.**
+- **A therapist joins every booking they hold**, not just the one on screen, because §8.8's notification bell needs messages from a client they are not currently viewing.
+- **The socket payload carries no `mine` flag.** One emit reaches both parties, so a viewer-relative field cannot be baked into it; the client derives it by comparing `senderRole` with its own role, which is unambiguous because a booking has exactly two participants.
+- **The sender's own sockets receive the message too**, deliberately — excluding them would break the second tab of anyone with two open. The client de-duplicates by id, which it must do anyway to survive a reconnect that re-syncs an overlapping window.
+- **`unread:update` goes to the reader's own room, never the booking's.** A badge is personal, and pushing it to the booking would tell the sender their message had been read — the read receipt deliberately left out in 7.2. A test asserts the sender receives nothing.
+- **The socket send path has its own rate limiter**, a sliding window matching the REST limit exactly. `express-rate-limit` does not apply to sockets, so without it the socket path would have bypassed the 30-a-minute budget entirely. A test walks a burst and asserts the 31st is refused.
+- **`message:new`, not the brief's `message:receive`.** The latter reads like something the client sends, and a mis-wired listener is a silent failure rather than a loud one.
+
+---
+
+### RECONNECTION
+
+`listMessages` gained an **`after` cursor** — one branch, reusing the same encoding — exposed on both the socket (`conversation:sync`) and REST (`?after=`), so gap-filling works with or without a socket. `before` and `after` together are refused.
+
+`meta.syncCursor` is new and is always the newest row on the page: the client keeps it and hands it back on reconnect to fill exactly what it missed, rather than blindly refetching. `meta.nextCursor` still means "load older" and is unchanged.
+
+---
+
+### THE TYPING INDICATOR — SYMMETRICAL, APPROVED 2026-09-13
+
+Both sides see the other typing, as in a standard chat app. **Purely ephemeral: zero database writes**, and a test asserts the message count is unchanged across a full start-stop cycle.
+
+Three things that make it not broken:
+
+- **Auto-stop after 5 seconds**, plus an explicit stop on disconnect and after a send. Without it a connection dropping mid-sentence would leave the other side watching "typing…" for ever. Both paths are tested, the timeout one for real rather than with fake timers.
+- **No draft text crosses the wire.** The payload is exactly `{ bookingId, senderRole }` — a test sends a `text` field alongside and asserts it never arrives, and pins the payload's key set.
+- **Never echoed to the typist, and never into another booking.** Membership for typing is checked against the socket's own rooms, which the server assigned, so it needs no database hit on an event this frequent.
+
+---
+
+### A SECOND TEST THAT PASSED WHILE PROVING NOTHING
+
+The first version of "persists before it emits" listened for the event and then looked the row up. **It passed against a deliberately inverted implementation** — the network round trip to the client and back takes milliseconds, by which time the write has landed whatever order the code used.
+
+Rewritten to assert the **order** rather than the timing: both the write and the emit are marked as they happen and the sequence is compared. Patching `Message.prototype.save` alone was not enough either — Mongoose's `Model.create` does not go through the document prototype, so it recorded nothing; both paths are now patched, which also survives a future refactor to `new Message().save()`.
+
+**Mutation-checked properly this time:** emitting before the write now breaks the test. The original round-trip check is kept as a delivery test under an honest name.
+
+That is the fourth false-confidence test this project has caught (1.3, 4.2, 7.2, now this), and the second in two chunks.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **1010 tests across 36 suites, all passing** (972 from earlier chunks, 38 new).
+- `npm run lint` — clean.
+- **Mutation-checked twice:** room membership broke 4 tests; emit-before-persist broke the rewritten ordering test.
+- Tests cover: valid, missing, malformed, forged and already-expired tokens at the handshake; the admin refused; an expired client refused and their therapist admitted; room membership and isolation; delivery both ways; persist-before-emit; a send into a foreign booking refused; the sender's second tab; no `mine` flag; shared validation; a forged system type; the send rate limit; live unread updates; no read receipt to the sender; reconnection gap-fill; a foreign sync refused; every typing property above; and REST working with the socket layer detached.
+
+**LIVE AGAINST THE REAL SERVER AND REAL ATLAS — 20 checks, all passing.** The real socket server on an ephemeral port, two real accounts on an actual booking, and a third from a different booking. **No account was modified at all this time** — tokens were signed directly rather than obtained by login, so not even a password hash was touched:
+- instant delivery both directions, with the right sender role and no `mine` flag;
+- both messages confirmed present in the database;
+- **a third party on another booking heard nothing, and could not send into booking A**;
+- **typing symmetrical in both directions, isolated to the booking, and writing nothing to the database**;
+- marking read pushed a live badge update;
+- **reconnection filled exactly the one message missed while the client was away**;
+- REST still sent and stored with the socket server detached.
+- **Cleanup confirmed:** 0 messages before, 0 after, the 5 created deleted by id.
+
+**Manual steps for the developer:**
+1. **Packages installed:** `socket.io` and `socket.io-client` in `/server`. No new environment variables, no external accounts.
+2. **Restart the API server** — `server.js` now creates an explicit `http.Server` and attaches Socket.io to it. You should see `Socket.io attached.` after the listening line.
+3. **The chunk's own verify step is yours**, and it needs the 7.4 UI to be meaningful: two browsers, client and therapist of the same booking, messages both ways, then kill the socket and confirm REST still carries the conversation. The API half is proven above.
+
+**Carried forward:**
+- **Chunk 7.4 builds the chat UI on this.** It must de-duplicate incoming messages by id (the sender's own sockets receive their own message), keep `meta.syncCursor` for reconnection, and derive `mine` from `senderRole`.
+- **The chat header transparency note** recorded in the 7.1 follow-up belongs on that screen, and `meta.participants.therapist.workingHours` is already on the response for it.
+- **Chunk 12.5 — two additions to the deployment list:**
+  - **Sticky sessions or a Redis adapter.** In-memory rooms are correct on one instance, which is what Render runs today. The moment the backend scales to two, a message emitted on instance 1 never reaches a socket on instance 2, and it fails silently. This sits beside the `sameSite` cookie and `VITE_API_BASE_URL` notes already parked there.
+  - **The socket URL in production.** Same trap as the API base URL: a relative path works behind the Vite dev proxy and resolves to nothing on Vercel.
+- Slice 11 must flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the gate compares against (from 7.1).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **No chat UI** (7.4), per the chunk's own "Do NOT".
+- **Nothing is stored in memory as a record.** The only in-memory state is a typing timer and a send-rate window, both of which die with the socket and neither of which is data.
+- **Sending is never blocked when the recipient is offline** — the message is persisted and simply waits, per §14 and the chunk's "Do NOT". There is no presence state anywhere in this code.
+- No notifications (10.4); no system messages (9.3); no admin visibility on any transport (§11).
+
+---
+
+## Chunk 7.4 — Client chat UI
+
+**Status: Complete.** Nothing skipped. **Not seen rendered** — see "Yours to check".
+
+> **A power cut interrupted this chunk mid-build on 2026-09-14.** Nothing was lost or corrupted: every file written before the cut was complete and the client still built. What was outstanding was the shell wiring and the whole verification pass, and both were finished on 2026-09-15. Recorded because the log should say when a chunk was built in two sittings.
+
+Built — server (the small addition approved 2026-09-14):
+- `constants/chat.js` — `CLIENT_MESSAGE_ID_MAX` / `CLIENT_MESSAGE_ID_PATTERN`.
+- Edits: `validation/chat.schema.js`, `services/chat.service.js`, `controllers/chat.controller.js`, `realtime/socketHandlers.js`, and 5 new tests across `routes/chat.test.js` and `realtime/socket.test.js`.
+
+Built — client:
+- `lib/chat/` — `messageStore.js` · `groupMessages.js` · `useChat.js`
+- `lib/socket/` — `socketClient.js` · `socketContext.js`
+- `lib/api/chatApi.js` · `data/chatContent.js`
+- `components/portal/client/PortalSocketProvider.jsx`
+- `components/portal/client/chat/` — `ChatHeader` · `MessageThread` · `MessageCluster` · `SystemNotice` · `DaySeparator` · `TypingDots` · `Composer` · `ChatEmptyState` · `ChatIcons`
+- `pages/portal/client/Chat.jsx` — replaces the 7.1 placeholder.
+- Edits: `pages/portal/ClientPortalShell.jsx` (socket provider + a bounded layout chain).
+
+**Package installed:** `socket.io-client` (^4.8.3) in `/client`. No new environment variables, no new colour or type tokens.
+
+---
+
+### `clientMessageId` — THE RACE REMOVED RATHER THAN PAPERED OVER
+
+Sending produces three events in no guaranteed order: the optimistic bubble, the server's ack, and the socket echo (your own sockets receive your own message, so a second tab stays in step). If the echo arrives before the ack, a naive list shows the message twice.
+
+The browser now generates an id, passes it with the send, and the server **echoes it back on both the ack and the emit**. Reconciliation is then exact rather than a guess based on matching text and timestamps — the fragile approach this project keeps rejecting.
+
+**IT IS NEVER STORED.** It is a rendering hint, not data: the model has no field for it, and four tests assert it never reaches the database on either transport. It is also attacker-controlled and round-tripped to the other party, so it is length-bounded and charset-restricted, and nothing interprets it as anything but an opaque token.
+
+---
+
+### A REAL BUG FOUND WHILE FINISHING
+
+The reconnection handler computed an anchor message and then called `fetchMessages(bookingId, { after: undefined })` — **the cursor was never actually passed**, so the gap-fill was a blind refetch of the newest page wearing the costume of a precise sync.
+
+Fixed properly: `meta.syncCursor` (added to the API in 7.3) is now kept in a ref and handed back as `after` on reconnect, so the server returns exactly what was missed. The merge is idempotent — anything already held dedupes by id — so an overlap costs nothing and a missed message cannot slip through.
+
+**Limitation stated rather than hidden:** if more than one page arrived while disconnected, the remainder fills by scrolling up as normal. At 30 sends a minute in a one-to-one conversation, that is not a case a real reconnect produces.
+
+---
+
+### DECISIONS MADE
+
+- **Enter sends on a pointer device; on touch it makes a new line.** Approved 2026-09-14. A phone's return key is how people break a line and there is no Shift to hold, so sending on Enter there would fire half-finished sentences. Detected with `pointer: coarse` — the platform's own answer — rather than sniffing the user agent. The send button is always present and is the only send path on touch.
+- **The socket lives in the SHELL, not the chat screen.** A connection that tore down every time someone tapped Worksheets would drop messages between tabs, and 7.6's unread badges need the same one. Marginally ahead of this chunk's brief, and flagged rather than slipped in.
+- **Nothing here requires the socket.** Every operation has a REST path and takes it whenever the connection is absent, disconnected, or times out. A blocked websocket costs instant delivery and nothing else (§14).
+- **The client half of 7.3's expiry fix landed here.** On `auth:expired` the client refreshes through the SAME single-flight promise the REST interceptor uses and reconnects — two separate refreshes would be worse than useless, because refresh rotates the token and the second would present one that no longer exists.
+- **Clustered, not stacked.** Consecutive messages from one person within five minutes share one timestamp and one tail. Five bubbles each carrying their own time is what turns a conversation into a spreadsheet. The tail is a single tightened corner rather than a drawn arrow — the shape says who spoke without an applied decoration.
+- **System messages are not bubbles.** Centred, on a pill with a drawn mark, visibly the platform speaking. Rendering one as a bubble would read as though one of the two people had typed *"Session scheduled for Thursday"*. They also never cluster into someone's run. (9.3 writes them; this chunk styles them.)
+- **Every date decision is made in the READER's timezone.** "Today" for a client in Dublin and their therapist in Perth are different days, and a boundary computed in UTC would put the separator in the wrong place for one of them.
+- **A failed message keeps its text, exactly where it was**, with Retry beneath it. Somebody who has just written something difficult must not have to write it twice. The failure line sits on the thread ground rather than inside the bubble — clay on ink would not clear contrast, and the message is not the thing that went wrong.
+- **The character counter appears only from 4,500.** A permanent counter on a therapy message reads as a limit on how much you are allowed to feel.
+- **Typing is throttled to one `start` every two seconds** with a stop after a pause. An event per keystroke would be jittery on the other side, and the server auto-stops after five seconds regardless.
+
+---
+
+### THE HEADER — §7.1's EXPLICIT REQUIREMENT
+
+"Therapist working hours displayed at the top of the chat." Shown two ways: the one-line state everyone reads (*"In clinic today · Until 17:00"*), and the full week behind a disclosure for anyone planning around it — reusing `convertWorkingHours` from 5.6, including the day-rollover handling, rather than a second implementation.
+
+The note is the developer's approved wording, with the therapist's name and their hours templated in and a neutral pronoun:
+
+> Write anytime your heart needs to speak, day or night. {name} mostly replies during their clinic hours ({hours}), but often answers sooner when free. There is never any rush.
+
+A second variant covers a therapist with no usable published hours, so the sentence never renders with an empty bracket. **No promise about reply speed anywhere** — §7.1 is explicit that a message simply waits.
+
+---
+
+### THE SCROLL BEHAVIOUR, WHICH IS WHERE CHAT UIs BREAK
+
+Four specific things, each a known failure:
+
+1. **First paint jumps to the bottom without animating** — a smooth scroll on load makes the whole history flick past.
+2. **A new message never yanks anyone down while they are reading history.** It increments the jump-to-latest count instead.
+3. **Loading older messages preserves position**, by correcting the scroll offset by the `scrollHeight` delta in a layout effect — before paint, or the reader visibly leaps mid-sentence.
+4. **Jump to latest carries the count** of what arrived, so the control says what it will do rather than only that it exists.
+
+**Mark-as-read fires only when the thread is open AND the reader is at the bottom** — never merely on mount. Marking messages read that nobody has seen is a lie the unread badge then tells.
+
+---
+
+### THE LAYOUT CHAIN, WHICH IS NOT COSMETIC
+
+`ClientPortalShell` moved from `min-h-dvh` to **`h-dvh` with `overflow-hidden`**, and `min-h-0` was added down the column. Without a definite height the whole way down, the chat's `flex-1` resolves to nothing and the thread cannot scroll at all — the composer would be pushed off-screen and the history unreachable. Screens that do not want the viewport simply sit at the top of the column as before.
+
+---
+
+### THREE ROOT FIXES RATHER THAN SUPPRESSIONS
+
+All three were React Compiler objections, handled the way 0.6, 4.2 and 5.1 handled theirs:
+
+- **`useChat`** assigned a ref during render. Now synced in an effect.
+- **`MessageThread`** incremented the missed-message counter inside a layout effect. Now a **render-phase state adjustment** — React's documented pattern for reacting to changed input, and the same one the admin DataTable uses for `resetKey`. The layout effect does scrolling only.
+- **`PortalSocketProvider`** set state from inside an effect. The socket is now built in a lazy state initialiser; construction is inert because `autoConnect` is false, so nothing happens on the wire until the effect connects.
+
+---
+
+### CONTRAST — TWO REAL FAILURES FOUND BY MEASURING
+
+| What | Was | Now |
+|---|---|---|
+| System notice text, `sage-deep` on `sage/12` over **mist** | **4.40:1 FAIL** | `sage-deep` on a **paper** pill — **5.48:1** |
+| System notice time, `sage-deep/80` on that tint | **2.98:1 FAIL** | `ink/70` on paper — **6.73:1** |
+
+The pill is now paper with a `sage/40` ring: the sage character is carried by the ring and the drawn mark rather than by a tint that cost the contrast. The time is differentiated **by hue rather than opacity** — a faded version of the same colour is exactly what failed.
+
+**35 pairs computed, 0 failures after the fix.** Tightest against their own floors: the composer placeholder at 4.59:1, the composer's sage focus border at 3.06:1, and the unsent label at 4.93:1. None may be lightened.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **1015 tests across 36 suites, all passing** (1010 from earlier chunks, 5 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 warnings** on every file this chunk touched. The six that remain are the developer's own in `home/Hero.jsx`, `home/Services.jsx`, `pages/Home.jsx`, `pages/Matches.jsx` and `about/WhyCardsDeck.jsx`, open since 2.2.
+- Client build passes.
+- **42 logic checks executed** against the real modules — the client has no Jest suite, so the merge rules were run rather than assumed: the optimistic/ack/echo race **in both orders**, a second tab, an overlapping history page never duplicating, out-of-order arrival, identical timestamps keeping a stable order, failure and retry preserving the text, the sync anchor ignoring pending rows, day boundaries **in the viewer's zone** including a Perth rollover and a same-instant-different-day case west of UTC, clustering by sender and by gap, and system messages splitting a run.
+- **35 contrast pairs computed, 0 failures.**
+- **All 6 chat icons bounds-checked** against the 24×24 viewBox including stroke, with a command-aware path parser — the false-failure trap from 5.2.
+- Impeccable detector — `[]`, and **read that as a degraded empty**: the four parsing dependencies are still absent, so it evaluates no contrast. The computed table is the compensation.
+- Generated CSS confirmed to carry every new utility the screen depends on: `overscroll-contain`, `whitespace-pre-wrap`, `wrap-break-word`, both tail radii, `tabular-nums`, `h-dvh`, `ring-sage` and the jump-pill shadow.
+
+**LIVE AGAINST THE REAL SERVER AND REAL ATLAS — 12 checks, all passing.** Using a real booking, writing only messages, and **modifying no account at all** (tokens signed directly, so not even a password hash was touched):
+- `clientMessageId` echoed on the socket ack **and** on the emit the other party receives, and on REST;
+- **never stored on either path**, confirmed against the raw document;
+- a non-opaque id refused with 422;
+- `meta.syncCursor` present, and **`after` returning exactly the one message that arrived while the client was "away"**;
+- the therapist's working hours and name on the response, which is what the chat header renders.
+- **Cleanup confirmed:** 0 messages before, 0 after, the 3 created deleted by id.
+
+**YOURS TO CHECK — nothing here has been seen rendered:**
+1. **The brief's own verify step:** two browsers, client and therapist of the same booking, messages both ways. Then kill the socket (stop the API or block the websocket) and confirm the conversation still sends over REST.
+2. **The working hours at the top**, and the full week when expanded — both converted into your clock.
+3. **The scroll behaviour**, which is the piece most likely to need tuning: scroll up, receive a message, and confirm you are not yanked down; then scroll to the top and confirm loading older history does not make the view jump.
+4. **Enter on a phone should make a new line**, and the send button should be the only way to send there. On a desktop Enter sends and Shift+Enter breaks the line.
+5. **The layout at 360px** — the header, thread and composer are three fixed regions and the page itself must not scroll.
+6. **Reduced motion**: no smooth scrolling, the typing dots hold still, the jump pill appears without sliding.
+
+**Manual steps for the developer:**
+1. **Package installed:** `socket.io-client` in `/client`. No new environment variables.
+2. **Restart both dev servers** — the client has a new dependency and the server has the `clientMessageId` field.
+3. Nothing to configure. Sign in as a real client and the conversation is live.
+
+**Carried forward:**
+- **Chunk 7.5 replaces the empty state** with §7.1's mandatory first message. The current empty state explains what the space is for and deliberately does not gate anything.
+- **Chunk 7.6** builds the unread badges on the socket provider this chunk mounted, and on `GET /chat/unread-count`.
+- **Chunk 9.3** writes the `type: "system"` messages this chunk already styles.
+- **Chunk 12.5 — the socket URL in production.** `socketClient.js` strips the API path to find an origin, so a relative `VITE_API_BASE_URL` means "same origin as the page". In production it must resolve to the real API origin, beside the `sameSite` cookie, the `VITE_API_BASE_URL` and the sticky-sessions notes already parked there.
+- Slice 11 must flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the gate compares against (from 7.1).
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created: every word on this screen is either spec-sourced or the developer's own approved copy.
+
+**Not done (out of scope, by design):**
+- **No mandatory first message** (7.5) and **no voice messages** — text only for v1, per the chunk's own "Do NOT".
+- No unread badges in the navigation (7.6).
+- No therapist-side chat (8.3).
+
+---
+
+## Chunk 7.5 — Mandatory first message
+
+**Status: Complete.** Nothing skipped. **Slice 7's chat is now whole apart from unread badges (7.6).** The brief's own verify step was run live against Atlas with a genuinely fresh paying client. Not seen rendered — see "Yours to check".
+
+Built — server:
+- `constants/chat.js` — `OPENING_MESSAGE_MIN`, `OPENING_MESSAGE_SUGGESTED`, the refusal message and code.
+- `services/chat.service.js` — `clientHasWritten()`, the enforcement in `sendMessage`, and `meta.awaitingOpeningMessage` on the message list.
+- `models/Message.js` — one supporting index.
+- 11 new tests across `routes/chat.test.js` and `realtime/socket.test.js`.
+
+Built — client:
+- `components/portal/client/chat/OpeningMessage.jsx`
+- `data/chatContent.js` — the `opening` copy.
+- Edits: `lib/chat/useChat.js` (`awaitingOpeningMessage` + a dedicated `sendOpening`), `pages/portal/client/Chat.jsx` (the branch).
+
+**No new packages, no new environment variables, no new colour tokens.**
+
+---
+
+### THE RULE, STATED PLAINLY
+
+The brief's wording — "reject other client messages on a booking that has no first message yet" — is circular, because the first message *is* the opening message. Confirmed with the developer, the enforceable rule underneath is:
+
+> **A client's first message on a booking must clear the opening floor. Every message after it is ordinary.**
+
+That closes the actual hole: someone bypassing the UI with curl and sending "hi" as their entire opening.
+
+**Enforced in the `sendMessage` service**, so REST and the socket inherit it identically — there is one write path and this sits on it. **Mutation-checked: removing the enforcement broke 6 tests** across both transports.
+
+---
+
+### TWENTY CHARACTERS, AND WHY IT IS NOT THIRTY
+
+**Developer's decision, 2026-09-15**, argued down from the 30 I proposed — and they were right.
+
+A 30-character floor refuses **"I can't do this anymore."** (24) and **"I feel completely broken"** (25). Those are not spam. They may be the most important message anyone on this platform ever sends, and a product that answers them with *"please write more"* has failed at the exact moment it matters.
+
+Twenty still stops "hi", "test" and "hello", which is the entire job of the floor. A test asserts the 24-character sentence is accepted, and names the reason, so nobody later raises the number without meeting the case first.
+
+**`OPENING_MESSAGE_SUGGESTED` (200) is never enforced anywhere.** The screen encourages roughly that much and then gets out of the way.
+
+The check measures the **trimmed** length, so twenty spaces around "hi" does not pass.
+
+---
+
+### DECISIONS MADE
+
+- **Clients only.** A therapist is never blocked: nothing in §7.1 restricts them, and stopping a clinician reaching someone would be the wrong failure. Two tests cover it, including the case where a therapist writes first.
+- **`awaitingOpeningMessage` is computed from THE CLIENT's messages, not the booking's.** So a therapist who somehow messaged first cannot accidentally unlock the requirement — the client still owes their opening, and a test pins exactly that.
+- **The server reports the flag; the browser never derives it.** With pagination the client may hold only the newest page and cannot know whether an opening exists further back.
+- **One flag serves both portals.** For the client it means "you still owe this"; for the therapist (8.3) it means "they have not written yet". A test checks it from the therapist's side too.
+- **A new index, `{ bookingId, senderId }`.** The existing unread index has `read` between those two fields, so the existence check that now runs on every send would scan rather than seek.
+- **The opening send is deliberately NOT optimistic**, unlike ordinary sending. In the thread an optimistic bubble is right, because the thread is where a failure should show. Here the reader is watching one button on a screen with nothing else on it: optimism buys nothing and would leave a phantom failed row behind a screen they cannot yet see. `sendOpening` awaits the real write and throws, so the screen can say what happened **while keeping every word they wrote**.
+- **The server's own refusal text is shown when there is one.** Its explanation of what this message is for reads far better than a generic failure.
+
+---
+
+### THE SCREEN
+
+§7.1: free text, never a structured form — the client chose that deliberately so somebody can express themselves naturally. So the design had to say "this is the beginning of a conversation" rather than describe it:
+
+- **The therapist's face is the first thing on the screen**, under "You are writing to". A real person, not a heading. §24.5 makes therapist portraits the exception to the site's photo treatment, so it carries no wash.
+- **§7.1's four prompts are one sentence of prose**, not four labelled fields and not a bulleted checklist — four prompts in a list is a form wearing different clothes. It ends *"There is no right way to do this."*
+- **The writing area is a page, not an input** — borderless on a mist ground, body-size type, generous leading, growing with the writing so the words never scroll away inside a fixed box.
+- **No counter, no progress bar, no step indicator.** A progress bar here would turn somebody's account of their own distress into a task with a completion state. Below the floor the cue reads *"A few more words, whenever you are ready."* — encouragement, never a requirement unmet.
+- **FRAUNCES IS USED HERE, AND NOWHERE ELSE IN EITHER PORTAL.** §24.3 permits it at display sizes; chunk 4.1 banned it from the admin chrome because a serif over dense table data is the wrong register. This is the one screen in the portal that is not a task, and §24.8 says the client portal skews warmer. Flagged as a deliberate break rather than an oversight.
+- **A true privacy line: *"Only {name} can read your messages."*** §11 records that an admin conversation viewer was proposed and the client decided against building it, so nobody else can. The content file carries that citation and notes the line must change if that ever does — §11 also requires such a capability be disclosed in the privacy policy.
+
+**It replaces the thread rather than sitting over it in a modal.** A modal would frame this as an interruption; it is the opposite.
+
+**There is no skip, and no client-side-only gate.** Someone who edited their own JavaScript past this screen would still be refused by the server.
+
+---
+
+### THREE PRE-EXISTING TEST FIXTURES, AND ONE BAD ASSERTION OF MY OWN
+
+Adding the rule broke four tests. Three were older fixtures whose message text — "Hello.", "No hint.", "Optimistic send." — was now too short to be a valid opening. That is the rule working, not a defect; the texts were incidental to what those tests check and were lengthened.
+
+The fourth was mine: I asserted the refusal body does not contain the rejected text `"hi"` — but **"hi" occurs inside the word "This"** in the refusal copy, so it failed for a reason that had nothing to do with a leak. Rewritten with a distinctive token, and the reason recorded at the test so nobody re-introduces the same shape.
+
+---
+
+**Verified:**
+- `npm test -- --runInBand` — **1026 tests across 36 suites, all passing** (1015 from earlier chunks, 11 new).
+- `npm run lint` (server) clean; `oxlint` (client) **0 warnings** on every file this chunk touched.
+- Client build passes. Impeccable detector `[]` on both new/changed UI files — **a degraded empty**, as always here.
+- **Mutation-checked:** removing the enforcement broke **6** tests.
+- **14 contrast pairs computed for the opening screen, 0 failures.** Tightest: the writing-page placeholder at 4.59:1, its sage focus ring at 3.06:1, and the send border at 3.44:1 — none may be lightened.
+- Tests cover: below the floor refused, exactly at the floor accepted, one under refused, **the 24-character cry for help accepted**, trimmed length measured, the rule applying once, the therapist never restricted, the client still owing after a therapist writes first, the flag reported correctly from both sides, refusal on **both** transports, and no message text echoed in the error.
+
+**LIVE AGAINST REAL ATLAS — 13 checks, all passing.** The brief's own verify step, with a **genuinely fresh paying client** created through the real onboarding transaction against a seeded therapist:
+- the portal was told an opening was owed, and the thread was genuinely empty;
+- "hi" refused with `OPENING_MESSAGE_REQUIRED`, and one character under the floor refused, with nothing written;
+- **"I can't do this anymore." accepted** — the sentence the floor was lowered for;
+- the requirement cleared, the opening message first in the thread, and **a two-character second message then accepted**;
+- the therapist never blocked.
+
+**DATABASE SAFETY — the developer's strict instruction was followed exactly.** Only the throwaway client's own records were created and deleted, each by the id recorded on the way in. Afterwards: 14 users, 2 client profiles, 2 bookings, 2 subscriptions — identical to the baseline, and zero throwaway accounts remaining.
+
+**One pre-existing message was found and deliberately LEFT ALONE.** A 2-character message sent 2026-09-14 21:26 from `muhammadhussnainrauf@gmail.com` — the developer's own test of the 7.4 chat UI. It was inspected only to confirm it was not created by this run. **Consequence worth knowing:** because that account already has a first message, it is grandfathered past this rule and will go straight to the normal chat. **`testclient1@example.com` has no messages, so that account is the one that will show the opening screen.**
+
+(The three expired `pendingCheckouts` drafts present in earlier runs are gone — their 26-hour TTL lapsed on its own. Nothing in this run deleted them.)
+
+**Yours to check — nothing here has been seen rendered:**
+1. **Sign in as `testclient1@example.com` and open Chat.** The opening screen should appear instead of the thread.
+2. **Does it read as a letter to a person, or as a form?** That is the entire brief for this screen and the one thing I cannot judge from here. The therapist's face, the Fraunces heading and the page-like writing area are the three things carrying it.
+3. **Type "hi" and try to send** — the button should stay disabled and the cue should read as encouragement, not as a rule.
+4. **Send a real opening, and confirm the normal chat appears** with it as the first message.
+5. **360px**, and reduced motion (the card should appear without rising).
+6. If you want to see the opening screen on the other account, its existing 2-character message would have to go — **your call, not mine, and I have not touched it.**
+
+**Manual steps for the developer:**
+1. **No new packages, no new environment variables.**
+2. **Restart the API server** — the new rule and the `awaitingOpeningMessage` field are read at startup.
+
+**Carried forward:**
+- **Chunk 7.6** builds unread badges on the socket provider mounted in 7.4 and `GET /chat/unread-count`.
+- **Chunk 8.3** can use `meta.awaitingOpeningMessage` to show a therapist that a newly matched client has not written yet.
+- Chunk 12.5: the socket URL in production, beside the `sameSite` cookie, `VITE_API_BASE_URL` and sticky-sessions notes.
+
+**Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created.
+
+**Not done (out of scope, by design):**
+- **Not a structured form**, per the chunk's explicit "Do NOT" — free text only.
+- **Not skippable**, and not client-side-only: the server refuses independently.
+- No voice messages. No unread badges (7.6). No therapist-side chat (8.3).

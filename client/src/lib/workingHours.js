@@ -20,8 +20,14 @@ import { DAY_KEYS, DAY_LABELS, DAY_SHORT } from '../data/matchesContent.js'
  * knows every IANA zone and its DST rules, so no library is needed.
  */
 
-/** Reads an instant back as wall-clock parts in a given zone. */
-function partsInZone(instant, timeZone) {
+/**
+ * Reads an instant back as wall-clock parts in a given zone.
+ *
+ * Exported for `therapistAvailability.js`, which needs the same DST-safe
+ * arithmetic to answer "is the therapist working right now". A second copy of
+ * this is how two screens end up disagreeing about a Perth therapist's Monday.
+ */
+export function partsInZone(instant, timeZone) {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone,
     hourCycle: 'h23',
@@ -54,7 +60,7 @@ function partsInZone(instant, timeZone) {
  * that appears when the offset itself changes across the guessed instant, which
  * is exactly what happens on a DST boundary.
  */
-function wallTimeToInstant(year, month, day, hour, minute, timeZone) {
+export function wallTimeToInstant(year, month, day, hour, minute, timeZone) {
   let instant = Date.UTC(year, month - 1, day, hour, minute)
 
   for (let pass = 0; pass < 2; pass += 1) {

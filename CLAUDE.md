@@ -117,6 +117,8 @@ These were considered and rejected. Do not reintroduce them.
 
 **When building any UI component or page, use the impeccable skill for frontend design guidance.**
 
+**Every screen must be genuinely premium, polished and consistent — client directive, 2026-09-13.** No plain text in bare boxes. Use real visual language: considered hierarchy, drawn icons, subtle graphics, elegant styling. A stack of same-shaped bordered rectangles is not a finished screen. This is permanent and applies to portals as well as marketing pages — full detail in `.claude/rules/frontend.md`.
+
 **At the end of every task:**
 
 1. Update `docs/ongoing.md` — mark the chunk complete with a one-line summary of what was built and any decisions made.

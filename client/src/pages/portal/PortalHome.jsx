@@ -1,28 +1,20 @@
+import { Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Heading, Text } from '../../components/ui'
 import TherapistProfile from './TherapistProfile'
 import { selectRole } from '../../store/authSlice'
 
 /**
- * `/portal` serves two roles (§5), so it branches here.
+ * The index of `/portal`, which serves two roles (§5).
  *
  * A therapist gets their profile — the only therapist screen that exists until
- * slice 8 builds the inbox. A client still gets a placeholder; the client
- * portal is slice 7.
+ * slice 8 builds the inbox. A client is sent to their chat: §7 lists it first
+ * and it is where the relationship actually happens, so landing anywhere else
+ * would make them navigate before they could do the one thing they came for.
  */
 export default function PortalHome() {
   const role = useSelector(selectRole)
 
-  if (role === 'therapist') return <TherapistProfile />
+  if (role === 'client') return <Navigate to="/portal/chat" replace />
 
-  return (
-    <div className="max-w-measure">
-      <Heading level={1} size="subsection">
-        Your portal
-      </Heading>
-      <Text tone="muted" className="mt-3">
-        Chat, worksheets, your journal and your sessions arrive in a later chunk.
-      </Text>
-    </div>
-  )
+  return <TherapistProfile />
 }

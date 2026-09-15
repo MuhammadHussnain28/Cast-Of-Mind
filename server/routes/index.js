@@ -7,6 +7,8 @@ import uploadRoutes from './upload.routes.js';
 import therapistApplicationRoutes from './therapistApplication.routes.js';
 import adminRoutes from './admin.routes.js';
 import therapistRoutes from './therapist.routes.js';
+import clientRoutes from './client.routes.js';
+import chatRoutes from './chat.routes.js';
 import matchingRoutes from './matching.routes.js';
 import therapistsRoutes from './therapists.routes.js';
 import checkoutRoutes from './checkout.routes.js';
@@ -22,6 +24,12 @@ router.use('/uploads', uploadRoutes);
 router.use('/therapist-applications', therapistApplicationRoutes);
 router.use('/admin', adminRoutes);
 router.use('/therapist', therapistRoutes);
+// Singular for the same reason '/therapist' is — a singleton for the signed-in
+// client, not a collection. Access is gated on subscription status inside.
+router.use('/client', clientRoutes);
+// Shared by client and therapist — the only surface both roles reach. The
+// admin is refused by role; §11 records that decision.
+router.use('/chat', chatRoutes);
 router.use('/matching', matchingRoutes);
 // Plural and public — the singular '/therapist' above is the authenticated
 // route where a therapist manages their own profile.
