@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useClientPortal } from '../../../lib/clientPortalContext'
 import { useChat } from '../../../lib/chat/useChat'
+import { useUnread } from '../../../lib/chat/unreadContext'
+import { useOnline } from '../../../lib/useOnline'
 import { detectViewerZone } from '../../../lib/workingHours'
 import { chat, opening as openingCopy } from '../../../data/chatContent'
 import { Button, Spinner, Text } from '../../../components/ui'
 import ChatHeader from '../../../components/portal/client/chat/ChatHeader'
 import MessageThread from '../../../components/portal/client/chat/MessageThread'
+import MessageAnnouncer from '../../../components/portal/client/chat/MessageAnnouncer'
 import Composer from '../../../components/portal/client/chat/Composer'
 import OpeningMessage from '../../../components/portal/client/chat/OpeningMessage'
 
@@ -24,11 +27,15 @@ export default function Chat() {
   const { booking, therapist, user } = useClientPortal()
   const timeZone = useMemo(() => detectViewerZone(), [])
 
+  const { setReadingBooking } = useUnread()
+  const online = useOnline()
+
   const {
     messages,
     awaitingOpeningMessage,
     status,
     theyAreTyping,
+    lastIncoming,
     hasMore,
     loadingOlder,
     send,
@@ -48,6 +55,39 @@ export default function Chat() {
   // reads as a letter rather than a message.
   const shortName = therapist?.firstName ?? null
   const [openingError, setOpeningError] = useState(null)
+
+  /**
+   * "Reading this conversation" — clears the nav badge and suppresses further
+   * increments for it, so the badge never flashes on and off in front of
+   * somebody who is watching the message land.
+   *
+   * Set when the reader reaches the bottom of the thread, released when they
+   * leave the screen. Deliberately NOT set on mount: being on the chat tab is
+   * not the same as having read what is on it.
+   */
+  useEffect(() => () => setReadingBooking(null), [setReadingBooking])
+
+  const handleReachBottom = useCallback(() => {
+    if (typeof document !== 'undefined' && document.hidden) return
+    setReadingBooking(booking?.id)
+    markRead()
+  }, [booking?.id, markRead, setReadingBooking])
+
+  /**
+   * Retry, then put the cursor back in the composer.
+   *
+   * On success the Retry button unmounts with the failure row, and focus would
+   * otherwise fall to the document body — a keyboard user would be dropped at
+   * the top of the page having just fixed something. Addressed by id because
+   * the composer's own label already owns it and it is stable.
+   */
+  const handleRetry = useCallback(
+    async (clientMessageId) => {
+      await retry(clientMessageId)
+      document.getElementById('chat-composer')?.focus()
+    },
+    [retry],
+  )
 
   if (status === 'loading') {
     return (
@@ -117,6 +157,9 @@ export default function Chat() {
         therapist={therapist ? { ...therapist, name: therapistName } : null}
       />
 
+      {/* Off screen, and the only thing in this tree that speaks. */}
+      <MessageAnnouncer incoming={lastIncoming} senderName={shortName} />
+
       <MessageThread
         messages={messages}
         therapistName={shortName}
@@ -124,12 +167,17 @@ export default function Chat() {
         hasMore={hasMore}
         loadingOlder={loadingOlder}
         onLoadOlder={loadOlder}
-        onRetry={retry}
-        onReachBottom={markRead}
+        onRetry={handleRetry}
+        onReachBottom={handleReachBottom}
         theyAreTyping={theyAreTyping}
       />
 
-      <Composer onSend={send} onTyping={notifyTyping} onStopTyping={stopTyping} />
+      <Composer
+        onSend={send}
+        onTyping={notifyTyping}
+        onStopTyping={stopTyping}
+        online={online}
+      />
     </section>
   )
 }

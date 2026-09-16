@@ -9,9 +9,11 @@ import AccessNotice from '../../components/portal/client/AccessNotice'
 import SubscriptionEnded from '../../components/portal/client/SubscriptionEnded'
 import PortalSkeleton from '../../components/portal/client/PortalSkeleton'
 import PortalSocketProvider from '../../components/portal/client/PortalSocketProvider'
+import UnreadProvider from '../../components/portal/UnreadProvider'
 import TherapistPresence from '../../components/portal/client/TherapistPresence'
 import { cx } from '../../lib/cx'
 import { ClientPortalContext } from '../../lib/clientPortalContext'
+import { useKeyboardViewportHeight } from '../../lib/useVisualViewport'
 import { fetchClientMe } from '../../lib/api/clientPortalApi'
 import logoInk from '../../assets/cast-of-mind-logo-singular-ink.png'
 
@@ -38,6 +40,9 @@ export default function ClientPortalShell() {
   // Bumped to re-run the fetch. A counter rather than a boolean, so a retry
   // after a retry still triggers.
   const [attempt, setAttempt] = useState(0)
+
+  // Called before the early returns below — hooks cannot sit behind a branch.
+  const keyboardHeight = useKeyboardViewportHeight()
 
   useEffect(() => {
     let cancelled = false
@@ -85,11 +90,20 @@ export default function ClientPortalShell() {
           tore down on every tab change would drop messages, and 7.6's unread
           badges need the same one. Null-tolerant: chat falls back to REST. */}
       <PortalSocketProvider>
+      <UnreadProvider myRole={state.user?.role}>
       {/* `h-dvh` with `overflow-hidden` rather than `min-h-dvh`, so the column
           below has a DEFINITE height. The chat screen fills the remaining space
           and scrolls internally; without a bounded chain its `flex-1` resolves
-          to nothing and the thread cannot scroll at all. */}
-      <div className="flex h-dvh flex-col overflow-hidden bg-mist lg:grid lg:grid-cols-[272px_1fr]">
+          to nothing and the thread cannot scroll at all.
+
+          The inline height takes over ONLY while a software keyboard is up, on
+          a browser that draws it over the viewport rather than shrinking it —
+          otherwise the composer sits underneath it. Null the rest of the time,
+          so `dvh` is what governs in the ordinary case. */}
+      <div
+        className="flex h-dvh flex-col overflow-hidden bg-mist lg:grid lg:grid-cols-[272px_1fr]"
+        style={keyboardHeight ? { height: `${keyboardHeight}px` } : undefined}
+      >
         <SkipLink />
 
         {/* Desktop rail. Exactly one of this and the tab bar is ever in the
@@ -98,6 +112,7 @@ export default function ClientPortalShell() {
           <ClientRail
             therapist={state.therapist}
             subscription={state.subscription}
+            bookingId={state.booking?.id}
             footer={<SignOutButton />}
           />
         </aside>
@@ -141,9 +156,10 @@ export default function ClientPortalShell() {
             </div>
           </main>
 
-          <ClientTabBar />
+          <ClientTabBar bookingId={state.booking?.id} />
         </div>
       </div>
+      </UnreadProvider>
       </PortalSocketProvider>
     </ClientPortalContext.Provider>
   )

@@ -17,6 +17,21 @@ const newClientMessageId = () =>
   `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
 
 /**
+ * Why a send failed, in words the reader can act on.
+ *
+ * The server's own message when there is one — it explains the rate limit and
+ * the length cap better than the browser could. A transport failure has no
+ * server message, and `null` means the row falls back to the plain "Not sent".
+ */
+const TRANSPORT_CODES = new Set(['OFFLINE', 'TIMEOUT', 'NETWORK_ERROR'])
+
+function reasonFor(error) {
+  if (!error) return null
+  if (TRANSPORT_CODES.has(error.code)) return null
+  return error.message || null
+}
+
+/**
  * The conversation — master spec §7.1 and §14.
  *
  * THE SOCKET IS AN ACCELERATOR, NEVER A REQUIREMENT. Every operation here has a
@@ -41,6 +56,10 @@ export function useChat({ bookingId, myRole }) {
   const [error, setError] = useState(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [theyAreTyping, setTheyAreTyping] = useState(false)
+  // The newest message from the other person, for the screen-reader live
+  // region. Carries a sequence number so two identical messages in a row are
+  // still two separate announcements rather than one silently swallowed.
+  const [lastIncoming, setLastIncoming] = useState(null)
 
   // Read in callbacks that must not re-subscribe when the list changes.
   // Synced in an effect rather than assigned during render — a ref written
@@ -95,7 +114,21 @@ export function useChat({ bookingId, myRole }) {
 
     const onMessage = (payload) => {
       setMessages((current) => upsert(current, normalise(payload, myRole)))
-      if (payload.senderRole !== myRole) setTheyAreTyping(false)
+      if (payload.senderRole !== myRole) {
+        setTheyAreTyping(false)
+        // Fed to the live region so a screen reader hears the message arrive.
+        // Only what came FROM the other person, and only while this screen is
+        // mounted — history and my own sends are not events.
+        //
+        // `seq` counts arrivals rather than carrying a timestamp: the announcer
+        // alternates between two regions on it, which is what makes the same
+        // message twice in a row get announced twice.
+        setLastIncoming((previous) => ({
+          id: payload.id,
+          text: payload.text,
+          seq: (previous?.seq ?? 0) + 1,
+        }))
+      }
     }
 
     const onTypingStart = (payload) => {
@@ -178,7 +211,11 @@ export function useChat({ bookingId, myRole }) {
         })
         if (ack?.data) return ack.data
         if (ack?.error?.code !== 'OFFLINE' && ack?.error?.code !== 'TIMEOUT') {
-          throw new Error(ack?.error?.message ?? 'Message not sent.')
+          // The code travels with the message, so the caller can tell a refusal
+          // it should explain from a transport failure it should not.
+          const failure = new Error(ack?.error?.message ?? 'Message not sent.')
+          failure.code = ack?.error?.code
+          throw failure
         }
         // Offline or timed out — fall through and try HTTP.
       }
@@ -209,11 +246,18 @@ export function useChat({ bookingId, myRole }) {
         setMeta((current) =>
           current.awaitingOpeningMessage ? { ...current, awaitingOpeningMessage: false } : current,
         )
-      } catch {
+      } catch (err) {
         // THE TEXT IS NEVER LOST. The row stays exactly where it was, visibly
         // unsent, with a retry — somebody who has just written something hard
         // must not have to write it twice.
-        setMessages((current) => markFailed(current, clientMessageId))
+        //
+        // NO AUTOMATIC RETRY, ANYWHERE. `clientMessageId` is never stored
+        // server-side, so the server cannot recognise a repeat: if a send
+        // actually landed and only the acknowledgement was lost, retrying would
+        // post the message twice. A duplicated message in a therapy
+        // conversation is worse than a visible failure, so retrying is always
+        // the reader's own deliberate act.
+        setMessages((current) => markFailed(current, clientMessageId, reasonFor(err)))
       }
     },
     [deliver, myRole],
@@ -252,16 +296,28 @@ export function useChat({ bookingId, myRole }) {
       try {
         const saved = await deliver(clientMessageId, target.text)
         setMessages((current) => upsert(current, normalise({ ...saved, clientMessageId }, myRole)))
-      } catch {
-        setMessages((current) => markFailed(current, clientMessageId))
+      } catch (err) {
+        setMessages((current) => markFailed(current, clientMessageId, reasonFor(err)))
       }
     },
     [deliver, myRole],
   )
 
   // --- read state -----------------------------------------------------------
+  /**
+   * §14: opening a conversation marks it read — and 7.6's brief adds the word
+   * that matters, "AND VISIBLE".
+   *
+   * A hidden tab is refused here rather than at the call site, so every path
+   * into this — first paint, reaching the bottom, coming back to the tab —
+   * inherits the same rule. Marking messages read on a background tab would be
+   * a lie the badge then tells, and the person it lies to is the one waiting to
+   * find out their therapist replied.
+   */
   const markRead = useCallback(async () => {
     if (!bookingId) return
+    if (typeof document !== 'undefined' && document.hidden) return
+
     try {
       if (socket?.connected) {
         await emitWithAck(socket, SOCKET_EVENTS.MESSAGE_READ, { bookingId })
@@ -314,6 +370,7 @@ export function useChat({ bookingId, myRole }) {
     status,
     error,
     theyAreTyping,
+    lastIncoming,
     connected: Boolean(socket?.connected),
     send,
     sendOpening,

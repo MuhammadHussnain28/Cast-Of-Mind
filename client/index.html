@@ -4,7 +4,22 @@
     <meta charset="UTF-8" />
     <!-- TODO: favicon pending — client to supply. -->
     <meta name="theme-color" content="#19122B" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `interactive-widget=resizes-content` tells the browser to SHRINK the
+      viewport when a software keyboard opens, rather than drawing the keyboard
+      over it. Without it, the chat portal's full-height layout keeps its full
+      height and the composer ends up underneath the keyboard, so somebody
+      cannot see what they are typing.
+
+      Honoured by Chromium (Android). Safari ignores it, which is why
+      `lib/useVisualViewport.js` measures `visualViewport` as well. Added
+      2026-09-16 with the developer's explicit approval, because this line is
+      global and affects every page — not only the portal.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
+    />
 
     <!--
       Both stylesheets are preloaded before they are applied.

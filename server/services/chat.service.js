@@ -4,7 +4,7 @@ import { Booking } from '../models/Booking.js';
 import { ClientProfile } from '../models/ClientProfile.js';
 import { TherapistProfile } from '../models/TherapistProfile.js';
 import { AppError } from '../utils/AppError.js';
-import { emitMessage, emitUnread } from '../realtime/emitter.js';
+import { emitMessage, emitUnread, getSocketServer } from '../realtime/emitter.js';
 import { ROLES } from '../constants/roles.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
 import {
@@ -284,7 +284,38 @@ export async function sendMessage(bookingId, user, text, { clientMessageId } = {
   // which is why every REST test still passes untouched.
   emitMessage(booking._id, presented);
 
+  await pushUnreadToRecipient(booking, user);
+
   return presented;
+}
+
+/**
+ * The badge going UP — §14: "Socket.io pushes badge updates live so counts
+ * change without a page refresh."
+ *
+ * `markRead` already pushed the count DOWN to the reader. Until now nothing
+ * pushed it up, so a recipient sitting on Worksheets learned about a new
+ * message only by opening the chat or reloading. This closes that half.
+ *
+ * TO THE RECIPIENT ONLY. The sender's count did not change — their own message
+ * is never unread for them (§14) — and pushing to the booking room would tell
+ * the sender something about the other person's state, which is the read
+ * receipt deliberately left out in 7.2.
+ *
+ * SKIPPED ENTIRELY WITH NO SOCKET SERVER ATTACHED. `emitUnread` would no-op on
+ * its own, but the aggregation behind it would still run on every send. Reading
+ * the attachment first keeps the REST-only path — the whole Jest suite, and any
+ * deployment running without sockets — at exactly the cost it had before.
+ */
+async function pushUnreadToRecipient(booking, sender) {
+  if (!getSocketServer()) return;
+
+  const senderIsClient = String(booking.clientId) === String(sender.id);
+  const recipient = senderIsClient
+    ? { id: booking.therapistId, role: ROLES.THERAPIST }
+    : { id: booking.clientId, role: ROLES.CLIENT };
+
+  emitUnread(recipient.id, await unreadCount(recipient));
 }
 
 /**

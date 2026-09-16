@@ -7,7 +7,7 @@ globs: client/**
 
 Applies to everything under `/client`. Full design specification: `docs/05-design-system.md`.
 
-**When building any UI component or page, use the impeccable skill for frontend design guidance.**
+**The `impeccable` skill is MANDATORY on every UI component and every page — client directive, 2026-09-16.** Invoke it via the Skill tool *before* designing, every time. Not "when unsure", not "for the big screens" — every time. This is deliberately not left to judgement, because judging when design guidance was needed is what produced three rounds of flat output.
 
 ---
 
@@ -93,11 +93,22 @@ Use Framer Motion.
 
 ---
 
-## The standing bar for every screen — client directive, 2026-09-13
+## The standing bar for every screen — client directive, 2026-09-13, restated and sharpened 2026-09-16
 
 **This applies to every screen in the project, forever. It does not need restating per chunk.**
 
-> Make the UI genuinely premium, polished and consistent. **Do not put plain text inside bare boxes.** Use real visual language — considered hierarchy, drawn icons, subtle graphics, elegant styling — so the platform feels high-end, beautiful and visually engaging rather than merely correct.
+> Make the UI genuinely premium, polished and consistent. **Do not put plain text inside bare boxes — a stack of flat rectangles is NOT a finished screen.** **Text is the caption, not the payload.** Use real visual language — considered hierarchy, drawn icons, real surface depth, soft ambient glows, elegant styling — so the platform feels high-end, beautiful and visually engaging rather than merely correct.
+
+**The house ambient wash**, used in the portal rail, the chat opening screen and the marketing asides, so the whole product shares one atmosphere:
+
+```jsx
+<div
+  aria-hidden="true"
+  className="pointer-events-none absolute -left-24 -top-20 size-72 rounded-full bg-sage/10 blur-[130px]"
+/>
+```
+
+Large, slow, low-contrast, behind the content, never a band gradient. A glow should be felt before it is noticed.
 
 **What this rules out**, because these are the shapes "correct but flat" actually takes:
 

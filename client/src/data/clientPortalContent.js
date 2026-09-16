@@ -14,6 +14,10 @@ export const CLIENT_NAV = [
     label: 'Chat',
     icon: 'chat',
     // §7.1 — the first feature, and where the mandatory first message lives.
+    // §14: the only place in this portal that carries an unread count. Declared
+    // on the nav data rather than checked against the route in two components,
+    // so the rail and the tab bar cannot disagree about where the badge goes.
+    unread: true,
   },
   { to: '/portal/worksheets', label: 'Worksheets', icon: 'worksheets' },
   { to: '/portal/journal', label: 'Journal', icon: 'journal' },

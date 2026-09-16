@@ -42,11 +42,33 @@ export const chat = {
 
   jumpToLatest: 'Jump to latest',
   loadingOlder: 'Loading earlier messages',
+  loadOlder: 'Load earlier messages',
   threadStart: 'This is the beginning of your conversation.',
 
   typing: 'is typing',
 
-  offline: 'Reconnecting — your messages will still send.',
+  /**
+   * Only when the BROWSER reports no connection — never merely when the socket
+   * is down. Chat works perfectly over REST without a socket (§14), so telling
+   * someone it is "reconnecting" in that state would worry them about nothing.
+   */
+  offline: 'You are offline. Your message will send once you are back.',
+
+  /** The conversation, named for a screen reader rather than left as a div. */
+  threadLabel: 'Conversation with {name}',
+  opensInNewTab: '(opens in a new tab)',
+
+  /**
+   * What a screen reader hears when a message arrives — §14.
+   *
+   * The full text under 400 characters, the sender alone above it (developer's
+   * decision, 2026-09-16). A live announcement cannot be paused, replayed or
+   * navigated, so a very long one that gets interrupted is simply lost; past
+   * that length the message is better read from the log, which is why the
+   * thread carries `role="log"`.
+   */
+  announce: '{name} says: {text}',
+  announceLong: '{name} sent a long message.',
 
   /**
    * The empty state. It does NOT implement the mandatory first message (§7.1,

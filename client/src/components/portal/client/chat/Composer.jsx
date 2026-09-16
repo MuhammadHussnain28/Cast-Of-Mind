@@ -16,7 +16,7 @@ const COUNTER_FROM = 4500
  * Shift to hold, so sending on Enter there would fire half-finished sentences.
  * The send button is always present and is the only send path on touch.
  */
-export default function Composer({ onSend, onTyping, onStopTyping, disabled }) {
+export default function Composer({ onSend, onTyping, onStopTyping, disabled, online = true }) {
   const [value, setValue] = useState('')
   const textareaRef = useRef(null)
 
@@ -114,6 +114,21 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled }) {
           <SendIcon />
         </button>
       </div>
+
+      {/* Only when the BROWSER reports no network. A socket that has dropped is
+          invisible and harmless — REST still carries the conversation (§14) —
+          so saying anything then would worry somebody about nothing. Sending is
+          still attempted regardless; this explains a failure, it never prevents
+          an attempt. */}
+      {!online && (
+        <p
+          role="status"
+          className="mx-auto mt-2 flex w-full max-w-3xl items-center gap-2 font-body text-caption text-ink/70"
+        >
+          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-clay" />
+          {chat.offline}
+        </p>
+      )}
 
       {showCounter && (
         <p

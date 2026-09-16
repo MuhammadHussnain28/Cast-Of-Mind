@@ -2,6 +2,7 @@ import { cx } from '../../../../lib/cx'
 import { timeIn } from '../../../../lib/chat/groupMessages'
 import { MESSAGE_STATUS } from '../../../../lib/chat/messageStore'
 import { chat } from '../../../../data/chatContent'
+import MessageText from './MessageText'
 import { UnsentIcon } from './ChatIcons'
 
 /**
@@ -44,7 +45,7 @@ export default function MessageCluster({ cluster, timeZone, onRetry }) {
               sending && 'opacity-70',
             )}
           >
-            {message.text}
+            <MessageText text={message.text} />
           </div>
         )
       })}
@@ -69,11 +70,14 @@ export default function MessageCluster({ cluster, timeZone, onRetry }) {
         .map((m) => (
           <p
             key={`failed-${m.clientMessageId}`}
-            className="flex items-center gap-2 px-1 font-body text-caption text-clay"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 font-body text-caption text-clay"
             role="status"
           >
             <UnsentIcon />
-            <span>{chat.failed}</span>
+            {/* The server's own reason when it gave one — "too many messages",
+                "too long" — because "Not sent" alone leaves someone guessing at
+                what to change. */}
+            <span>{m.error || chat.failed}</span>
             <button
               type="button"
               onClick={() => onRetry?.(m.clientMessageId)}

@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import http from 'node:http';
 import mongoose from 'mongoose';
 import { io as ioClient } from 'socket.io-client';
@@ -583,32 +584,143 @@ describe('message delivery', () => {
 // ---------------------------------------------------------------------------
 
 describe('read state', () => {
-  it('pushes a live unread update to the reader', async () => {
+  it('pushes the badge UP to the recipient the moment a message is sent', async () => {
     const client = await connect(tokens.clientA);
     const therapist = await connect(tokens.therapistA);
 
+    const update = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
     await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
       bookingId: String(bookingA._id),
       text: 'From your therapist.',
     });
 
-    const update = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
+    const counts = await update;
+    expect(counts.total).toBe(1);
+    expect(counts.byBooking).toEqual([{ bookingId: String(bookingA._id), count: 1 }]);
+  });
+
+  it('never pushes an unread update to the SENDER of the message', async () => {
+    // Their own message is never unread for them (§14), so their count did not
+    // change — and pushing to the booking room instead of the recipient's own
+    // room would leak that the other person had received it.
+    const client = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    const nothingForSender = expectNoEvent(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+    const arrived = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
+
+    await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'Only one side of this gets a badge.',
+    });
+
+    await expect(nothingForSender).resolves.toBeUndefined();
+    expect((await arrived).total).toBe(1);
+  });
+
+  it('pushes the badge up to the THERAPIST when the client writes', async () => {
+    // Symmetrical, because §8.1's sidebar needs the same event from the other
+    // side. One implementation serves both portals.
+    const client = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    const update = waitFor(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+    await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'A long enough opening message for the floor in chunk 7.5.',
+    });
+
+    expect((await update).total).toBe(1);
+  });
+
+  it('counts up as messages accumulate, and never counts the reader own', async () => {
+    const client = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    for (const text of ['One.', 'Two.', 'Three.']) {
+      const update = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
+      await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
+        bookingId: String(bookingA._id),
+        text,
+      });
+      await update;
+    }
+
+    // The client replies. Their own message must not raise their own badge.
+    const therapistUpdate = waitFor(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+    await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'My own reply, which is never unread for me.',
+    });
+    await therapistUpdate;
+
+    const ack = await emit(client, SOCKET_EVENTS.CONVERSATION_SYNC, {
+      bookingId: String(bookingA._id),
+    });
+    expect(ack.data.data).toHaveLength(4);
+  });
+
+  it('reaches every tab the recipient has open, not just one', async () => {
+    const tabOne = await connect(tokens.clientA);
+    const tabTwo = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    const onOne = waitFor(tabOne, SOCKET_EVENTS.UNREAD_UPDATE);
+    const onTwo = waitFor(tabTwo, SOCKET_EVENTS.UNREAD_UPDATE);
+
+    await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'Both tabs should learn about this.',
+    });
+
+    expect((await onOne).total).toBe(1);
+    expect((await onTwo).total).toBe(1);
+  });
+
+  it('never reaches someone outside the booking', async () => {
+    const outsider = await connect(tokens.clientB);
+    const therapist = await connect(tokens.therapistA);
+
+    const nothing = expectNoEvent(outsider, SOCKET_EVENTS.UNREAD_UPDATE);
+    await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'Not for booking B at all.',
+    });
+
+    await expect(nothing).resolves.toBeUndefined();
+  });
+
+  it('pushes a live unread update to the reader when they mark read', async () => {
+    const client = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    // Wait out the send's own push first, so the two transitions cannot race.
+    const raised = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
+    await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: 'From your therapist.',
+    });
+    expect((await raised).total).toBe(1);
+
+    const cleared = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
     const ack = await emit(client, SOCKET_EVENTS.MESSAGE_READ, {
       bookingId: String(bookingA._id),
     });
 
     expect(ack.data.marked).toBe(1);
-    expect((await update).total).toBe(0);
+    expect((await cleared).total).toBe(0);
   });
 
   it('does not tell the SENDER their message was read', async () => {
     const client = await connect(tokens.clientA);
     const therapist = await connect(tokens.therapistA);
 
+    const raised = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
     await emit(therapist, SOCKET_EVENTS.MESSAGE_SEND, {
       bookingId: String(bookingA._id),
       text: 'Read receipts are deliberately absent.',
     });
+    await raised;
 
     const nothingForTherapist = expectNoEvent(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
     await emit(client, SOCKET_EVENTS.MESSAGE_READ, { bookingId: String(bookingA._id) });
@@ -834,5 +946,33 @@ describe('graceful degradation', () => {
     expect(await Message.countDocuments({ bookingId: bookingA._id })).toBe(1);
 
     setSocketServer(io);
-  });
+    // Explicit timeout, like the rate-limit test above. This is the only
+    // supertest call in a file that has already opened and closed several dozen
+    // sockets, and the first HTTP request after all that has been measured at
+    // 785ms alone and over 12s at the end of a full run on a loaded machine.
+    // The default 5s is a measure of the machine, not of this behaviour.
+  }, 20000);
+
+  it('runs NO unread aggregation at all when nothing is listening', async () => {
+    // The emitter would no-op on its own, but the aggregation behind it would
+    // still run on every single send. Reading the attachment first is what
+    // keeps the REST-only path at exactly the cost it had before 7.6 — this
+    // suite, and any deployment running without sockets.
+    const request = (await import('supertest')).default;
+    const spy = jest.spyOn(Message, 'aggregate');
+    setSocketServer(null);
+
+    try {
+      const res = await request(app)
+        .post(`/api/v1/chat/${bookingA._id}/messages`)
+        .set('Authorization', `Bearer ${tokens.therapistA}`)
+        .send({ text: 'No socket, so no badge to push anywhere.' });
+
+      expect(res.status).toBe(201);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      setSocketServer(io);
+    }
+  }, 20000);
 });

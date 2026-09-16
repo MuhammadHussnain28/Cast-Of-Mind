@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cx } from '../../../../lib/cx'
 import { groupMessages } from '../../../../lib/chat/groupMessages'
@@ -128,6 +128,50 @@ export default function MessageThread({
     }
   }, [hasMore, loadingOlder, onLoadOlder, onReachBottom])
 
+  /**
+   * The same thing, reachable without a mouse wheel.
+   *
+   * Loading older history was scroll-only until now, which meant a keyboard or
+   * screen-reader user simply could not read back through their conversation.
+   * The anchor is set here too, so position is preserved identically.
+   */
+  const loadOlderFromButton = useCallback(() => {
+    const el = scrollerRef.current
+    if (el) pendingAnchor.current = el.scrollHeight
+    onLoadOlder?.()
+  }, [onLoadOlder])
+
+  /**
+   * Coming back to the tab counts as reading it, if they are at the bottom.
+   *
+   * `markRead` refuses outright while the tab is hidden, so the first paint's
+   * call is correctly ignored when the portal is opened in a background tab.
+   * This is what makes it land once they actually look.
+   */
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden && atBottom) onReachBottom?.()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [atBottom, onReachBottom])
+
+  /**
+   * A software keyboard opening shortens the thread without scrolling it, so
+   * whatever was at the bottom slides out of sight behind the keyboard. If they
+   * were reading the newest message, keep them on it.
+   */
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return undefined
+
+    const repin = () => {
+      if (atBottom) scrollToBottom('auto')
+    }
+    viewport.addEventListener('resize', repin)
+    return () => viewport.removeEventListener('resize', repin)
+  }, [atBottom, scrollToBottom])
+
   if (messages.length === 0) {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -138,10 +182,25 @@ export default function MessageThread({
 
   return (
     <div className="relative min-h-0 flex-1">
+      {/*
+        `role="log"` makes this a navigable record rather than an anonymous
+        scrolling div, and `tabIndex` is what lets a keyboard user scroll it at
+        all — without it the arrow keys have nothing focused to act on.
+
+        NO `aria-live` HERE, on purpose: it would read the whole first page on
+        load and every page of history on the way back. Arrivals are announced
+        by the dedicated region in Chat.jsx instead.
+      */}
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
+        role="log"
+        tabIndex={0}
+        aria-label={chat.threadLabel.replace('{name}', therapistName || 'your therapist')}
+        className={cx(
+          'h-full overflow-y-auto overscroll-contain px-4 py-4 sm:px-5',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink',
+        )}
       >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
           {/* The start of the relationship, stated once. */}
@@ -149,6 +208,28 @@ export default function MessageThread({
             <p className="py-2 text-center font-body text-caption text-ink/70">
               {chat.threadStart}
             </p>
+          )}
+
+          {hasMore && !loadingOlder && (
+            <div className="flex justify-center py-1">
+              <button
+                type="button"
+                onClick={loadOlderFromButton}
+                className={cx(
+                  // `ink/50`, not `ink/25`. The button is paper on the thread's
+                  // mist ground — 1.11:1 between the two surfaces — so the
+                  // border is the entire boundary, and WCAG 1.4.11 wants 3:1
+                  // for that. Measured: ink/25 on mist is 1.55:1 and FAILS;
+                  // ink/50 is 3.08:1 and passes. Same token chunk 0.4 settled
+                  // on for input borders, for the same reason.
+                  'min-h-11 rounded-full border border-ink/50 bg-paper px-4',
+                  'font-body text-caption text-ink',
+                  'transition-colors duration-200 ease-out hover:border-ink',
+                )}
+              >
+                {chat.loadOlder}
+              </button>
+            </div>
           )}
 
           {loadingOlder && (

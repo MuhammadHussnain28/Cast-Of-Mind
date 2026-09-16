@@ -37,3 +37,23 @@ export async function markConversationRead(bookingId) {
     throw toApiError(error)
   }
 }
+
+/**
+ * The unread badge — §14.
+ *
+ * Returns a total and a per-booking breakdown. A client has one booking so the
+ * total is the whole answer; a therapist has many and §8.1 needs one count per
+ * client, which is why the breakdown is here from the start.
+ *
+ * This is the TRUTH the socket's live pushes are corrected against: the socket
+ * makes the badge instant, this makes it right after a reconnect, a reload, or
+ * any event that was missed while away.
+ */
+export async function fetchUnreadCount() {
+  try {
+    const { data } = await apiClient.get('/chat/unread-count')
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

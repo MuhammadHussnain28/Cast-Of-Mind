@@ -49,6 +49,10 @@ export function normalise(message, myRole) {
     senderRole: message.senderRole,
     mine: message.mine ?? message.senderRole === myRole,
     status: message.status ?? MESSAGE_STATUS.SENT,
+    // Explicitly null rather than absent: `upsert` merges over the existing
+    // row, so a failure reason left off here would survive the retry that
+    // cleared it and sit under a message that did send.
+    error: null,
   };
 }
 
@@ -105,18 +109,31 @@ export function optimisticMessage({ clientMessageId, text, senderRole }) {
     senderRole,
     mine: true,
     status: MESSAGE_STATUS.SENDING,
+    error: null,
   };
 }
 
-export function markFailed(messages, clientMessageId) {
+/**
+ * Failed, and WHY when the server said why.
+ *
+ * "Not sent" alone is a dead end: someone who has hit the rate limit or the
+ * 5,000-character cap can only guess, and guessing wrong means writing it all
+ * again. The server's own sentence explains it better than any message the
+ * browser could invent, so it is carried through and shown.
+ */
+export function markFailed(messages, clientMessageId, reason = null) {
   return messages.map((m) =>
-    m.clientMessageId === clientMessageId ? { ...m, status: MESSAGE_STATUS.FAILED } : m,
+    m.clientMessageId === clientMessageId
+      ? { ...m, status: MESSAGE_STATUS.FAILED, error: reason }
+      : m,
   );
 }
 
 export function markSending(messages, clientMessageId) {
   return messages.map((m) =>
-    m.clientMessageId === clientMessageId ? { ...m, status: MESSAGE_STATUS.SENDING } : m,
+    m.clientMessageId === clientMessageId
+      ? { ...m, status: MESSAGE_STATUS.SENDING, error: null }
+      : m,
   );
 }
 

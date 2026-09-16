@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import { cx } from '../../../lib/cx'
 import { CLIENT_NAV } from '../../../data/clientPortalContent'
+import { useUnreadFor } from '../../../lib/chat/unreadContext'
+import UnreadBadge from '../UnreadBadge'
+import { unreadLabel } from '../../../lib/chat/unreadStore'
 import { NAV_ICONS } from './navIcons'
 
 /**
@@ -28,7 +31,12 @@ import { NAV_ICONS } from './navIcons'
  * should be 14px with shorter labels instead, that is a one-line change here
  * plus the labels in data/clientPortalContent.js.
  */
-export default function ClientTabBar() {
+export default function ClientTabBar({ bookingId }) {
+  // §14. The badge sits on the icon's corner rather than beside the label,
+  // because the label already runs at 11px in a 64px tab and has no room to
+  // give up.
+  const unread = useUnreadFor(bookingId)
+
   return (
     <nav
       aria-label="Your portal"
@@ -38,11 +46,13 @@ export default function ClientTabBar() {
       <ul className="mx-auto flex max-w-lg items-stretch">
         {CLIENT_NAV.map((item) => {
           const Icon = NAV_ICONS[item.icon]
+          const count = item.unread ? unread : 0
 
           return (
             <li key={item.to} className="flex-1">
               <NavLink
                 to={item.to}
+                aria-label={unreadLabel(item.label, count)}
                 className={({ isActive }) =>
                   cx(
                     'flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2',
@@ -63,7 +73,10 @@ export default function ClientTabBar() {
                         isActive ? 'bg-gold' : 'bg-transparent',
                       )}
                     />
-                    <Icon size={22} className={isActive ? 'text-gold' : 'text-paper/70'} />
+                    <span className="relative inline-flex">
+                      <Icon size={22} className={isActive ? 'text-gold' : 'text-paper/70'} />
+                      <UnreadBadge count={count} variant="corner" />
+                    </span>
                     <span>{item.label}</span>
                   </>
                 )}

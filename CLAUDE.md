@@ -49,7 +49,8 @@ npm run lint
 | `docs/04-features-and-flows.md` | Every page, portal, and the 33-field therapist form |
 | `docs/05-design-system.md` | Palette, typography, motion, page specs — read before any UI work |
 | `docs/chunks.md` | The build plan. Chunks are executed in order. |
-| `docs/ongoing.md` | Progress log. You update this. |
+| `docs/ongoing.md` | Progress log. You update this. Carries the standing decisions, the Slice 6 summary, Slice 7 in full, and the 13 pre-launch blockers. |
+| `docs/archive/ongoing-slices-0-6.md` | The raw, unedited build log for Slices 0–6, moved out 2026-09-16. History, not instruction — read it for the full reasoning behind an extracted decision. |
 
 `Cast_of_Mind_Master_Spec.md` is the complete source of truth. If a split file and the master spec disagree, **the master spec wins**.
 
@@ -115,13 +116,19 @@ These were considered and rejected. Do not reintroduce them.
 
 **Stay inside the chunk.** Each chunk in `docs/chunks.md` has a "Do NOT" list. Respect it — do not build ahead.
 
-**When building any UI component or page, use the impeccable skill for frontend design guidance.**
+### STANDING UI DIRECTIVE — client, 2026-09-16. Permanent, every session, every chunk.
 
-**Every screen must be genuinely premium, polished and consistent — client directive, 2026-09-13.** No plain text in bare boxes. Use real visual language: considered hierarchy, drawn icons, subtle graphics, elegant styling. A stack of same-shaped bordered rectangles is not a finished screen. This is permanent and applies to portals as well as marketing pages — full detail in `.claude/rules/frontend.md`.
+**1. Visual-first.** Every screen must be premium, polished, consistent and beautiful. **Do NOT put plain text inside bare boxes — a stack of flat rectangles is NOT a finished screen.** Text is the caption, not the payload. Use drawn icons, real surface depth, and soft ambient glows (the house pattern is `bg-sage/10 blur-[130px]` on an absolutely positioned, `aria-hidden` element).
+
+**2. The `impeccable` skill is mandatory.** Invoke it on **EVERY** UI component and **EVERY** page, before designing. Not when unsure — every time.
+
+Applies to portals as well as marketing pages. Full detail in `.claude/rules/frontend.md`. What still outranks it: the accessibility floor, the eight palette tokens, and §24.9's line — **natural, not decorated**.
 
 **At the end of every task:**
 
 1. Update `docs/ongoing.md` — mark the chunk complete with a one-line summary of what was built and any decisions made.
+
+   **From Chunk 8.1 onwards the entry is 60–70 lines, not an essay — client directive, 2026-09-16.** Five headings only: Status & Built · Key decisions · Verification · Manual steps for the developer · Carried forward. **No contrast tables** (report the count, and only a failure actually found), no narrative sections with their own headings, no restating what the code does. The exact template is at the top of `docs/ongoing.md`. The long-form entries for Slices 0–7 are the old format and are not the model to copy.
 2. List all manual steps required from the developer:
    - New environment variables (name + what value goes in it)
    - Packages installed

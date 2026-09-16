@@ -2,6 +2,9 @@ import { NavLink } from 'react-router-dom'
 import { cx } from '../../../lib/cx'
 import { formatDate } from '../../../lib/dateFormat'
 import { CLIENT_NAV } from '../../../data/clientPortalContent'
+import { useUnreadFor } from '../../../lib/chat/unreadContext'
+import UnreadBadge from '../UnreadBadge'
+import { unreadLabel } from '../../../lib/chat/unreadStore'
 import TherapistPresence from './TherapistPresence'
 import { NAV_ICONS } from './navIcons'
 
@@ -21,7 +24,10 @@ import { NAV_ICONS } from './navIcons'
  * join and checkout asides use, which is what makes this read as the fifth
  * surface in one family rather than a new place.
  */
-export default function ClientRail({ therapist, subscription, onNavigate, footer }) {
+export default function ClientRail({ therapist, subscription, bookingId, onNavigate, footer }) {
+  // §14. A client has exactly one booking (§7), so this is the whole answer.
+  const unread = useUnreadFor(bookingId)
+
   return (
     <div data-surface="dark" className="relative flex h-full flex-col overflow-hidden bg-ink">
       {/* Ambient only — a flat ground with light on it, never a band gradient. */}
@@ -38,12 +44,16 @@ export default function ClientRail({ therapist, subscription, onNavigate, footer
         <ul className="flex flex-col gap-1">
           {CLIENT_NAV.map((item) => {
             const Icon = NAV_ICONS[item.icon]
+            const count = item.unread ? unread : 0
 
             return (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   onClick={onNavigate}
+                  // The count goes in the ACCESSIBLE NAME, never left to the
+                  // pill: a numeral announced on its own means nothing.
+                  aria-label={unreadLabel(item.label, count)}
                   className={({ isActive }) =>
                     cx(
                       'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5',
@@ -58,6 +68,7 @@ export default function ClientRail({ therapist, subscription, onNavigate, footer
                     <>
                       <Icon className={isActive ? 'text-gold' : 'text-paper/70'} />
                       <span>{item.label}</span>
+                      <UnreadBadge count={count} className="ml-auto" />
                     </>
                   )}
                 </NavLink>
