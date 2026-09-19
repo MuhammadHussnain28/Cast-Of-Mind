@@ -140,3 +140,39 @@ export function SignOutIcon({ size = 18, ...props }) {
     </svg>
   )
 }
+
+/** A screen with typed lines — filling a worksheet in on a device. */
+export function ScreenIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <rect x="3.75" y="4.75" width="16.5" height="11.5" rx="2" />
+      <path d="M8.5 19.25h7" />
+      <path d="M12 16.25v3" />
+      <path d="M7.5 9h6" />
+      <path d="M7.5 12h9" />
+    </svg>
+  )
+}
+
+/** A pencil over a line — writing by hand. */
+export function PencilIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="m14.75 5.25 4 4L9 19H5v-4l9.75-9.75Z" />
+      <path d="m12.75 7.25 4 4" />
+      <path d="M13 19.25h6.25" />
+    </svg>
+  )
+}
+
+/** Two sheets, one behind the other — several pages become one file. */
+export function PagesIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M8.75 6.75V5.5a1.75 1.75 0 0 1 1.75-1.75h6.75a1.75 1.75 0 0 1 1.75 1.75v10a1.75 1.75 0 0 1-1.75 1.75H16" />
+      <rect x="4.25" y="6.75" width="11.75" height="13.5" rx="1.75" />
+      <path d="M7.25 11.25h5.75" />
+      <path d="M7.25 14.5h4" />
+    </svg>
+  )
+}

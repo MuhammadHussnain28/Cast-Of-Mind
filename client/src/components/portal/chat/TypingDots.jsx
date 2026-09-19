@@ -1,5 +1,5 @@
 import { useReducedMotion } from 'framer-motion'
-import { chat } from '../../../../data/chatContent'
+import { chat } from '../../../data/chatContent'
 
 /**
  * Three dots, on the other party's side of the thread.

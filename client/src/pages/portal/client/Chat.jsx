@@ -7,10 +7,11 @@ import { detectViewerZone } from '../../../lib/workingHours'
 import { chat, opening as openingCopy } from '../../../data/chatContent'
 import { Button, Spinner, Text } from '../../../components/ui'
 import ChatHeader from '../../../components/portal/client/chat/ChatHeader'
-import MessageThread from '../../../components/portal/client/chat/MessageThread'
-import MessageAnnouncer from '../../../components/portal/client/chat/MessageAnnouncer'
-import Composer from '../../../components/portal/client/chat/Composer'
+import MessageThread from '../../../components/portal/chat/MessageThread'
+import MessageAnnouncer from '../../../components/portal/chat/MessageAnnouncer'
+import Composer from '../../../components/portal/chat/Composer'
 import OpeningMessage from '../../../components/portal/client/chat/OpeningMessage'
+import ChatEmptyState from '../../../components/portal/client/chat/ChatEmptyState'
 
 /**
  * The client's conversation with their therapist — master spec §7.1.
@@ -162,7 +163,8 @@ export default function Chat() {
 
       <MessageThread
         messages={messages}
-        therapistName={shortName}
+        otherName={shortName}
+        emptyState={<ChatEmptyState therapistName={shortName} />}
         timeZone={timeZone}
         hasMore={hasMore}
         loadingOlder={loadingOlder}

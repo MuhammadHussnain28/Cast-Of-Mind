@@ -1,4 +1,4 @@
-import { timeIn } from '../../../../lib/chat/groupMessages'
+import { timeIn } from '../../../lib/chat/groupMessages'
 import MessageText from './MessageText'
 import { NoticeIcon } from './ChatIcons'
 

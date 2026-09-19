@@ -14,6 +14,7 @@ import { EMPTY_UNREAD, countFor } from './unreadStore'
  */
 export const UnreadContext = createContext({
   unread: EMPTY_UNREAD,
+  ready: false,
   setReadingBooking: () => {},
   markBookingRead: () => {},
 })

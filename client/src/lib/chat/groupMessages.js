@@ -62,7 +62,13 @@ export function timeIn(value, timeZone, locale = undefined) {
  * platform, not something either person said, and grouping one into a run of
  * someone's messages would read as if they had written it.
  */
-export function groupMessages(messages, timeZone, now = new Date(), locale = undefined) {
+export function groupMessages(
+  messages,
+  timeZone,
+  now = new Date(),
+  locale = undefined,
+  { openingId = null } = {},
+) {
   const rows = [];
   let currentDay = null;
   let cluster = null;
@@ -87,6 +93,27 @@ export function groupMessages(messages, timeZone, now = new Date(), locale = und
     if (message.type === 'system') {
       closeCluster();
       rows.push({ kind: 'system', key: `sys-${message.id ?? message.clientMessageId}`, message });
+      continue;
+    }
+
+    /**
+     * THE OPENING MESSAGE STANDS ALONE (8.3).
+     *
+     * It is the one message in the relationship with a label, so it gets a run
+     * of its own — otherwise "Opening message" would sit over a bubble and the
+     * three short follow-ups clustered under it, and a therapist could not tell
+     * which of them the client actually opened with.
+     */
+    if (openingId && message.id === openingId) {
+      closeCluster();
+      rows.push({
+        kind: 'cluster',
+        key: `cl-${message.id}`,
+        senderRole: message.senderRole,
+        mine: message.mine,
+        opening: true,
+        messages: [message],
+      });
       continue;
     }
 

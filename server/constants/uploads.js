@@ -11,6 +11,8 @@ export const FILE_TYPES = Object.freeze({
   PNG: 'png',
   WEBP: 'webp',
   PDF: 'pdf',
+  // Worksheets only (8.4); never accepted for applications.
+  DOCX: 'docx',
 });
 
 const IMAGE_TYPES = Object.freeze([FILE_TYPES.JPEG, FILE_TYPES.PNG, FILE_TYPES.WEBP]);
@@ -45,6 +47,22 @@ export const UPLOAD_KINDS = Object.freeze({
     visibility: 'authenticated',
     label: 'certificate',
   }),
+  // 8.4: private, streamed through our API; DOCX is inspected inside first.
+  worksheet: Object.freeze({
+    folder: 'cast-of-mind/worksheets',
+    allowedTypes: Object.freeze([FILE_TYPES.PDF, FILE_TYPES.DOCX]),
+    maxBytes: 10 * MB,
+    visibility: 'authenticated',
+    label: 'worksheet',
+  }),
+  // 8.5: what a client sends back — a file, or a photo of a paper sheet.
+  worksheetReturn: Object.freeze({
+    folder: 'cast-of-mind/worksheet-returns',
+    allowedTypes: Object.freeze([FILE_TYPES.PDF, FILE_TYPES.DOCX, ...IMAGE_TYPES]),
+    maxBytes: 10 * MB,
+    visibility: 'authenticated',
+    label: 'completed worksheet',
+  }),
   license: Object.freeze({
     folder: 'cast-of-mind/licenses',
     allowedTypes: DOCUMENT_TYPES,
@@ -54,7 +72,11 @@ export const UPLOAD_KINDS = Object.freeze({
   }),
 });
 
-export const UPLOAD_KIND_VALUES = Object.freeze(Object.keys(UPLOAD_KINDS));
+// The PUBLIC /uploads endpoint's kinds. Worksheet files never go through it (8.4, 8.5).
+const PRIVATE_KINDS = Object.freeze(['worksheet', 'worksheetReturn']);
+export const UPLOAD_KIND_VALUES = Object.freeze(
+  Object.keys(UPLOAD_KINDS).filter((kind) => !PRIVATE_KINDS.includes(kind)),
+);
 
 // Multer's own ceiling, applied before we ever see the buffer. Set to the
 // largest per-kind cap; the exact per-kind limit is enforced afterwards, once
@@ -73,6 +95,7 @@ export const TYPE_LABELS = Object.freeze({
   [FILE_TYPES.PNG]: 'PNG',
   [FILE_TYPES.WEBP]: 'WebP',
   [FILE_TYPES.PDF]: 'PDF',
+  [FILE_TYPES.DOCX]: 'Word (.docx)',
 });
 
 // A legitimate application needs at most four uploads: photo, two certificates,

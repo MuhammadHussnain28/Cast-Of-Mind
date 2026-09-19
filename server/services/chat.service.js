@@ -4,6 +4,8 @@ import { Booking } from '../models/Booking.js';
 import { ClientProfile } from '../models/ClientProfile.js';
 import { TherapistProfile } from '../models/TherapistProfile.js';
 import { AppError } from '../utils/AppError.js';
+import { encodeCursor as encode, decodeCursor as decode } from '../utils/cursor.js';
+import { clientDisplayName } from '../utils/clientDisplayName.js';
 import { emitMessage, emitUnread, getSocketServer } from '../realtime/emitter.js';
 import { ROLES } from '../constants/roles.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
@@ -73,14 +75,9 @@ async function loadParticipants(booking) {
   ]);
 
   // A couple is one account with both partners nested (§6), so the thread is
-  // with both of them and the label says so.
-  let clientName = clientProfile?.name ?? null;
-  if (clientProfile?.type === 'couple') {
-    clientName =
-      [clientProfile.coupleData?.partner1?.name, clientProfile.coupleData?.partner2?.name]
-        .filter(Boolean)
-        .join(' and ') || null;
-  }
+  // with both of them and the label says so. Shared with the therapist's client
+  // list (8.1) — the two must never word the same person differently.
+  const clientName = clientDisplayName(clientProfile);
 
   return {
     client: { name: clientName },
@@ -148,19 +145,16 @@ async function clientHasWritten(booking) {
  *
  * `createdAt` alone is not unique, so the cursor carries `_id` as the tiebreak
  * and the query compares the pair. The compound index serves exactly this.
+ *
+ * The encoding moved to utils/cursor.js in 8.1 so the therapist client list
+ * shares it. The wrappers keep this file's own field name and its own error.
  */
-const encodeCursor = (message) =>
-  Buffer.from(`${message.createdAt.getTime()}:${message._id}`).toString('base64url');
+const encodeCursor = (message) => encode(message.createdAt, message._id);
 
 function decodeCursor(cursor) {
-  try {
-    const [time, id] = Buffer.from(cursor, 'base64url').toString('utf8').split(':');
-    const createdAt = new Date(Number(time));
-    if (Number.isNaN(createdAt.getTime()) || !mongoose.isValidObjectId(id)) throw new Error();
-    return { createdAt, id: new mongoose.Types.ObjectId(id) };
-  } catch {
-    throw new AppError(INVALID_CURSOR_MESSAGE, 400, INVALID_CURSOR_CODE);
-  }
+  const decoded = decode(cursor);
+  if (!decoded) throw new AppError(INVALID_CURSOR_MESSAGE, 400, INVALID_CURSOR_CODE);
+  return { createdAt: decoded.at, id: decoded.id };
 }
 
 export async function listMessages(
@@ -282,7 +276,9 @@ export async function sendMessage(bookingId, user, text, { clientMessageId } = {
   // point: the row exists before anyone is told about it, so a dropped socket
   // loses nothing. `emitMessage` is a no-op when no socket server is attached,
   // which is why every REST test still passes untouched.
-  emitMessage(booking._id, presented);
+  // The booking's two people, from the STORED record — so a booking created
+  // after either of them connected still reaches both (8.3).
+  emitMessage(booking._id, presented, [booking.clientId, booking.therapistId]);
 
   await pushUnreadToRecipient(booking, user);
 

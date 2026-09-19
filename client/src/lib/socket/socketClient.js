@@ -24,6 +24,7 @@ export const SOCKET_EVENTS = Object.freeze({
   MESSAGE_NEW: 'message:new',
   UNREAD_UPDATE: 'unread:update',
   AUTH_EXPIRED: 'auth:expired',
+  WORKSHEETS_UPDATE: 'worksheets:update',
 })
 
 /**

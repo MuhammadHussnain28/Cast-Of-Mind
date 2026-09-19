@@ -8,8 +8,9 @@ import ClientTabBar from '../../components/portal/client/ClientTabBar'
 import AccessNotice from '../../components/portal/client/AccessNotice'
 import SubscriptionEnded from '../../components/portal/client/SubscriptionEnded'
 import PortalSkeleton from '../../components/portal/client/PortalSkeleton'
-import PortalSocketProvider from '../../components/portal/client/PortalSocketProvider'
+import PortalSocketProvider from '../../components/portal/PortalSocketProvider'
 import UnreadProvider from '../../components/portal/UnreadProvider'
+import WorksheetsPendingProvider from '../../components/portal/client/WorksheetsPendingProvider'
 import TherapistPresence from '../../components/portal/client/TherapistPresence'
 import { cx } from '../../lib/cx'
 import { ClientPortalContext } from '../../lib/clientPortalContext'
@@ -91,6 +92,7 @@ export default function ClientPortalShell() {
           badges need the same one. Null-tolerant: chat falls back to REST. */}
       <PortalSocketProvider>
       <UnreadProvider myRole={state.user?.role}>
+      <WorksheetsPendingProvider initial={state.pendingWorksheets ?? 0}>
       {/* `h-dvh` with `overflow-hidden` rather than `min-h-dvh`, so the column
           below has a DEFINITE height. The chat screen fills the remaining space
           and scrolls internally; without a bounded chain its `flex-1` resolves
@@ -159,6 +161,7 @@ export default function ClientPortalShell() {
           <ClientTabBar bookingId={state.booking?.id} />
         </div>
       </div>
+      </WorksheetsPendingProvider>
       </UnreadProvider>
       </PortalSocketProvider>
     </ClientPortalContext.Provider>

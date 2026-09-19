@@ -29,6 +29,16 @@ export default function UnreadProvider({ myRole, children }) {
   const [unread, setUnread] = useState(EMPTY_UNREAD)
 
   /**
+   * Has the server's count arrived at least once? (8.3)
+   *
+   * Until it has, a zero here means "not known yet", not "nothing unread" — and
+   * a caller holding its own count from elsewhere (the therapist list carries
+   * one per row) needs to tell those apart. After it has, the provider is the
+   * only truth, including when that truth is zero.
+   */
+  const [ready, setReady] = useState(false)
+
+  /**
    * The conversation currently open, at the bottom, on a visible tab.
    *
    * Held in a ref because the socket listener below must read the CURRENT value
@@ -44,7 +54,9 @@ export default function UnreadProvider({ myRole, children }) {
     // fixed at the root in 0.6, 4.2 and 5.1 rather than silenced.
     fetchUnreadCount()
       .then((data) => {
-        if (!cancelled) setUnread(fromServer(data))
+        if (cancelled) return
+        setUnread(fromServer(data))
+        setReady(true)
       })
       .catch(() => {
         // Silent. A badge is not worth an error banner over someone's
@@ -63,6 +75,7 @@ export default function UnreadProvider({ myRole, children }) {
 
     const onUnread = (payload) => {
       const next = fromServer(payload)
+      setReady(true)
       // The open conversation is being read right now, so whatever the server
       // counted for it is already stale. Everything else is taken as given.
       const reading = readingRef.current
@@ -110,8 +123,8 @@ export default function UnreadProvider({ myRole, children }) {
   useUnreadTabTitle(unread.total)
 
   const value = useMemo(
-    () => ({ unread, setReadingBooking, markBookingRead }),
-    [unread, setReadingBooking, markBookingRead],
+    () => ({ unread, ready, setReadingBooking, markBookingRead }),
+    [unread, ready, setReadingBooking, markBookingRead],
   )
 
   return <UnreadContext.Provider value={value}>{children}</UnreadContext.Provider>

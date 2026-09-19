@@ -1,6 +1,6 @@
 import { Heading, Text } from '../../../ui'
 import { chat } from '../../../../data/chatContent'
-import { OpenQuoteIcon } from './ChatIcons'
+import { OpenQuoteIcon } from '../../chat/ChatIcons'
 
 /**
  * Before anything has been written.

@@ -9,7 +9,7 @@ import {
   therapistAvailability,
 } from '../../../../lib/therapistAvailability'
 import { chat, headerNote } from '../../../../data/chatContent'
-import { ChevronDownIcon } from './ChatIcons'
+import { ChevronDownIcon } from '../../chat/ChatIcons'
 
 /**
  * The top of the conversation — §7.1's explicit requirement.

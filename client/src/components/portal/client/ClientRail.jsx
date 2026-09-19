@@ -5,6 +5,8 @@ import { CLIENT_NAV } from '../../../data/clientPortalContent'
 import { useUnreadFor } from '../../../lib/chat/unreadContext'
 import UnreadBadge from '../UnreadBadge'
 import { unreadLabel } from '../../../lib/chat/unreadStore'
+import { useWorksheetsPending, pendingLabel } from '../../../lib/client/worksheetsPending'
+import NavDot from './NavDot'
 import TherapistPresence from './TherapistPresence'
 import { NAV_ICONS } from './navIcons'
 
@@ -27,6 +29,7 @@ import { NAV_ICONS } from './navIcons'
 export default function ClientRail({ therapist, subscription, bookingId, onNavigate, footer }) {
   // §14. A client has exactly one booking (§7), so this is the whole answer.
   const unread = useUnreadFor(bookingId)
+  const { pending } = useWorksheetsPending()
 
   return (
     <div data-surface="dark" className="relative flex h-full flex-col overflow-hidden bg-ink">
@@ -45,6 +48,7 @@ export default function ClientRail({ therapist, subscription, bookingId, onNavig
           {CLIENT_NAV.map((item) => {
             const Icon = NAV_ICONS[item.icon]
             const count = item.unread ? unread : 0
+            const waiting = item.dot ? pending : 0
 
             return (
               <li key={item.to}>
@@ -53,7 +57,7 @@ export default function ClientRail({ therapist, subscription, bookingId, onNavig
                   onClick={onNavigate}
                   // The count goes in the ACCESSIBLE NAME, never left to the
                   // pill: a numeral announced on its own means nothing.
-                  aria-label={unreadLabel(item.label, count)}
+                  aria-label={item.dot ? pendingLabel(item.label, waiting) : unreadLabel(item.label, count)}
                   className={({ isActive }) =>
                     cx(
                       'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5',
@@ -69,6 +73,7 @@ export default function ClientRail({ therapist, subscription, bookingId, onNavig
                       <Icon className={isActive ? 'text-gold' : 'text-paper/70'} />
                       <span>{item.label}</span>
                       <UnreadBadge count={count} className="ml-auto" />
+                      <NavDot show={waiting > 0} className="ml-auto" />
                     </>
                   )}
                 </NavLink>

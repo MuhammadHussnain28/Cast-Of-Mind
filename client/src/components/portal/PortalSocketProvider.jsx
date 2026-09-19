@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { SocketContext } from '../../../lib/socket/socketContext'
-import { createSocket } from '../../../lib/socket/socketClient'
+import { SocketContext } from '../../lib/socket/socketContext'
+import { createSocket } from '../../lib/socket/socketClient'
 
 /**
  * Opens the portal's socket for as long as the portal is mounted.

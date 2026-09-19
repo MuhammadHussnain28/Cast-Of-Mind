@@ -1,9 +1,9 @@
-import { cx } from '../../../../lib/cx'
-import { timeIn } from '../../../../lib/chat/groupMessages'
-import { MESSAGE_STATUS } from '../../../../lib/chat/messageStore'
-import { chat } from '../../../../data/chatContent'
+import { cx } from '../../../lib/cx'
+import { timeIn } from '../../../lib/chat/groupMessages'
+import { MESSAGE_STATUS } from '../../../lib/chat/messageStore'
+import { chat } from '../../../data/chatContent'
 import MessageText from './MessageText'
-import { UnsentIcon } from './ChatIcons'
+import { OpenQuoteIcon, UnsentIcon } from './ChatIcons'
 
 /**
  * One run of messages from one person.
@@ -18,12 +18,36 @@ import { UnsentIcon } from './ChatIcons'
  * Elevation is declared once: each bubble has a ground and neither a border nor
  * a shadow. A tinted rectangle with a hairline under a shadow is the ghost card.
  */
-export default function MessageCluster({ cluster, timeZone, onRetry }) {
-  const { mine, messages } = cluster
+export default function MessageCluster({
+  cluster,
+  timeZone,
+  onRetry,
+  density = 'comfortable',
+  openingLabel = null,
+}) {
+  const { mine, messages, opening } = cluster
+  const compact = density === 'compact'
   const last = messages[messages.length - 1]
 
   return (
-    <div className={cx('flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
+    <div
+      className={cx(
+        'flex flex-col',
+        compact ? 'gap-0.5' : 'gap-1',
+        mine ? 'items-end' : 'items-start',
+      )}
+    >
+      {/* THE OPENING MESSAGE, NAMED (8.3). §7.1 makes it the context a
+          therapist never starts without, so it is labelled where it sits in
+          the thread rather than left to be recognised. A caption above the
+          bubble, never a coloured bar beside it. */}
+      {opening && openingLabel && (
+        <p className="flex items-center gap-1.5 px-1 pb-0.5 font-body text-caption font-medium text-sage-deep">
+          <OpenQuoteIcon size={16} />
+          {openingLabel}
+        </p>
+      )}
+
       {messages.map((message, index) => {
         const isLast = index === messages.length - 1
         const sending = message.status === MESSAGE_STATUS.SENDING
@@ -32,7 +56,9 @@ export default function MessageCluster({ cluster, timeZone, onRetry }) {
           <div
             key={message.id ?? message.clientMessageId}
             className={cx(
-              'max-w-[85%] px-4 py-2.5 sm:max-w-[75%]',
+              compact
+                ? 'max-w-[88%] px-3.5 py-2 sm:max-w-[70%]'
+                : 'max-w-[85%] px-4 py-2.5 sm:max-w-[75%]',
               'font-body text-ui leading-relaxed',
               // Long words and pasted URLs must wrap rather than force the
               // whole thread to scroll sideways.
@@ -43,6 +69,10 @@ export default function MessageCluster({ cluster, timeZone, onRetry }) {
               'rounded-2xl',
               isLast && (mine ? 'rounded-br-md' : 'rounded-bl-md'),
               sending && 'opacity-70',
+              // A ring, not a shadow and not a tint change: the bubble keeps its
+              // own ground, so the message reads exactly as written, and the
+              // edge alone says this one is different.
+              opening && 'ring-1 ring-sage/60',
             )}
           >
             <MessageText text={message.text} />

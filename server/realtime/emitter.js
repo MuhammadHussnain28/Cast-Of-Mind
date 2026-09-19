@@ -42,10 +42,59 @@ function emit(room, event, payload) {
  * message id instead — which it must do anyway to survive a reconnect that
  * re-syncs an overlapping window.
  */
-export function emitMessage(bookingId, message) {
+export function emitMessage(bookingId, message, participantIds = []) {
   const { mine, ...viewerAgnostic } = message;
   void mine;
-  return emit(bookingRoom(bookingId), SOCKET_EVENTS.MESSAGE_NEW, viewerAgnostic);
+
+  if (io) joinParticipants(bookingId, participantIds);
+
+  /**
+   * THE BOOKING ID TRAVELS WITH EVERY MESSAGE (8.3).
+   *
+   * A therapist's socket is in EVERY one of their clients' rooms, so a message
+   * arriving on it has to say which conversation it belongs to — otherwise the
+   * open thread cannot tell Client A's words from Client B's, and the only
+   * thing standing between them is luck. The browser refuses any message whose
+   * booking is not the one on screen.
+   *
+   * Its absence went unnoticed until 8.3 because the client portal has one
+   * booking and never needed it — and `UnreadProvider`'s instant increment,
+   * which DID need it, returned early on every message and was silently
+   * covered by the separate `unread:update` push.
+   *
+   * On the emit rather than on the REST shape: a REST page is already scoped by
+   * the booking id in its own URL.
+   */
+  return emit(bookingRoom(bookingId), SOCKET_EVENTS.MESSAGE_NEW, {
+    ...viewerAgnostic,
+    bookingId: String(bookingId),
+  });
+}
+
+/**
+ * Put both people's sockets in the booking's room before anything is emitted
+ * to it (8.3).
+ *
+ * Rooms are joined at connect (`joinOwnRooms`), which leaves one real gap: a
+ * booking created AFTER someone connected. A client pays while their new
+ * therapist is already online, and the therapist's socket is not in that room
+ * — so the opening message, the most important one in the relationship, would
+ * not appear in an open thread until the socket happened to reconnect.
+ *
+ * THE SERVER STILL DECIDES THE ROOMS. The ids come from the STORED BOOKING the
+ * caller has already proved membership against, never from a request, so this
+ * is the same guarantee `joinOwnRooms` gives, applied after connect as well as
+ * at it. A browser still cannot ask to join anything.
+ *
+ * Joining a room a socket is already in is a no-op, so this costs nothing on
+ * the common path. `socketsJoin` acts on every socket in the user's personal
+ * room — every tab and device they have open.
+ */
+function joinParticipants(bookingId, participantIds) {
+  const room = bookingRoom(bookingId);
+  for (const userId of participantIds) {
+    if (userId) io.in(userRoom(String(userId))).socketsJoin(room);
+  }
 }
 
 /**
@@ -57,4 +106,10 @@ export function emitMessage(bookingId, message) {
  */
 export function emitUnread(userId, counts) {
   return emit(userRoom(userId), SOCKET_EVENTS.UNREAD_UPDATE, counts);
+}
+
+// 8.5: a client's count of worksheets still to complete, to their own sockets.
+// A number only — never a title or a file.
+export function emitWorksheetsUpdate(userId, pending) {
+  return emit(userRoom(String(userId)), SOCKET_EVENTS.WORKSHEETS_UPDATE, { pending });
 }

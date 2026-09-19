@@ -1,4 +1,4 @@
-import { chat } from '../../../../data/chatContent'
+import { chat } from '../../../data/chatContent'
 
 /**
  * What a screen reader hears when a message arrives — master spec §14.

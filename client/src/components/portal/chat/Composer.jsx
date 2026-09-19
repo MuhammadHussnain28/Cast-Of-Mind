@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cx } from '../../../../lib/cx'
-import { chat } from '../../../../data/chatContent'
+import { cx } from '../../../lib/cx'
+import { chat } from '../../../data/chatContent'
 import { SendIcon } from './ChatIcons'
 
 const MESSAGE_TEXT_MAX = 5000
@@ -15,9 +15,27 @@ const COUNTER_FROM = 4500
  * 2026-09-14. A phone's return key is how people break a line and there is no
  * Shift to hold, so sending on Enter there would fire half-finished sentences.
  * The send button is always present and is the only send path on touch.
+ *
+ * SHARED BY BOTH PORTALS (8.3). `placeholder` and `wide` let the therapist's
+ * denser workspace set its own voice and measure without a second composer.
+ *
+ * DRAFTS. `initialValue` and `onDraftChange` let a caller keep what was being
+ * written when the composer unmounts — the therapist switching clients
+ * mid-sentence. The composer itself never stores anything: where a draft lives,
+ * and that it is never written to browser storage, is the caller's decision.
  */
-export default function Composer({ onSend, onTyping, onStopTyping, disabled, online = true }) {
-  const [value, setValue] = useState('')
+export default function Composer({
+  onSend,
+  onTyping,
+  onStopTyping,
+  disabled,
+  online = true,
+  placeholder = chat.composerPlaceholder,
+  wide = false,
+  initialValue = '',
+  onDraftChange,
+}) {
+  const [value, setValue] = useState(initialValue)
   const textareaRef = useRef(null)
 
   // `pointer: coarse` is the platform's own answer to "is this a touch device",
@@ -48,6 +66,7 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled, onl
     if (!text || disabled) return
     onSend(text)
     setValue('')
+    onDraftChange?.('')
     onStopTyping?.()
     // Height resets with the value; focus stays so a reply can follow.
     requestAnimationFrame(() => textareaRef.current?.focus())
@@ -72,7 +91,7 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled, onl
         submit()
       }}
     >
-      <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
+      <div className={cx('mx-auto flex w-full items-end gap-2', wide ? 'max-w-4xl' : 'max-w-3xl')}>
         <label htmlFor="chat-composer" className="sr-only">
           {chat.composerLabel}
         </label>
@@ -85,11 +104,12 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled, onl
           disabled={disabled}
           onChange={(event) => {
             setValue(event.target.value)
+            onDraftChange?.(event.target.value)
             onTyping?.()
           }}
           onBlur={() => onStopTyping?.()}
           onKeyDown={handleKeyDown}
-          placeholder={chat.composerPlaceholder}
+          placeholder={placeholder}
           className={cx(
             'min-h-11 flex-1 resize-none rounded-2xl bg-mist px-4 py-3',
             'font-body text-ui text-ink-deep placeholder:text-ink/60',
@@ -123,7 +143,7 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled, onl
       {!online && (
         <p
           role="status"
-          className="mx-auto mt-2 flex w-full max-w-3xl items-center gap-2 font-body text-caption text-ink/70"
+          className={cx('mx-auto mt-2 flex w-full items-center gap-2 font-body text-caption text-ink/70', wide ? 'max-w-4xl' : 'max-w-3xl')}
         >
           <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-clay" />
           {chat.offline}
@@ -133,7 +153,8 @@ export default function Composer({ onSend, onTyping, onStopTyping, disabled, onl
       {showCounter && (
         <p
           className={cx(
-            'mx-auto mt-2 w-full max-w-3xl text-right font-body text-caption tabular-nums',
+            'mx-auto mt-2 w-full text-right font-body text-caption tabular-nums',
+            wide ? 'max-w-4xl' : 'max-w-3xl',
             over ? 'text-clay' : 'text-ink/70',
           )}
         >

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary.js';
 import { AppError } from '../utils/AppError.js';
-import { detectFileType } from '../utils/fileSignature.js';
+import { detectFileType, isLegacyOfficeFile } from '../utils/fileSignature.js';
 import {
   FILE_TYPES,
   TYPE_LABELS,
@@ -70,6 +70,15 @@ export async function uploadFile({ buffer, kind }) {
   // that trusts the label. Only the leading bytes are decided by the real format.
   const detectedType = detectFileType(buffer);
 
+  // An old .doc gets a fix, not just a refusal (8.4).
+  if (!detectedType && isLegacyOfficeFile(buffer) && config.allowedTypes.includes(FILE_TYPES.DOCX)) {
+    throw new AppError(
+      'Older Word files (.doc) are not accepted. Please save it as a PDF or a .docx and try again.',
+      422,
+      'UPLOAD_REJECTED',
+    );
+  }
+
   if (!detectedType || !config.allowedTypes.includes(detectedType)) {
     const accepted = config.allowedTypes.map((type) => TYPE_LABELS[type]).join(', ');
     throw new AppError(
@@ -81,7 +90,9 @@ export async function uploadFile({ buffer, kind }) {
 
   // The original filename is discarded. It can carry the applicant's own name
   // (a privacy leak into a URL) or characters that make a messy public id.
-  const publicId = crypto.randomBytes(16).toString('hex');
+  // Cloudinary keeps a raw file's extension inside its public id.
+  const isRaw = detectedType === FILE_TYPES.DOCX;
+  const publicId = crypto.randomBytes(16).toString('hex') + (isRaw ? '.docx' : '');
 
   // 'authenticated' means the plain URL returns nothing — viewing needs a signed
   // request, which slice 4 generates for the admin. 'upload' is public, used for
@@ -90,7 +101,7 @@ export async function uploadFile({ buffer, kind }) {
 
   // PDFs must not be classified as images. 'auto' lets Cloudinary decide, which
   // keeps a scanned JPEG certificate and a PDF certificate in one folder.
-  const resourceType = detectedType === FILE_TYPES.PDF ? 'auto' : 'image';
+  const resourceType = isRaw ? 'raw' : detectedType === FILE_TYPES.PDF ? 'auto' : 'image';
 
   let result;
 
@@ -128,9 +139,30 @@ export async function uploadFile({ buffer, kind }) {
     publicId: result.public_id,
     kind,
     format: result.format ?? detectedType,
+    resourceType: result.resource_type ?? resourceType,
+    type: detectedType,
     bytes: result.bytes ?? buffer.length,
     visibility: config.visibility,
   };
 }
 
-export default { uploadFile };
+/**
+ * Remove a stored file — used when the record it belonged to could not be saved,
+ * or was withdrawn. Never throws: a stray file is logged, not fatal.
+ */
+export async function destroyFile({ publicId, resourceType = 'image', visibility = 'authenticated' }) {
+  if (!isCloudinaryConfigured || !publicId) return false;
+  try {
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: resourceType,
+      type: visibility === 'authenticated' ? 'authenticated' : 'upload',
+      invalidate: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('Cloudinary delete failed:', error?.message ?? error);
+    return false;
+  }
+}
+
+export default { uploadFile, destroyFile };

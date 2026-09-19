@@ -19,7 +19,8 @@ export const CLIENT_NAV = [
     // so the rail and the tab bar cannot disagree about where the badge goes.
     unread: true,
   },
-  { to: '/portal/worksheets', label: 'Worksheets', icon: 'worksheets' },
+  // 8.5: a quiet dot while a worksheet is still to complete.
+  { to: '/portal/worksheets', label: 'Worksheets', icon: 'worksheets', dot: true },
   { to: '/portal/journal', label: 'Journal', icon: 'journal' },
   { to: '/portal/sessions', label: 'Sessions', icon: 'sessions' },
   { to: '/portal/account', label: 'Account', icon: 'account' },
@@ -54,7 +55,7 @@ export const SCREENS = {
       { label: 'They assign it', detail: 'A document appears here with the date it was set.' },
       { label: 'You download it', detail: 'It saves to your own device, to open however suits you.' },
       { label: 'You fill it in', detail: 'On paper, in a PDF app, or in Word — whichever you prefer.' },
-      { label: 'You upload it back', detail: 'Your therapist sees it is done and reads it before your next session.' },
+      { label: 'You send it back', detail: 'Upload it here, and your therapist sees it has come back.' },
     ],
   },
 
@@ -109,3 +110,87 @@ export const ENDED = {
 
 /** §13 requires this sentence visible in the portal, not only at checkout. */
 export const RENEWAL_NOTICE = 'To stop your subscription, cancel before this date.'
+
+// ── Worksheets, client side — §7.2 (8.5) ─────────────────────────────────────
+
+export const MY_WORKSHEETS = {
+  lead: (name) => `Exercises from ${name}. Download one, fill it in however suits you, and send it back here.`,
+  howTitle: 'Ways to fill one in',
+  ways: [
+    { key: 'screen', title: 'On screen', body: 'Open a PDF in a PDF app, or a Word file in Word, and type your answers. Save it, then send that file back.' },
+    { key: 'paper', title: 'On paper', body: 'Print it and write by hand. Then take a clear photo, or scan it, and send that back.' },
+    { key: 'pages', title: 'Several pages?', body: "Your phone's document scanner can turn them into one PDF — on iPhone in the Files or Notes app, on Android in Google Drive." },
+  ],
+  sections: { toComplete: 'To complete', submitted: 'Submitted' },
+  row: {
+    assigned: (date) => `Assigned ${date}`,
+    sent: (date) => `Sent ${date}`,
+    download: 'Download',
+    sendBack: 'Send it back',
+    replace: 'Replace file',
+    yourFile: 'Your file',
+    withTherapist: 'With your therapist',
+    canReplace: 'You can replace it until your therapist has reviewed it.',
+    downloadFailed: 'That file could not be downloaded. Try again.',
+    cancel: 'Cancel',
+  },
+  drop: {
+    choose: 'Choose your completed file',
+    drop: 'or drop it here',
+    rules: 'PDF, Word (.docx) or a photo · up to 10 MB',
+    send: 'Send',
+    sending: 'Sending',
+    sent: 'Sent. Your therapist can see it now.',
+  },
+  empty: {
+    title: 'No worksheets assigned yet',
+    body: (name) => `When ${name} sets you an exercise, it will appear here.`,
+  },
+  loadError: 'Your worksheets could not be loaded.',
+  retry: 'Try again',
+  loadMore: 'Show older worksheets',
+}
+
+/**
+ * The journal (§7.3). Written by the client, always read by their therapist.
+ * The transparency line above is the one the spec requires; it leads the screen.
+ */
+export const JOURNAL = {
+  transparencyTitle: 'Your therapist reads this',
+
+  composer: {
+    heading: 'Write an entry',
+    placeholder:
+      'How has it been since you last wrote? Anything at all — a whole week, or one moment from today.',
+    save: 'Save entry',
+    cancel: 'Cancel',
+  },
+
+  mood: {
+    label: 'Add a mood, if you want to',
+    other: 'In my own words',
+    otherLabel: 'Your word for it',
+    otherPlaceholder: 'e.g. restless',
+  },
+
+  entry: {
+    edit: 'Edit',
+    delete: 'Delete',
+    saveChanges: 'Save changes',
+    confirm: 'Delete this entry for good?',
+    confirmYes: 'Delete it',
+    confirmNo: 'Keep it',
+    deleteFailed: 'That entry could not be deleted. Try again.',
+  },
+
+  empty: {
+    title: 'Nothing written yet',
+    body: 'Whatever you write here stays, so you and your therapist can look back over it together.',
+  },
+
+  count: (n) => (n === 1 ? '1 entry' : `${n} entries`),
+  saveFailed: 'That entry could not be saved. Try again.',
+  loadError: 'Your journal could not be loaded.',
+  retry: 'Try again',
+  loadMore: 'Show older entries',
+}

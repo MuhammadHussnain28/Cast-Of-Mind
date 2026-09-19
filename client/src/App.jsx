@@ -28,6 +28,10 @@ import PortalWorksheets from './pages/portal/client/Worksheets'
 import PortalJournal from './pages/portal/client/Journal'
 import PortalSessions from './pages/portal/client/Sessions'
 import PortalAccount from './pages/portal/client/Account'
+import ClientWorkspace from './pages/portal/therapist/ClientWorkspace'
+import { DEFAULT_WORKSPACE_TAB } from './data/therapistPortalContent'
+import TherapistNotifications from './pages/portal/therapist/Notifications'
+import TherapistProfile from './pages/portal/TherapistProfile'
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import Applications from './pages/admin/Applications'
@@ -96,9 +100,15 @@ export default function App() {
                 navbar and footer wrapped round a signed-in surface was the same
                 mistake the admin portal fixed in 4.1.
 
-                The five child routes are the client's features (§7). A
-                therapist never sees them: they land on the index, which renders
-                their profile until slice 8 builds the inbox.
+                The children split by role and PortalLayout redirects anyone on
+                the wrong set: chat/worksheets/journal/sessions/account are the
+                client's features (§7), and clients/profile/notifications are
+                the therapist's inbox (§8).
+
+                The therapist's selected client lives in the URL rather than in
+                state, so a refresh keeps their place, §8.8's notification can
+                link straight to a client, and the phone's list-then-detail
+                split needs no extra machinery.
 
                 Guarding the LAYOUT covers every child, so a feature added in a
                 later chunk cannot ship unprotected. The server enforces both the
@@ -113,11 +123,26 @@ export default function App() {
               }
             >
               <Route index element={<PortalHome />} />
+
+              {/* Client (§7) */}
               <Route path="chat" element={<PortalChat />} />
               <Route path="worksheets" element={<PortalWorksheets />} />
               <Route path="journal" element={<PortalJournal />} />
               <Route path="sessions" element={<PortalSessions />} />
               <Route path="account" element={<PortalAccount />} />
+
+              {/* Therapist (§8). The TAB is in the URL so a refresh keeps the
+                  therapist where they were, and the sidebar carries it across
+                  when they open the next client. A bare client id redirects to
+                  the default tab rather than rendering a tabless workspace. */}
+              <Route
+                path="clients/:bookingId"
+                element={<Navigate to={DEFAULT_WORKSPACE_TAB} replace />}
+              />
+              <Route path="clients/:bookingId/:tab" element={<ClientWorkspace />} />
+              <Route path="profile" element={<TherapistProfile />} />
+              <Route path="notifications" element={<TherapistNotifications />} />
+
               <Route path="*" element={<NotFound />} />
             </Route>
 

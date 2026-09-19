@@ -5,6 +5,14 @@ import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { requireActiveSubscription } from '../middleware/requireActiveSubscription.js';
 import { getMe } from '../controllers/clientPortal.controller.js';
 import { CLIENT_RATE_LIMIT } from '../constants/clientPortal.js';
+import { validate, validateQuery } from '../middleware/validate.js';
+import { uploadSingleFile } from '../middleware/upload.js';
+import { listWorksheetsQuerySchema } from '../validation/worksheets.schema.js';
+import { clientList, clientDownload, clientSubmit } from '../controllers/worksheet.controller.js';
+import { WORKSHEET_UPLOAD_RATE_LIMIT } from '../constants/worksheets.js';
+import { journalEntrySchema, journalQuerySchema } from '../validation/journal.schema.js';
+import { listMine, create, update, remove } from '../controllers/journal.controller.js';
+import { JOURNAL_WRITE_RATE_LIMIT } from '../constants/journal.js';
 
 // Everything under /api/v1/client — the signed-in client's own portal (§7).
 //
@@ -47,5 +55,33 @@ router.get('/me', getMe);
  * it would have to be deliberately mounted above this line.
  */
 router.use(requireActiveSubscription);
+
+// Worksheets (8.5) — gated above. The booking comes from the token, never the URL.
+export const clientWorksheetUploadRateLimiter = createRateLimiter(WORKSHEET_UPLOAD_RATE_LIMIT);
+
+router.get('/worksheets', validateQuery(listWorksheetsQuerySchema), clientList);
+router.get('/worksheets/:worksheetId/file/:which', clientDownload);
+router.post(
+  '/worksheets/:worksheetId/submit',
+  clientWorksheetUploadRateLimiter,
+  uploadSingleFile,
+  clientSubmit,
+);
+
+/**
+ * Journal (8.6) — gated above. The booking comes from the token, never the URL.
+ *
+ * NOTHING HERE TOUCHES `privateNotes`. The journal controller and service do
+ * not import that model or its service, so a note cannot reach a client
+ * response even by mistake — there is no code path to filter. §8.5/8.6 requires
+ * that separation to be architectural, and a test proves this file's import
+ * graph never reaches it.
+ */
+export const journalWriteRateLimiter = createRateLimiter(JOURNAL_WRITE_RATE_LIMIT);
+
+router.get('/journal', validateQuery(journalQuerySchema), listMine);
+router.post('/journal', journalWriteRateLimiter, validate(journalEntrySchema), create);
+router.patch('/journal/:entryId', journalWriteRateLimiter, validate(journalEntrySchema), update);
+router.delete('/journal/:entryId', remove);
 
 export default router;

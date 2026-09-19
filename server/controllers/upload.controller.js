@@ -24,7 +24,10 @@ export const createUpload = asyncHandler(async (req, res) => {
     throw new AppError('No file was received. Please choose a file and try again.', 400, 'UPLOAD_REJECTED');
   }
 
-  const result = await uploadFile({ buffer: req.file.buffer, kind });
+  // Same public response as before 8.4; the extra fields are for internal callers.
+  const { resourceType, type, ...result } = await uploadFile({ buffer: req.file.buffer, kind });
+  void resourceType;
+  void type;
 
   res.status(201).json(result);
 });

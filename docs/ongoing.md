@@ -1398,6 +1398,328 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 - **No file attachments and no voice**, per the chunk's own "Do NOT" — deferred to v2.
 - No therapist-side badges (8.1), no notification bell (10.4), no admin visibility of any kind (§11).
 - **No automatic retry of a failed send**, for the duplication reason recorded above.
+
+---
+
+# SLICE 8 — Therapist Portal & Chat
+
+## Chunk 8.1 — Therapist portal layout and client list sidebar
+
+**Status:** Complete. Nothing skipped. **Slice 8 has started.** First entry in the 60–70 line format. Not seen rendered — see Manual steps.
+
+**Built**
+- server: `services/therapistClients.service.js` · `controllers/therapistClients.controller.js` · `validation/therapistClients.schema.js` · `constants/therapistClients.js` · `utils/cursor.js` · `utils/clientDisplayName.js` · `routes/therapistClients.test.js` (24 tests). Edits: `routes/therapist.routes.js` (mounts `GET /api/v1/therapist/clients`), `services/chat.service.js` (now uses the two extracted utils).
+- client: `pages/portal/TherapistPortalShell.jsx` · `pages/portal/therapist/{ClientsIndex,ClientWorkspace,Notifications}.jsx` · `components/portal/therapist/{TherapistRail,ClientListItem,ClientListEmpty,ClientMonogram,TherapistGlobalNav,TherapistPortalIcons,navIcons}` · `lib/therapist/{useTherapistClients,initials}.js` · `lib/api/therapistClientsApi.js` · `data/therapistPortalContent.js`. Edits: `App.jsx` (three therapist routes), `PortalLayout.jsx` (branches by role, redirects either role off the other's paths), `PortalHome.jsx`, `SkipLink.jsx` (`target` prop). Moved: `PortalSocketProvider` → `components/portal/` (role-agnostic already; no code change).
+- Packages / env vars: none.
+
+**Key decisions**
+- **The selected client lives in the URL (`/portal/clients/:bookingId`), not in state** — a refresh keeps their place, §8.8's notification can link straight to a client, and the phone's list-then-detail split needs no extra machinery.
+- **Keyed on `bookingId`, never `clientId`** — the booking is the central record (§10.5) and every screen from 8.2 onwards hangs off it; a client id would cost a lookup on each one.
+- **NO MESSAGE PREVIEW, on the wire or on screen.** Every inbox puts a snippet under the name, and here that snippet is therapy content sitting permanently in a sidebar — over a shoulder, in a screen share, in a screenshot of something else. §8.1 asks for "last activity", which is a time. The server never projects `text`, so it is a boundary rather than a markup choice.
+- **No client user id in the response** — same rule as 7.2's messages; `bookingId` is the only handle a therapist's browser needs.
+- **The client list is ink, and that is accessibility not taste** — the unread badge is gold, gold is 1.63:1 on light and banned there as an indicator, 11.08:1 on ink. A light list would have no legible colour for the one signal it exists to carry. This also decides the phone: the list is dark at every width, the workspace light.
+- **The cursor encoding and the client display name were extracted to `utils/`** (approved) — chat and the client list must never disagree about a page boundary or about whether a couple is "Marta and Joris" or "Marta".
+- **One aggregation, two `$lookup` sub-pipelines, whatever the client count** — the backend rules name this exact screen as an N+1 risk. Both sub-pipelines ride indexes `messages` already has.
+- **`/portal` is now the inbox; the profile moved to `/portal/profile`** (approved) — §8 makes the client list the portal's home.
+- **Notifications ships as a nav entry plus an honest screen** (your call) — §8.8's feed is 10.4, and the screen says so plainly rather than leaving a therapist waiting for alerts that never come. No timeline, as everywhere.
+- **The empty state is one sentence and nothing else** — §8.1 explicitly rejected profile prompts, visibility tips and tag suggestions, because a therapist who completed a 33-field application and was approved would read them as "something is wrong".
+
+**Verification**
+- Tests: **1057 passing across 37 suites** (1033 from earlier chunks, 24 new). `npm run lint` (server) clean; `oxlint` (client) **0 findings** on every file this chunk touched — the six that remain are the developer's own, open since 2.2.
+- **Mutation-checked twice:** removing the `therapistId` scope broke **6** tests; removing the `senderId ≠ me` exclusion broke **1**, which is too few, so the fixture was strengthened with a booking where only the therapist has written — the same false-confidence shape 7.2 caught in this aggregation. It now breaks **2**.
+- Contrast: **41 pairs computed, 0 failures.** One real failure caught before it shipped: `ClientMonogram` used `paper` initials, correct at 12.59:1 on the ink rail and about 1.2:1 on the light workspace — a tint composites over whatever is behind it, the same trap 7.1 and 7.4 found. It now carries a tone, `ink` initials on light at 12.81:1. Tightest against their floors: the not-found border at 3.35:1, the rail's button border at 3.81:1, the empty-state leaf at 4.05:1. *(Note: 7.6 recorded `ink/50` on mist as 3.08:1 for a paper button on a mist page; this border has no fill behind it so it composites over mist directly and reads 3.35:1. Different geometry, not a corrected figure.)*
+- **14 client logic checks executed** on `initialsFrom` (the client has no Jest suite) — individual, couple, the joining word never becoming an initial, accents, whitespace, the server's fallback name, null/undefined, and no surrogate-pair split.
+- **6 icons bounds-checked** against the 24 viewBox including stroke, 0 out of bounds. The checker was rewritten to sample arcs from their true centre rather than read their endpoints — endpoint-only bounds reported the bell's dome 5 units short, the inverse of 5.2's false-failure trap.
+- Client build passes; generated CSS confirmed to carry the 320px grid column, `blur(130px)`, `min-h-16`, `size-14`, `tabular-nums` and the panel shadow.
+- Impeccable detector `[]` — **read that as a degraded empty**: `htmlparser2`, `css-select`, `css-tree` and `domutils` were re-checked this chunk and are all still absent, so it evaluates no contrast at all. The computed table is the compensation.
+- **No live run against Atlas this chunk** — nothing here writes, and the read path is covered by the suite against a real in-memory MongoDB. Nothing in the database was created, modified or deleted.
+
+**Manual steps for the developer**
+1. **No new packages, no new environment variables, no external setup.**
+2. **Restart the API server** — the `/api/v1/therapist/clients` route is read at startup. **Hard-refresh the client**, since `/portal` changed meaning for therapists.
+3. Sign in as a therapist with no clients: you should see only *"No clients yet. You'll see them here once they're matched with you."* — if anything else appears there, that is a bug, not a feature.
+4. Sign in as a seeded therapist who has a paying client. Confirm they appear, and that selecting them loads that person's name in the right pane. The workspace itself is 8.2.
+5. **The badge is the thing worth testing.** With the inbox open, send a message as that client from a second browser — the row's count should rise and the row should move to the top without a refresh.
+6. **At 360px**: `/portal` is the dark list, tapping a client is a separate screen with "All clients" back at the top. Check a long couple name (*"Marta and Joris"*) truncates rather than pushing the badge out.
+7. **Keyboard and reduced motion**: tab through the list and confirm the focus ring is visible and gold on the ink ground; with reduced motion on, the skeleton rows must not pulse.
+8. **Your old bookmark to `/portal` as the profile page now lands on the inbox** — the profile is at `/portal/profile`.
+
+**Carried forward**
+- **Chunk 8.2 builds the workspace tabs** into `ClientWorkspace`, which currently carries the client's identity and one honest line. It is the shell's `Outlet`, so the list and the tabs already share one fetch. `max-w-4xl` was chosen with a tab row and a conversation in mind.
+- **Chunk 8.3** can use `meta.awaitingOpeningMessage` from `GET /chat/:bookingId/messages` to show that a newly matched client has not written yet — deliberately kept out of the sidebar in 8.1 (your call) so the rows stay to §8.1's three fields.
+- **Chunk 10.4** replaces `pages/portal/therapist/Notifications.jsx` with the real feed; the nav entry and route are already in place.
+- **A known limit, stated:** the list refetches its FIRST page when a message arrives, dropping any further pages that were loaded. Page size is 50 against real client counts in the tens, so a live account does not reach it.
+- Slice 11 must still flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the 7.1 gate compares against.
+- Chunk 12.5: the socket URL in production, sticky sessions or a Redis adapter, the `sameSite` cookie and `VITE_API_BASE_URL`.
+- **Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created: every word in `data/therapistPortalContent.js` is a spec fact or a plain description of a screen.
+
+**Not done (out of scope, by design):** no per-client tabs, chat, worksheets, sessions or journal/notes (8.2–8.6, slice 9) · no onboarding prompts in the empty state · no notification logic (10.4) · no search or filter on the client list.
+
+---
+
+## Chunk 8.2 — Client workspace tabs
+
+**Status:** Complete. Nothing skipped. Not seen rendered — see Manual steps.
+
+**Built**
+- server: `services/therapistClient.service.js` · `controllers/therapistClient.controller.js` · `routes/therapistClient.test.js` (22 tests). Edits: `routes/therapist.routes.js` (mounts `GET /api/v1/therapist/clients/:bookingId`), `constants/therapistClients.js` (the client-field allowlist and the one refusal message).
+- client: `components/portal/therapist/workspace/{ClientIdentityStrip,WorkspaceTabs,TabPending,ClientInfo,ConcernChips}.jsx` · `components/portal/therapist/workspaceIcons.js` · `lib/therapist/useTherapistClient.js`. Rewritten: `pages/portal/therapist/ClientWorkspace.jsx` (8.1's placeholder, as planned). Edits: `App.jsx` (`clients/:bookingId/:tab` plus a redirect from the bare id), `TherapistPortalShell.jsx` (derives the active tab, main is now full width), `TherapistRail.jsx` and `ClientListItem.jsx` (carry the tab), `Notifications.jsx` (caps its own width), `TherapistPortalIcons.jsx` (`InfoIcon`), `data/therapistPortalContent.js`, `lib/api/therapistClientsApi.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **Every refusal is a byte-identical 404** — a booking that does not exist, a malformed id, and another therapist's client are indistinguishable. A 403 on the third confirms the id is real, which is the whole of what is needed to enumerate booking ids by diffing responses. This is the strongest form of the chunk's own critical requirement, and it is 7.2's rule reused rather than re-derived.
+- **The tab is in the URL and travels with the therapist** (your call) — reading worksheets for one client and clicking the next stays in worksheets. Only the choice travels; `useTherapistClient` is keyed on the booking id and clears **during render**, so no row of one person's record can appear for a frame under another's name.
+- **Chat is the default tab** (your call) — §8.2 lists it first and it is why a therapist opens a client. It shows an honest pending panel until 8.3, which is better than moving a URL therapists may have bookmarked.
+- **The client's timezone is reported as not collected** (your call). `clientProfiles` has never held one (§10.2 lists none) and the settled pattern since 5.6 is the viewer's own browser zone. A blank row reads as missing data; a country-derived guess would be worse than either. A test pins that no timezone value reaches this endpoint, so nobody can quietly add a guessed one.
+- **No email, no billing figures, no Stripe ids.** §8.2 asks for subscription *status*, which tells a therapist why a client may have gone quiet. It does not ask for their money, and email is the one field that turns a clinical record into a mailing list.
+- **Both the stored status and the resolved access ship**, as in 7.1 — `access` decides what renders, `status` is what the screen says out loud.
+- **An ended booking still loads** and says so in the strip. 8.1's list shows only active bookings, but 7.2 already decided the therapist keeps read access because the record is clinically theirs.
+- **Concern chips are shown, message previews still are not.** The opposite call to 8.1's sidebar, and the distinction is not squeamishness: a therapist is the one person these concerns are *for*, §8.2 asks for them by name, and tags chosen from a fixed list are not a quotation from a conversation.
+- **The active tab marker is ink, not gold** — gold is 1.63:1 on a light surface and banned there as an indicator, so the accent stays in the ink rail. Marked three ways: rule, weight, and full-strength ink against `ink/70`.
+- **A 404 and a network failure are different screens.** The 404 offers no retry, because nothing about it is transient; a timeout or a 500 does, because refusing one would strand a therapist on a page that would have worked a second later.
+
+**Verification**
+- Tests: **1079 passing across 38 suites** (1057 from earlier chunks, 22 new). `oxlint` (client) **0 findings** on every file this chunk touched — the six that remain are the developer's own, open since 2.2. **Correction, recorded in 8.3:** this line originally also said server lint was clean. It was not run in 8.2, and it had two errors (an unused rest-destructure in `therapistClient.service.js`). Fixed in 8.3 with no change in behaviour; the 22 tests still pass.
+- **Mutation-checked twice, both on the guard the endpoint rests on:** removing the ownership comparison broke **3** tests; downgrading the refusal from an identical 404 to a 403 broke **2**.
+- Contrast: **32 pairs computed, 0 failures.** One design fault the numbers caught: the concern chip's `sage/15` fill is **1.17:1** against paper — legible text in a shape with no visible edge. It now carries a `sage/40` ring, the same fix the chat system notice took in 7.4. Tightest against their floors: the retry border at 3.35:1 and the pending-tab icon at 4.69:1.
+- **18 client logic checks executed** (the client has no Jest suite): the tab derivation across eight real paths including a trailing slash and the client portal's own routes, the tab set's order and uniqueness, that exactly one tab is built, that no two pending tabs share a body, that all three gender preferences and all five subscription states are worded, and that no copy anywhere promises a timeline.
+- **7 icons bounds-checked**, 0 out of bounds. The checker gained `<rect>` support for `InfoIcon` — its first run silently reported bounds that excluded the card, which would have passed while measuring the wrong shape.
+- Client build passes. **Two Tailwind findings verified in the generated CSS rather than trusted:** `scrollbar-none` emits only `scrollbar-width`, which Safari did not support until 18.2, so the `::-webkit-scrollbar` rule is kept beside it; and the questionnaire stores the country **display name**, not an ISO code, so nothing here maps one — a code-to-name lookup would have printed "IE" for every real client.
+- Impeccable detector `[]` — **a degraded empty**, as in every chunk: the four parsing dependencies are still absent, so it evaluates no contrast. The computed table is the compensation.
+- **No live Atlas run.** This endpoint only reads, and the suite covers it against a real in-memory MongoDB. Nothing in the database was created, modified or deleted.
+
+**Manual steps for the developer**
+1. **No new packages, no new environment variables, no external setup.**
+2. **Restart the API server** — the `/clients/:bookingId` route is read at startup. **Hard-refresh the client**, since the workspace URL gained a tab segment.
+3. **The chunk's own verify step, part one:** open a client, move between tabs, and confirm the URL changes and a refresh keeps you on the same tab. Then click a different client in the sidebar and confirm you stay on that tab with the new person's data.
+4. **The chunk's own verify step, part two — the important one.** Copy a booking id belonging to a *different* therapist and put it in the URL. You should get "Client not found", identical to what a made-up id gives. The API returns the same 404 for both.
+5. **Client info** is the only tab with real content. Check a couple in particular — both partners should get their own row.
+6. **At 360px**: the identity strip and tabs are one sticky block, the tab strip scrolls sideways with the active tab brought into view, and the concern chips run on one scrolling line rather than pushing the tabs off screen.
+7. **Keyboard and reduced motion**: tab through the tab strip and confirm focus is visible; with reduced motion on, no skeleton should pulse.
+
+**Carried forward**
+- **Chunk 8.3 replaces the chat tab**, 8.4 the worksheets tab, 8.6 journal and notes, 9.2 sessions. Each is one component swap in `ClientWorkspace` — the strip, the tabs and the fetch are already in place.
+- **THE TIMEZONE GAP IS A SLICE 9 DECISION AND SHOULD BE TAKEN BEFORE 9.2.** Session scheduling converts a therapist's local time into the client's, and with no stored client zone it can only use whatever browser that client last opened. That works, but a therapist cannot see *"6pm mine is 2am theirs"* while choosing a slot — which is exactly when it matters. Adding `timezone` to `clientProfiles` means a questionnaire change and a field that stays null for every existing client, so it is a real trade rather than an oversight.
+- **Worth asking:** whether a therapist should be able to see a client's email address. Deliberately withheld here; §8 never lists it and all contact is in-portal.
+- Slice 11 must still flip a cancelled subscription to `expired` on the same `currentPeriodEnd` boundary the 7.1 gate compares against.
+- Chunk 12.5: the socket URL in production, sticky sessions or a Redis adapter, the `sameSite` cookie and `VITE_API_BASE_URL`.
+- **Pre-launch blockers — unchanged, the list stands at 13.** No placeholder content was created: every word in the workspace is a spec fact or a plain description of a screen.
+
+**Not done (out of scope, by design):** no tab contents beyond Client info, per the chunk's own "Do NOT" — no chat, worksheets, sessions, journal or private notes. Nothing on this screen is editable; 8.2 is entirely read-only.
+
+---
+
+## Chunk 8.3 — Therapist chat UI
+
+**Status:** Complete. Nothing skipped. Not seen rendered — see Manual steps. **Three real bugs found and fixed on the way**, two of them in shipped code (7.6 and 8.1).
+
+**Built**
+- server: `realtime/emitter.js` (room reconciliation, `bookingId` on every `message:new`), `services/chat.service.js` (passes the booking's two user ids), `realtime/socket.test.js` (7 new tests + one fake server updated). `services/therapistClient.service.js` lint fix (see Verification).
+- client: new `components/portal/therapist/workspace/TherapistChat.jsx` · `lib/chat/{openingMessage,draftStore,draftContext}.js`. **Moved** to `components/portal/chat/` (role-neutral, as `UnreadProvider` was): `MessageThread`, `MessageCluster`, `SystemNotice`, `DaySeparator`, `TypingDots`, `Composer`, `MessageText`, `MessageAnnouncer`, `ChatIcons`. Edits: `useChat.js`, `messageStore.js`, `groupMessages.js`, `UnreadProvider.jsx`, `unreadContext.js`, `ClientListItem.jsx`, `ClientWorkspace.jsx`, `TherapistPortalShell.jsx`, `pages/portal/client/Chat.jsx`, `therapistPortalContent.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **THE LEAK THE BRIEF WARNED ABOUT WAS REAL.** `useChat`'s `message:new` handler never checked the booking — harmless for a client in one room, a straight leak for a therapist in every room. Five layers now: the chat remounts with `key={bookingId}`; every socket handler passes `belongsTo(bookingId, event)`, which **fails closed**; every row carries its booking; every late REST result is applied only if its booking is still open; the screen-reader announcer only hears the open booking — otherwise Client A's words would be *read aloud* on Client B's screen.
+- **`message:new` never carried `bookingId`**, so the layers above had nothing to check. Added on the emit. The same gap had silently disabled `UnreadProvider`'s instant increment since 7.6 — it returned early on every message, covered by the separate `unread:update` push.
+- **All rooms stay joined; the browser never picks one** (your call). "Leave/join" is met at the subscription layer: switching tears down the old chat's listeners.
+- **Rooms are reconciled at send time from the STORED booking** (`socketsJoin`). A client who paid while their therapist was online had no room on that therapist's socket, so the opening message — the most important one — did not arrive live.
+- **The sidebar badge never cleared (8.1 bug).** `live || client.unreadCount` turns a live 0 into the stale list count. The provider now reports `ready`, and is the only truth once it is.
+- **Times in the therapist's PROFILE zone** (§15), with a quiet "Times shown in …" when it differs from the browser's.
+- **The opening message is marked only once the whole history is held** (your call), in a cluster of its own. Marking a reply as somebody's opening would be worse than marking nothing.
+- **"Not written yet" copy is literally true:** 7.5's opening screen replaces the client's thread, so a therapist who writes first is read only after the client sends theirs.
+- **Drafts per client, memory only** (your call) — never browser storage; cleared on send and on sign-out.
+- **Your `main` edit in `TherapistPortalShell.jsx` was folded into one rule** (approved): the text `// py-6 sm:py-8 lg:py-10` sat inside the class string, so it was live classes, not a comment. Main has one padding rule again; the workspace cancels it with matching negative margins, and Profile and Notifications get their top padding back.
+
+**Verification**
+- Tests: **1086 passing across 38 suites** (1079 from earlier chunks, 7 new). Server lint clean; client `oxlint` **0 findings** on touched files.
+- **Correction to 8.2:** its log claimed server lint was clean; it had not been run and had 2 errors (an unused rest-destructure in `therapistClient.service.js`). Fixed here with no behaviour change; the 8.2 entry now says so.
+- **Mutation-checked four times.** Removing room reconciliation broke **1** test (the one that exercises it). Dropping `bookingId` from the emit broke **3**. Making the client's `belongsTo` accept everything failed **11 of 47** logic checks, including all five rapid-switch runs.
+- A test fake broke on the first full run: "persists before it emits" stubs the socket server with only `to()`, and the emitter now also calls `in()`. The fake was extended; production code was not bent to suit it.
+- **47 client logic checks**, including **a rapid-switch simulation** — three clients, 5,000 interleaved events and switches across five seeds, with late responses landing after a switch — and **zero messages ever shown under the wrong client**.
+- Contrast: **25 pairs, 0 failures.** Tightest: composer placeholder 4.56:1, opening label 4.93:1, unsent reason 4.93:1. The opening ring (2.07:1) is decorative; the label carries the meaning.
+- Two files turned out to be **CRLF**; patched on a normalised copy and written back CRLF.
+- Build passes; generated CSS confirmed. Detector `[]` — degraded, as always. **Atlas not touched** (your call).
+
+**Manual steps for the developer**
+1. **Restart the API server BEFORE loading the new client.** The browser now refuses any live message without a `bookingId`, and only the new server sends one — the old server with the new client drops live messages in **both** portals until a refresh.
+2. Hard-refresh the client.
+3. **The brief's verify step:** three test clients, one therapist. Open A, then B, then C quickly while messages arrive — no message may appear under the wrong name, and no screen reader may read one out.
+4. Read a thread to the bottom and confirm **both** the sidebar badge and the Chat tab dot clear.
+5. Type half a reply to A, switch to B, switch back — A's draft should be there; B's composer empty.
+6. A client who has not written: the "has not written yet" panel, and the composer still usable.
+7. At 360px: the page must not scroll — only the thread — and the composer stays reachable.
+
+**Carried forward**
+- **Chunk 12.5: deploy the server before, or with, the client** — step 1's hazard applies in production too.
+- **12.5, again: `socketsJoin` works across instances only with the Redis adapter** — beside the sticky-sessions note already parked there.
+- 8.4 worksheets, 8.6 journal and notes, 9.2 sessions each replace one pending tab. The timezone decision (from 8.2) is still owed before 9.2.
+- Slice 11: flip a cancelled subscription to `expired` on the 7.1 gate's `currentPeriodEnd` boundary.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no voice or attachments; no leave/join events from the browser; no pinned opening-message bar; no live Atlas run.
+
+---
+
+## Chunk 8.4 — Worksheets: therapist side
+
+**Status:** Complete. Nothing skipped. Not seen rendered — see Manual steps. Client side is 8.5.
+
+**Built**
+- server: `models/Worksheet.js` · `constants/worksheets.js` · `validation/worksheets.schema.js` · `services/worksheet.service.js` · `controllers/worksheet.controller.js` · `test/zipFixture.js` · `routes/therapistWorksheets.test.js`. Routes on `/therapist`: `POST /worksheets`, `GET /worksheets/:bookingId`, `GET /worksheets/:bookingId/:worksheetId/file/:which`, `DELETE /worksheets/:bookingId/:worksheetId`.
+- server edits: `utils/fileSignature.js` (DOCX), `constants/uploads.js` (`worksheet` kind), `services/upload.service.js` (raw files, `destroyFile`), `controllers/upload.controller.js`, `services/therapistClient.service.js` (`loadOwnBooking` exported and shared).
+- client: `workspace/{WorksheetsTab,WorksheetUploader,WorksheetRow}.jsx` · `lib/therapist/{useWorksheets,worksheetFiles}.js` · `lib/api/therapistWorksheetsApi.js` · 5 icons · copy in `therapistPortalContent.js` · `ClientWorkspace.jsx`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **PDF + DOCX, DOCX inspected** (your call). The server reads the ZIP's directory only — nothing is unzipped, so a zip bomb costs nothing. Needs `[Content_Types].xml` + `word/document.xml` and **no `vbaProject.bin`**. `.docm`, `.xlsx`, plain ZIPs and old `.doc` are refused; `.doc` gets a "save as PDF or .docx" fix.
+- **Security hole caught before it opened:** the PUBLIC `/uploads` endpoint accepts any kind in `UPLOAD_KIND_VALUES`. Adding `worksheet` there would have let a stranger write into the private folder. It is now excluded; tests pin it, and that a DOCX is still refused as a certificate.
+- **Spec addition (§10.8):** `publicId`, `resourceType`, `format` and `bytes` beside each file URL — needed to sign, stream and delete. URLs and ids never leave the server.
+- **Files are private (`authenticated`) and streamed through our API**, as admin documents are (4.2). `Content-Type` comes from our stored format, never Cloudinary's. `attachment`, `nosniff`, `no-store`; the filename is a cleaned title in RFC 5987 form.
+- **DOCX is stored `raw`, with `.docx` inside its public id** — how Cloudinary keys raw files.
+- **Ownership before upload:** a foreign booking stores nothing. One shared `loadOwnBooking` gives 8.2's byte-identical 404. An ended booking gets 409 on upload but its list still loads.
+- **No orphan files:** if the record fails to save, the stored file is deleted.
+- **Withdraw only while `assigned`** (your call), as one atomic conditional delete, so a client returning it at the same moment keeps their work (409). A failed file delete is logged, never fatal.
+- **Titles are never logged** — a title can name the client or their difficulty.
+- **Upload limit 30/hour** for therapists (the public limit is 10). Client timeout raised to 120 s for uploads, 60 s for downloads — the 15 s default would cut a 10 MB upload on a slow line.
+- **UI:** "Waiting for their answers" and "Returned" sections, with a drawn state mark (open ring vs tick), never colour alone. The client's answers are the primary gold action. Withdraw is confirmed inline, not in a modal.
+- **Honest note in the uploader:** the client cannot open worksheets yet; 8.5 removes it.
+
+**Verification**
+- Tests: **1132 passing across 39 suites** (1086 before, 46 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes.
+- **Mutation-checked three times:** removing the ownership check broke **5** tests; removing the macro check broke **3**; removing "only while assigned" broke **1**.
+- DOCX tests use real ZIPs built by `test/zipFixture.js` (valid CRCs), not faked headers. The existing upload suite passes unchanged.
+- **26 client logic checks** (file rules, size and name formatting, copy). Two first-run failures were my own test script, not the code.
+- **12 icons bounds-checked**, 0 out of bounds. **33 contrast pairs, 0 failures**; tightest: dropzone dashed border 3.37:1, returned-tile icon 4.69:1.
+- Detector `[]` — degraded, as always. **Atlas and real Cloudinary untouched** — Cloudinary is faked in tests.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.**
+2. The brief's check: as a therapist, open a client → Worksheets → assign a PDF. It should appear under "Waiting for their answers"; **Download** should open the file.
+3. Assign a real `.docx` and download it. **This is the first live test of raw files on Cloudinary** — if it fails, check the Cloudinary settings allow document delivery.
+4. Try a `.doc` and a renamed `.exe` — both refused with a clear reason.
+5. Withdraw one: an inline confirm, then it disappears.
+6. At 360px: rows wrap and the buttons stay at least 44px tall.
+
+**Carried forward**
+- **8.5 builds the client side:** download, return with images allowed (the model already accepts JPEG/PNG/WebP), status flips to `completed`. Remove the uploader's "not switched on" note then.
+- 10.4: a notification when a worksheet is returned.
+- 12.5: confirm Cloudinary allows raw and PDF delivery on Asad's account.
+- Timezone decision still owed before 9.2. Slice 11: cancelled → expired on the 7.1 boundary.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** client side (8.5); structured in-app forms; editing a title or replacing a file (withdraw and assign again).
+
+---
+
+## Chunk 8.5 — Worksheets: client side
+
+**Status:** Complete. Nothing skipped. Not seen rendered — see Manual steps. The worksheet loop is now whole: assign → download → return → review.
+
+**Built**
+- server routes (client, behind the subscription gate):
+  - `GET /client/worksheets`
+  - `GET /client/worksheets/:id/file/:which`
+  - `POST /client/worksheets/:id/submit`
+- server route (therapist): `POST /therapist/worksheets/:bookingId/:id/review`.
+- server new: `routes/clientWorksheets.test.js` (28 tests).
+- server edits:
+  - `services/worksheet.service.js` — client functions, review, shared stream and presenter, live count.
+  - `controllers/worksheet.controller.js` — one `sendFile` for both roles.
+  - `models/Worksheet.js` (`reviewedAt`); `constants/{uploads,worksheets,socket}.js`; `realtime/emitter.js` (`emitWorksheetsUpdate`).
+  - `services/clientPortal.service.js` (`pendingWorksheets`); both route files.
+- client new:
+  - `pages/portal/client/Worksheets.jsx` (replaces the 7.1 placeholder).
+  - `components/portal/client/worksheets/{MyWorksheetRow,ReturnDrop}.jsx`; `components/portal/client/{WorksheetsPendingProvider,NavDot}.jsx`.
+  - `lib/client/{useMyWorksheets,worksheetsPending}.js`; `lib/api/clientWorksheetsApi.js`; 3 icons.
+- client edits: `ClientRail`, `ClientTabBar`, `ClientPortalShell`, `worksheetFiles.js`, `socketClient.js`, both content files, and the therapist `WorksheetRow`/`WorksheetsTab`/`WorksheetUploader`/`useWorksheets`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **The therapist marks a worksheet reviewed** (your call). Until then the client can replace their file; after, 409. Spec addition `reviewedAt`; the model refuses it on an unreturned sheet. Reviewing twice keeps the first date.
+- **No read receipt:** the client sees "With your therapist", never "opened" or a time.
+- **One returned file** (your call), with guidance: on screen, on paper plus a photo, and "several pages? your phone's scanner makes one PDF". Photos (JPEG/PNG/WebP) are allowed for returns only. No HEIC in `accept`, so iOS converts to JPEG itself.
+- **Submit is one atomic update that only matches while unreviewed.** An early check refuses a reviewed sheet before any upload. A review landing mid-submit → the new file is deleted and 409. A replaced file is deleted only after the new one is recorded; a failed save deletes the new file.
+- **The client's booking comes from the token, never the URL.** Another client's worksheet, a missing one and junk give one identical 404. An expired client is refused by the existing gate (403).
+- **Nav dot (your addition — not in the brief text).** A quiet gold dot on Worksheets while any sheet is to complete: no number, no pulse. The count sits in the link's name ("Worksheets, 2 to complete"). It starts from `/client/me` and stays live: assign, withdraw and submit push `worksheets:update` to the client's own room, **a number only**. The push is best-effort and skipped without a socket server.
+- **Copy corrected:** 7.1's step "reads it before your next session" promised something nobody guarantees; now "your therapist sees it has come back". The therapist uploader's "not switched on" note is gone.
+- `worksheetReturn` is private and excluded from the public `/uploads` kinds, like `worksheet`.
+
+**Verification**
+- Tests: **1160 passing across 40 suites** (1132 before, 28 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes.
+- **Mutation-checked four times:** removing "worksheet belongs to this booking" broke **2**; the atomic review lock **1** (the race test); the early review check **1**; "review only once returned" **1**.
+- The race is tested for real: a review is written between the check and the write, and the new file must be deleted.
+- **20 client logic checks** (return rules, the HEIC-free accept list, nav labels, copy). **13 client icons** bounds-checked, 0 out. **21 contrast pairs, 0 failures**; tightest: the drop edge against the mist panel 3.08:1, the "With your therapist" chip 4.69:1.
+- Detector `[]` — degraded, as always. **Atlas and real Cloudinary untouched.**
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.**
+2. As a therapist, assign a worksheet. With the client's portal already open elsewhere, **the gold dot on Worksheets should appear without a refresh.**
+3. As the client: open Worksheets, download it, then **Send it back** with a PDF or a phone photo. It moves to "Submitted" and the dot clears.
+4. **Replace file** once; then as the therapist, **Download their answers** (it should be the replacement) and **Mark as reviewed**. The client now sees "With your therapist" and no Replace.
+5. At 360px, and on a real iPhone: choosing a photo should upload a JPEG.
+
+**Carried forward**
+- 10.4: a therapist notification when a worksheet comes back.
+- 12.5: confirm Cloudinary delivers raw, PDF and image files on Asad's account.
+- Timezone decision still owed before 9.2. Slice 11: cancelled → expired on the 7.1 boundary.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** in-app form filling; several files per return; notifications (10.4).
+
+---
+
+## Chunk 8.6 — Journal and Private Notes
+
+**Status:** Complete. Nothing skipped. Not seen rendered — see Manual steps. Slice 8 is finished.
+
+**Built**
+- server models: `Journal.js` (§10.9 + `editedAt`) · `PrivateNote.js` (§10.10).
+- server new: `constants/journal.js` · `validation/journal.schema.js` · `services/journal.service.js` · `services/privateNotes.service.js` · `controllers/{journal,privateNotes}.controller.js` · `routes/journal.test.js` (28) · `routes/privateNotes.test.js` (16).
+- server routes (client, behind the subscription gate): `GET/POST /client/journal`, `PATCH/DELETE /client/journal/:entryId`.
+- server routes (therapist): `GET /therapist/journal/:bookingId` (read only) · `GET/POST /therapist/notes/:bookingId` · `PATCH/DELETE /therapist/notes/:bookingId/:noteId`.
+- client new: `pages/portal/client/Journal.jsx` (replaces the 7.1 placeholder) · `components/portal/journal/{EntrySpine,JournalIcons}.jsx` · `components/portal/client/journal/{JournalComposer,MoodPicker,EntryRow}.jsx` · `components/portal/therapist/workspace/{JournalNotesTab,NoteComposer,NoteRow}.jsx`.
+- client new libs: `lib/client/{useJournal,moods}.js` · `lib/therapist/{useClientJournal,usePrivateNotes}.js` · `lib/api/{journalApi,therapistJournalApi}.js` · `lib/journalDates.js` · 7 icons.
+- client edits: `ClientWorkspace.jsx`, both content files (`TAB_PENDING.journal` removed, tab marked built).
+- Packages / env vars: none.
+
+**Key decisions**
+- **THE BOUNDARY IS AN IMPORT EDGE, NOT A FILTER.** Two collections, two services, two endpoints. Nothing on the client request path imports `PrivateNote` or its service, so a note cannot reach a client response even by mistake — there is no code path to filter. A test walks the import graph from `client.routes.js` and `chat.routes.js` and asserts it never reaches them, and asserts the therapist path DOES, so the walker cannot pass vacuously.
+- **No combined endpoint**, though the tab shows both side by side. One response object holding both collections is the shape a later refactor leaks; the browser fetches twice and the layout is the only place they meet.
+- **Mood: eight presets plus a word the client types** (your call), capped at 30. Each preset is drawn as a line that behaves like the feeling — Low descends, Hopeful rises, Angry spikes — so the row is not eight identical word-boxes. **The eight are mine, not Asad's**, and want his confirmation like the 5.1 relationship-status list.
+- **An edited entry shows "Edited" to the therapist** (your call); spec addition `editedAt`. There is still **no read stamp** — 7.2's rule holds, the client never learns when it was read.
+- **Deleting is permanent** (your call) and removes it from the therapist's view too.
+- **The therapist has no write route for a client's entries at all** — not hidden, absent. Three verbs are tested and all 404.
+- **Notes are scoped by author as well as booking**, and an ended booking still takes one: a closing note is written after the work ends.
+- **The notes section sits under a dark ink header** — prominence by inversion, as 6.6's renewal disclosure does, not by an alarm colour. It is also the only ground where gold is legible (11.08:1 against 1.63:1 on paper), and the clearest signal that this half is not shared.
+- Journal text and note text are never logged.
+
+**Verification**
+- Tests: **1204 passing across 42 suites** (1160 before, 44 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes.
+- **Mutation-checked five times, and the first run was the useful one: FOUR OF THE FIVE BROKE NOTHING.** A booking has one client and one therapist today, so `bookingId` alone carried every case and the ownership scopes were decorative. Two tests were added that construct the situation reassignment would create — a colleague's note on my booking, and an entry on my booking by another author. Now each of the five breaks a test: notes' `therapistId` on a single note **1** and on the list **1**; the entry's author match **1** and booking match **1**; importing `PrivateNote` into the journal service **1**.
+- The client-response sweep runs all eight client endpoints and asserts a seeded note's text, `privatenote`, `clinicalnote` and `"notes"` appear in none. *(Not `"note"` — `workingHours.note` is the therapist's own availability field, §10.3.)*
+- **55 client logic checks** (mood strokes in bounds, preset uniqueness, date labels including a 12-hour locale always showing am/pm, and copy rules — no timelines, no nudges, no gamification). **7 icons** bounds-checked, 0 out; **9 mood strokes** checked against their own 24×12 box. **67 contrast pairs, 0 failures**; tightest: the writing-area focus border 3.06:1 and the notes composer against its mist body 3.08:1.
+- **8.5's list-nesting bug repeated and was caught again before shipping**: the animation wrappers put a `<div>` between `<ol>` and its `<li>`. `Entry` and `NoteRow` now render no list item of their own — the caller's `motion.li` is it.
+- Generated CSS confirmed to carry every new utility, including the spine offsets Tailwind v4 emits as `calc(var(--spacing) * -7.25)` rather than a literal rem.
+- Detector `[]` — degraded, as always; the four parsers were re-checked and are still absent. **Atlas untouched.**
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.**
+2. **The brief's own verify step.** As a client, open DevTools → Network, use the whole portal, and confirm no response anywhere contains `privateNotes` or any note text. Write a note as the therapist first, so there is something real to leak.
+3. As the client: write an entry, add a mood, edit it, then delete one. The transparency panel should be the first thing you read.
+4. As the therapist: open that client → Journal and Notes. Their entries on the left, your notes under the dark header on the right. Check the "Edited" mark appears after the client edits.
+5. At 360px the two sections stack with the journal first; at 1280px+ they sit side by side.
+6. Keyboard and reduced motion: the mood chips must show a visible focus ring, and entries must not slide in.
+
+**Carried forward**
+- **Asad to confirm the eight mood words** before launch, with the 5.1 relationship-status list.
+- 10.4: a therapist notification when a journal entry is written; 12.5: Cloudinary delivery, socket URL, sticky sessions.
+- **The timezone decision is now owed — 9.2 is next.** Slice 11: cancelled → expired on the 7.1 boundary.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no per-entry privacy toggle (§7.3 rules it out) · no client sight of notes in any form · no notifications (10.4) · no admin visibility (§11).
+
+---
+
 ## Pre-Launch Blockers
 
 **The list stands at 13.** Unchanged since chunk 5.5. Every one of these must be resolved

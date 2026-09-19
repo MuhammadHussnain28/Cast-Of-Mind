@@ -33,6 +33,7 @@ jest.unstable_mockModule('../config/cloudinary.js', () => ({
 const { default: app } = await import('../app.js');
 const { uploadRateLimiter } = await import('./upload.routes.js');
 const { UPLOAD_KINDS } = await import('../constants/uploads.js');
+const { docx } = await import('../test/zipFixture.js');
 
 // Real file headers. The point of the endpoint is that it reads these rather
 // than trusting the filename or the declared content type.
@@ -311,5 +312,24 @@ describe('POST /api/v1/uploads — rate limiting', () => {
 
     const blocked = await post({ kind: 'photo', file: PNG });
     expect(blocked.status).toBe(429);
+  });
+});
+
+describe('POST /api/v1/uploads — worksheets stay off the public endpoint (8.4)', () => {
+  it('refuses kind=worksheet from a stranger', async () => {
+    const res = await post({ kind: 'worksheet', file: PDF, filename: 'w.pdf', contentType: 'application/pdf' });
+    expect(res.status).toBe(422);
+    expect(uploadStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('still refuses a Word document as a certificate', async () => {
+    const res = await post({
+      kind: 'certificate',
+      file: docx(),
+      filename: 'cert.docx',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    expect(res.status).toBe(422);
+    expect(uploadStreamMock).not.toHaveBeenCalled();
   });
 });

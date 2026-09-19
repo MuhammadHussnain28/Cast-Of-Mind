@@ -379,6 +379,10 @@ describe('message delivery', () => {
           if (event === SOCKET_EVENTS.MESSAGE_NEW) order.push('emitted');
         },
       }),
+      // The emitter puts both participants into the booking room before it
+      // emits (8.3), so the fake has to model that call as well. Joining a room
+      // is not delivery, so it records nothing in the order.
+      in: () => ({ socketsJoin: () => {} }),
     });
 
     try {
@@ -975,4 +979,222 @@ describe('graceful degradation', () => {
       setSocketServer(io);
     }
   }, 20000);
+});
+
+// ---------------------------------------------------------------------------
+// The therapist inbox (8.3) — one therapist, several clients, one socket
+// ---------------------------------------------------------------------------
+
+describe('the therapist inbox — several clients on one socket', () => {
+  const inbox = {};
+
+  const openingFor = (name) => `${name} writing an opening long enough for the floor.`;
+
+  async function makeInboxClient(key, name) {
+    const passwordHash = await hashPassword('correct-horse-battery-staple');
+    const user = await User.create({
+      email: `inbox-${key}@example.com`,
+      passwordHash,
+      role: ROLES.CLIENT,
+      status: USER_STATUS.ACTIVE,
+    });
+
+    await ClientProfile.create({
+      userId: user._id,
+      type: 'individual',
+      name,
+      age: 30,
+      gender: 'female',
+      country: 'IE',
+      city: 'Cork',
+      relationshipStatus: 'Single',
+      concernTags: ['Anxiety'],
+      therapistGenderPreference: 'no_preference',
+    });
+
+    const booking = await Booking.create({ clientId: user._id, therapistId: inbox.therapistId });
+
+    await Subscription.create({
+      bookingId: booking._id,
+      clientId: user._id,
+      status: SUBSCRIPTION_STATUS.ACTIVE,
+      amount: SUBSCRIPTION_AMOUNT_MINOR,
+      startDate: new Date(Date.now() - 5 * DAY),
+      currentPeriodEnd: new Date(Date.now() + 25 * DAY),
+      nextBillingDate: new Date(Date.now() + 25 * DAY),
+    });
+
+    inbox[key] = {
+      userId: user._id,
+      bookingId: String(booking._id),
+      token: signAccessToken({ userId: String(user._id), role: ROLES.CLIENT }),
+    };
+  }
+
+  beforeAll(async () => {
+    const passwordHash = await hashPassword('correct-horse-battery-staple');
+    const therapist = await User.create({
+      email: 'inbox-therapist@example.com',
+      passwordHash,
+      role: ROLES.THERAPIST,
+      status: USER_STATUS.ACTIVE,
+    });
+    inbox.therapistId = therapist._id;
+    inbox.therapistToken = signAccessToken({ userId: String(therapist._id), role: ROLES.THERAPIST });
+    await makeTherapistProfile(therapist._id, 'Imogen');
+
+    await makeInboxClient('a', 'Aoife');
+    await makeInboxClient('b', 'Bram');
+    await makeInboxClient('c', 'Cora');
+  }, 60000);
+
+  it('delivers every client message to the therapist tagged with ITS OWN booking', async () => {
+    const therapist = await connect(inbox.therapistToken);
+    const clients = {
+      a: await connect(inbox.a.token),
+      b: await connect(inbox.b.token),
+      c: await connect(inbox.c.token),
+    };
+
+    const received = [];
+    therapist.on(SOCKET_EVENTS.MESSAGE_NEW, (payload) => received.push(payload));
+
+    // Interleaved on purpose: the order a busy therapist actually sees.
+    const sends = ['a', 'b', 'c', 'b', 'a', 'c'];
+    const expected = new Map();
+    for (const [index, key] of sends.entries()) {
+      const text = index < 3 ? openingFor(key) : `${key} message number ${index}`;
+      expected.set(text, inbox[key].bookingId);
+      await emit(clients[key], SOCKET_EVENTS.MESSAGE_SEND, { bookingId: inbox[key].bookingId, text });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(received).toHaveLength(sends.length);
+    for (const payload of received) {
+      // The whole leak defence in the browser rests on this field being right.
+      expect(payload.bookingId).toBe(expected.get(payload.text));
+    }
+  });
+
+  it('never delivers one client message to another client of the same therapist', async () => {
+    const clientA = await connect(inbox.a.token);
+    const clientB = await connect(inbox.b.token);
+
+    const nothingForA = expectNoEvent(clientA, SOCKET_EVENTS.MESSAGE_NEW);
+    await emit(clientB, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: inbox.b.bookingId,
+      text: openingFor('Bram, privately'),
+    });
+
+    await expect(nothingForA).resolves.toBeUndefined();
+  });
+
+  it('marking ONE client read clears only that client', async () => {
+    const therapist = await connect(inbox.therapistToken);
+
+    for (const key of ['a', 'b', 'c']) {
+      const client = await connect(inbox[key].token);
+      const raised = waitFor(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+      await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+        bookingId: inbox[key].bookingId,
+        text: openingFor(key),
+      });
+      await raised;
+    }
+
+    const cleared = waitFor(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+    await emit(therapist, SOCKET_EVENTS.MESSAGE_READ, { bookingId: inbox.b.bookingId });
+    const counts = await cleared;
+
+    const byBooking = Object.fromEntries(counts.byBooking.map((row) => [row.bookingId, row.count]));
+    expect(byBooking[inbox.b.bookingId]).toBeUndefined();
+    expect(byBooking[inbox.a.bookingId]).toBe(1);
+    expect(byBooking[inbox.c.bookingId]).toBe(1);
+    expect(counts.total).toBe(2);
+  });
+
+  it('typing from one client names ITS OWN booking and no other', async () => {
+    const therapist = await connect(inbox.therapistToken);
+    const clientC = await connect(inbox.c.token);
+
+    const typing = waitFor(therapist, SOCKET_EVENTS.TYPING_START);
+    clientC.emit(SOCKET_EVENTS.TYPING_START, { bookingId: inbox.c.bookingId });
+
+    expect((await typing).bookingId).toBe(inbox.c.bookingId);
+  });
+
+  describe('a booking created AFTER the therapist connected', () => {
+    let late;
+
+    afterEach(async () => {
+      // Only the records this test created, removed by the ids it recorded.
+      if (!late) return;
+      await Subscription.deleteMany({ bookingId: late.bookingId });
+      await Booking.deleteOne({ _id: late.bookingId });
+      await ClientProfile.deleteOne({ userId: late.userId });
+      await User.deleteOne({ _id: late.userId });
+      delete inbox.late;
+      late = null;
+    });
+
+    it('still delivers the new client opening message live, on every tab', async () => {
+      // Connected first: at this moment the booking does not exist, so the
+      // handshake could not have joined its room.
+      const tabOne = await connect(inbox.therapistToken);
+      const tabTwo = await connect(inbox.therapistToken);
+
+      await makeInboxClient('late', 'Lena');
+      late = inbox.late;
+
+      const client = await connect(late.token);
+      const onOne = waitFor(tabOne, SOCKET_EVENTS.MESSAGE_NEW);
+      const onTwo = waitFor(tabTwo, SOCKET_EVENTS.MESSAGE_NEW);
+
+      await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+        bookingId: late.bookingId,
+        text: openingFor('Lena, just matched'),
+      });
+
+      expect((await onOne).bookingId).toBe(late.bookingId);
+      expect((await onTwo).bookingId).toBe(late.bookingId);
+    });
+
+    it('joins NOBODY ELSE to the new room', async () => {
+      const outsider = await connect(tokens.therapistB);
+      await makeInboxClient('late', 'Lena');
+      late = inbox.late;
+
+      const client = await connect(late.token);
+      const nothing = expectNoEvent(outsider, SOCKET_EVENTS.MESSAGE_NEW);
+
+      await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+        bookingId: late.bookingId,
+        text: openingFor('Lena, not for Nadia'),
+      });
+
+      await expect(nothing).resolves.toBeUndefined();
+    });
+
+    it('takes the room members from the STORED booking, never from the request', async () => {
+      // A payload naming someone else's booking is refused before anything is
+      // emitted, so no socket can be pulled into a room by asking for it.
+      const outsider = await connect(tokens.therapistB);
+      await makeInboxClient('late', 'Lena');
+      late = inbox.late;
+
+      const ack = await emit(outsider, SOCKET_EVENTS.MESSAGE_SEND, {
+        bookingId: late.bookingId,
+        text: 'Trying to reach a room that is not mine at all.',
+      });
+      expect(ack.error).toBeDefined();
+
+      const room = io.sockets.adapter.rooms.get(bookingRoom(late.bookingId));
+      const outsiderSockets = await io.in(`user:${ids.therapistB}`).fetchSockets();
+      expect(outsiderSockets.length).toBeGreaterThan(0);
+      for (const socket of outsiderSockets) {
+        expect(room?.has(socket.id) ?? false).toBe(false);
+      }
+    });
+  });
 });

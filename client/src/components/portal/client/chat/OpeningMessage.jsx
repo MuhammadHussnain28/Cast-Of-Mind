@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { cx } from '../../../../lib/cx'
 import { Heading, Text } from '../../../ui'
 import { opening } from '../../../../data/chatContent'
-import { SendIcon } from './ChatIcons'
+import { SendIcon } from '../../chat/ChatIcons'
 
 /**
  * The mandatory first message — master spec §7.1.

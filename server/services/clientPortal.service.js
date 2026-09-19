@@ -4,6 +4,7 @@ import { TherapistProfile } from '../models/TherapistProfile.js';
 import { Booking } from '../models/Booking.js';
 import { AppError } from '../utils/AppError.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
+import { countPendingWorksheets } from './worksheet.service.js';
 import { resolveAccess, findCurrentSubscription } from '../middleware/requireActiveSubscription.js';
 import {
   CLIENT_SUBSCRIPTION_FIELDS,
@@ -70,9 +71,10 @@ export async function getClientPortalState(userId) {
     throw new AppError(NO_BOOKING_MESSAGE, 404, NO_BOOKING_CODE);
   }
 
-  const [therapist, subscription] = await Promise.all([
+  const [therapist, subscription, pendingWorksheets] = await Promise.all([
     loadTherapist(booking.therapistId),
     findCurrentSubscription(userId),
+    countPendingWorksheets(booking._id),
   ]);
 
   return {
@@ -101,6 +103,9 @@ export async function getClientPortalState(userId) {
       : null,
 
     booking: { id: String(booking._id), matchedAt: booking.matchedAt },
+
+    // The Worksheets nav dot (8.5): a count only, never a title.
+    pendingWorksheets,
 
     therapist,
 

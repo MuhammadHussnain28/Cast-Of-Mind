@@ -39,9 +39,12 @@ function compare(a, b) {
  * both parties, so a viewer-relative field cannot be baked into it. It is
  * derived here from the role the viewer holds.
  */
-export function normalise(message, myRole) {
+export function normalise(message, myRole, bookingId = null) {
   return {
     id: message.id,
+    // Which conversation this belongs to. A socket event names it; a REST page
+    // is scoped by the booking in its own URL, so the caller stamps it.
+    bookingId: message.bookingId != null ? String(message.bookingId) : bookingId,
     clientMessageId: message.clientMessageId ?? null,
     text: message.text,
     type: message.type ?? 'text',
@@ -99,9 +102,10 @@ export function mergePage(messages, page) {
 }
 
 /** The optimistic row, drawn before the server has heard anything. */
-export function optimisticMessage({ clientMessageId, text, senderRole }) {
+export function optimisticMessage({ clientMessageId, text, senderRole, bookingId = null }) {
   return {
     id: null,
+    bookingId,
     clientMessageId,
     text,
     type: 'text',
@@ -147,4 +151,22 @@ export function newestSent(messages) {
     if (messages[i].id && messages[i].status === MESSAGE_STATUS.SENT) return messages[i];
   }
   return null;
+}
+
+/**
+ * Does this event belong to the conversation on screen? (8.3)
+ *
+ * THE LEAK GUARD. A therapist's socket sits in every one of their clients'
+ * rooms, so a `message:new` for Client A arrives while Client B's thread is
+ * open. Everything that could put one person's words into another person's
+ * thread passes through this first.
+ *
+ * FAILS CLOSED. An event with no booking id, or with a different one, is not
+ * accepted — a message that cannot say where it belongs does not belong here.
+ * The client portal passes through it too; with one booking it simply always
+ * matches.
+ */
+export function belongsTo(bookingId, event) {
+  if (!bookingId || event?.bookingId == null) return false;
+  return String(event.bookingId) === String(bookingId);
 }

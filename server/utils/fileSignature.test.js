@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
-import { detectFileType } from './fileSignature.js';
+import { detectFileType, isLegacyOfficeFile } from './fileSignature.js';
+import { buildZip, docx } from '../test/zipFixture.js';
 import { FILE_TYPES } from '../constants/uploads.js';
 
 // Real leading bytes for each format, followed by filler so the buffers have
@@ -41,7 +42,7 @@ describe('detectFileType', () => {
     expect(detectFileType(buf([0x7f, 0x45, 0x4c, 0x46]))).toBeNull();
   });
 
-  it('rejects a ZIP archive, which also covers .docx and .xlsx', () => {
+  it('rejects a bare ZIP header with no directory', () => {
     expect(detectFileType(buf([0x50, 0x4b, 0x03, 0x04]))).toBeNull();
   });
 
@@ -76,5 +77,57 @@ describe('detectFileType', () => {
     // A WAV file is also RIFF, but carries "WAVE" at offset 8.
     const wav = buf([0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45]);
     expect(detectFileType(wav)).toBeNull();
+  });
+});
+
+describe('detectFileType — Word documents (8.4)', () => {
+  it('identifies a real .docx', () => {
+    expect(detectFileType(docx())).toBe(FILE_TYPES.DOCX);
+  });
+
+  it('refuses a .docm — Word with macros', () => {
+    expect(detectFileType(docx({ 'word/vbaProject.bin': 'macro' }))).toBeNull();
+  });
+
+  it('refuses macros whatever the case of the name', () => {
+    expect(detectFileType(docx({ 'word/VBAProject.BIN': 'macro' }))).toBeNull();
+  });
+
+  it('refuses an ordinary ZIP of other files', () => {
+    expect(detectFileType(buildZip({ 'notes.txt': 'hi', 'photo.jpg': 'x' }))).toBeNull();
+  });
+
+  it('refuses an Excel workbook (.xlsx) — a ZIP, but not Word', () => {
+    const xlsx = buildZip({ '[Content_Types].xml': '<x/>', 'xl/workbook.xml': '<x/>' });
+    expect(detectFileType(xlsx)).toBeNull();
+  });
+
+  it('refuses a ZIP with word/document.xml but no content-types part', () => {
+    expect(detectFileType(buildZip({ 'word/document.xml': '<x/>' }))).toBeNull();
+  });
+
+  it('refuses a ZIP whose directory is cut off', () => {
+    const whole = docx();
+    expect(detectFileType(whole.subarray(0, whole.length - 30))).toBeNull();
+  });
+
+  it('refuses a ZIP whose directory points past the end of the file', () => {
+    const broken = Buffer.from(docx());
+    broken.writeUInt32LE(0x7fffffff, broken.length - 6);
+    expect(detectFileType(broken)).toBeNull();
+  });
+
+  it('refuses an executable renamed to .docx', () => {
+    expect(detectFileType(buf([0x4d, 0x5a, 0x90, 0x00]))).toBeNull();
+  });
+
+  it('never accepts an old binary .doc', () => {
+    const doc = buf([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    expect(detectFileType(doc)).toBeNull();
+    expect(isLegacyOfficeFile(doc)).toBe(true);
+  });
+
+  it('does not call a PDF an old Office file', () => {
+    expect(isLegacyOfficeFile(buf(headers.pdf))).toBe(false);
   });
 });

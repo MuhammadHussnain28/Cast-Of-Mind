@@ -23,6 +23,8 @@ export const SOCKET_EVENTS = Object.freeze({
   MESSAGE_NEW: 'message:new',
   UNREAD_UPDATE: 'unread:update',
   AUTH_EXPIRED: 'auth:expired',
+  // 8.5: the client's count of worksheets still to complete. A number only.
+  WORKSHEETS_UPDATE: 'worksheets:update',
 });
 
 export const SOCKET_ERRORS = Object.freeze({

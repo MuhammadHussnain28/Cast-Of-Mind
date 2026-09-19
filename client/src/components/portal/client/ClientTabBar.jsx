@@ -4,6 +4,8 @@ import { CLIENT_NAV } from '../../../data/clientPortalContent'
 import { useUnreadFor } from '../../../lib/chat/unreadContext'
 import UnreadBadge from '../UnreadBadge'
 import { unreadLabel } from '../../../lib/chat/unreadStore'
+import { useWorksheetsPending, pendingLabel } from '../../../lib/client/worksheetsPending'
+import NavDot from './NavDot'
 import { NAV_ICONS } from './navIcons'
 
 /**
@@ -36,6 +38,7 @@ export default function ClientTabBar({ bookingId }) {
   // because the label already runs at 11px in a 64px tab and has no room to
   // give up.
   const unread = useUnreadFor(bookingId)
+  const { pending } = useWorksheetsPending()
 
   return (
     <nav
@@ -47,12 +50,13 @@ export default function ClientTabBar({ bookingId }) {
         {CLIENT_NAV.map((item) => {
           const Icon = NAV_ICONS[item.icon]
           const count = item.unread ? unread : 0
+          const waiting = item.dot ? pending : 0
 
           return (
             <li key={item.to} className="flex-1">
               <NavLink
                 to={item.to}
-                aria-label={unreadLabel(item.label, count)}
+                aria-label={item.dot ? pendingLabel(item.label, waiting) : unreadLabel(item.label, count)}
                 className={({ isActive }) =>
                   cx(
                     'flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2',
@@ -76,6 +80,7 @@ export default function ClientTabBar({ bookingId }) {
                     <span className="relative inline-flex">
                       <Icon size={22} className={isActive ? 'text-gold' : 'text-paper/70'} />
                       <UnreadBadge count={count} variant="corner" />
+                      <NavDot show={waiting > 0} variant="corner" />
                     </span>
                     <span>{item.label}</span>
                   </>

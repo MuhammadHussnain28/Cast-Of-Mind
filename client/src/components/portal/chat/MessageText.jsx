@@ -1,5 +1,5 @@
-import { linkify } from '../../../../lib/chat/linkify'
-import { chat } from '../../../../data/chatContent'
+import { linkify } from '../../../lib/chat/linkify'
+import { chat } from '../../../data/chatContent'
 
 /**
  * The words in a message.

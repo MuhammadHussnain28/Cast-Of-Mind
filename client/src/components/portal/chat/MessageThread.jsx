@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { cx } from '../../../../lib/cx'
-import { groupMessages } from '../../../../lib/chat/groupMessages'
-import { chat } from '../../../../data/chatContent'
+import { cx } from '../../../lib/cx'
+import { groupMessages } from '../../../lib/chat/groupMessages'
+import { chat } from '../../../data/chatContent'
 import DaySeparator from './DaySeparator'
 import MessageCluster from './MessageCluster'
 import SystemNotice from './SystemNotice'
 import TypingDots from './TypingDots'
-import ChatEmptyState from './ChatEmptyState'
 import { ArrowDownIcon } from './ChatIcons'
 
 // How close to the bottom still counts as "reading the newest".
@@ -30,10 +29,15 @@ const NEAR_TOP_PX = 120
  *     otherwise the reader visibly leaps mid-sentence.
  *  4. JUMP TO LATEST carries the count of what arrived, so the control says
  *     what it will do rather than only that it exists.
+ *
+ * SHARED BY BOTH PORTALS (8.3). Everything that differs between a client's
+ * conversation and a therapist's is a prop: who the other person is, what an
+ * empty thread says, how dense the rows are, and whether the client's opening
+ * message is labelled. Nothing in here assumes which side it is on.
  */
 export default function MessageThread({
   messages,
-  therapistName,
+  otherName,
   timeZone,
   hasMore,
   loadingOlder,
@@ -41,7 +45,13 @@ export default function MessageThread({
   onRetry,
   onReachBottom,
   theyAreTyping,
+  emptyState = null,
+  density = 'comfortable',
+  openingId = null,
+  openingLabel = null,
+  startLabel = chat.threadStart,
 }) {
+  const compact = density === 'compact'
   const scrollerRef = useRef(null)
   const bottomRef = useRef(null)
   const reduce = useReducedMotion()
@@ -70,7 +80,10 @@ export default function MessageThread({
     if (grew && !atBottom) setMissed((n) => n + (messages.length - countedUpTo))
   }
 
-  const rows = useMemo(() => groupMessages(messages, timeZone), [messages, timeZone])
+  const rows = useMemo(
+    () => groupMessages(messages, timeZone, undefined, undefined, { openingId }),
+    [messages, timeZone, openingId],
+  )
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
     const el = scrollerRef.current
@@ -175,7 +188,7 @@ export default function MessageThread({
   if (messages.length === 0) {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <ChatEmptyState therapistName={therapistName} />
+        {emptyState}
       </div>
     )
   }
@@ -196,17 +209,23 @@ export default function MessageThread({
         onScroll={handleScroll}
         role="log"
         tabIndex={0}
-        aria-label={chat.threadLabel.replace('{name}', therapistName || 'your therapist')}
+        aria-label={chat.threadLabel.replace('{name}', otherName || 'this person')}
         className={cx(
-          'h-full overflow-y-auto overscroll-contain px-4 py-4 sm:px-5',
+          'h-full overflow-y-auto overscroll-contain',
+          compact ? 'px-3 py-3 sm:px-4' : 'px-4 py-4 sm:px-5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink',
         )}
       >
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+        <div
+          className={cx(
+            'mx-auto flex w-full flex-col',
+            compact ? 'max-w-4xl gap-2' : 'max-w-3xl gap-3',
+          )}
+        >
           {/* The start of the relationship, stated once. */}
           {!hasMore && (
             <p className="py-2 text-center font-body text-caption text-ink/70">
-              {chat.threadStart}
+              {startLabel}
             </p>
           )}
 
@@ -248,11 +267,13 @@ export default function MessageThread({
                 cluster={row}
                 timeZone={timeZone}
                 onRetry={onRetry}
+                density={density}
+                openingLabel={openingLabel}
               />
             )
           })}
 
-          {theyAreTyping && <TypingDots name={therapistName} />}
+          {theyAreTyping && <TypingDots name={otherName} />}
 
           <div ref={bottomRef} />
         </div>

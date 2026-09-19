@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSocket } from '../socket/socketContext'
 import { SOCKET_EVENTS, emitWithAck } from '../socket/socketClient'
 import { fetchMessages, postMessage, markConversationRead } from '../api/chatApi'
 import {
   MESSAGE_STATUS,
+  belongsTo,
   markFailed,
   markSending,
   mergePage,
@@ -31,27 +32,43 @@ function reasonFor(error) {
   return error.message || null
 }
 
+const INITIAL_META = Object.freeze({
+  hasMore: false,
+  nextCursor: null,
+  syncCursor: null,
+  participants: null,
+  // §7.1: has the client sent their opening message yet? Reported by the
+  // server, because with pagination the browser may hold only the newest page
+  // and cannot know whether an opening exists further back.
+  awaitingOpeningMessage: false,
+})
+
 /**
- * The conversation — master spec §7.1 and §14.
+ * The conversation — master spec §7.1, §8.2 and §14.
  *
  * THE SOCKET IS AN ACCELERATOR, NEVER A REQUIREMENT. Every operation here has a
  * REST path and takes it whenever the socket is absent or disconnected, so a
  * blocked websocket costs instant delivery and nothing else.
+ *
+ * ONE CONVERSATION AT A TIME, AND NOTHING FROM ANY OTHER (8.3). The client
+ * portal has one booking; a therapist's socket sits in EVERY one of their
+ * clients' rooms. So every path by which a message can reach this list is held
+ * to the booking on screen:
+ *
+ *   - socket events pass `belongsTo` or are dropped;
+ *   - every async result is applied only if the booking it was requested FOR is
+ *     still the booking on screen;
+ *   - switching booking clears the list during render, before anything paints.
+ *
+ * The therapist workspace also remounts this hook per client with `key`, so
+ * these are the second line rather than the only one — and each is tested on
+ * its own, because a defence nobody exercises is a defence nobody has.
  */
 export function useChat({ bookingId, myRole }) {
   const socket = useSocket()
 
   const [messages, setMessages] = useState([])
-  const [meta, setMeta] = useState({
-    hasMore: false,
-    nextCursor: null,
-    syncCursor: null,
-    participants: null,
-    // §7.1: has the client sent their opening message yet? Reported by the
-    // server, because with pagination the browser may hold only the newest page
-    // and cannot know whether an opening exists further back.
-    awaitingOpeningMessage: false,
-  })
+  const [meta, setMeta] = useState(INITIAL_META)
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -60,6 +77,41 @@ export function useChat({ bookingId, myRole }) {
   // region. Carries a sequence number so two identical messages in a row are
   // still two separate announcements rather than one silently swallowed.
   const [lastIncoming, setLastIncoming] = useState(null)
+
+  /**
+   * A DIFFERENT BOOKING MEANS A DIFFERENT CONVERSATION, reset during render.
+   *
+   * React's documented pattern for state that depends on an input, and the root
+   * fix this project uses instead of a setState-in-effect (0.6, 4.2, 5.1, 7.4).
+   * Resetting in an effect would paint one frame of the previous client's
+   * thread under the next client's name.
+   */
+  const [forBooking, setForBooking] = useState(bookingId)
+  if (forBooking !== bookingId) {
+    setForBooking(bookingId)
+    setMessages([])
+    setMeta(INITIAL_META)
+    setStatus('loading')
+    setError(null)
+    setLoadingOlder(false)
+    setTheyAreTyping(false)
+    setLastIncoming(null)
+  }
+
+  /**
+   * The booking on screen RIGHT NOW, for async results to check against.
+   *
+   * A layout effect rather than a passive one: it runs during commit, so there
+   * is no gap between the new booking painting and this ref knowing about it —
+   * a network response cannot arrive inside a window that does not exist.
+   */
+  const bookingRef = useRef(bookingId)
+  useLayoutEffect(() => {
+    bookingRef.current = bookingId
+  }, [bookingId])
+
+  /** Apply `update` only if the conversation it was fetched for is still open. */
+  const stillOn = useCallback((requestedFor) => bookingRef.current === requestedFor, [])
 
   // Read in callbacks that must not re-subscribe when the list changes.
   // Synced in an effect rather than assigned during render — a ref written
@@ -78,11 +130,12 @@ export function useChat({ bookingId, myRole }) {
   useEffect(() => {
     if (!bookingId) return undefined
     let cancelled = false
+    syncCursorRef.current = null
 
     fetchMessages(bookingId)
       .then((page) => {
-        if (cancelled) return
-        setMessages(page.data.map((m) => normalise(m, myRole)))
+        if (cancelled || !stillOn(bookingId)) return
+        setMessages(page.data.map((m) => normalise(m, myRole, bookingId)))
         setMeta({
           hasMore: page.meta.hasMore,
           nextCursor: page.meta.nextCursor,
@@ -97,28 +150,32 @@ export function useChat({ bookingId, myRole }) {
         setStatus('ready')
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err)
-          setStatus('error')
-        }
+        if (cancelled || !stillOn(bookingId)) return
+        setError(err)
+        setStatus('error')
       })
 
     return () => {
       cancelled = true
     }
-  }, [bookingId, myRole])
+  }, [bookingId, myRole, stillOn])
 
   // --- live delivery --------------------------------------------------------
   useEffect(() => {
     if (!socket || !bookingId) return undefined
+    let cancelled = false
 
     const onMessage = (payload) => {
-      setMessages((current) => upsert(current, normalise(payload, myRole)))
+      // THE LEAK GUARD. Another client's message is simply not this thread's.
+      if (!belongsTo(bookingId, payload)) return
+
+      setMessages((current) => upsert(current, normalise(payload, myRole, bookingId)))
       if (payload.senderRole !== myRole) {
         setTheyAreTyping(false)
         // Fed to the live region so a screen reader hears the message arrive.
-        // Only what came FROM the other person, and only while this screen is
-        // mounted — history and my own sends are not events.
+        // Only what came FROM the other person, only for THIS conversation —
+        // otherwise Client A's words would be read aloud on Client B's screen,
+        // a leak no visual check would ever catch.
         //
         // `seq` counts arrivals rather than carrying a timestamp: the announcer
         // alternates between two regions on it, which is what makes the same
@@ -132,10 +189,10 @@ export function useChat({ bookingId, myRole }) {
     }
 
     const onTypingStart = (payload) => {
-      if (payload.bookingId === bookingId && payload.senderRole !== myRole) setTheyAreTyping(true)
+      if (belongsTo(bookingId, payload) && payload.senderRole !== myRole) setTheyAreTyping(true)
     }
     const onTypingStop = (payload) => {
-      if (payload.bookingId === bookingId && payload.senderRole !== myRole) setTheyAreTyping(false)
+      if (belongsTo(bookingId, payload) && payload.senderRole !== myRole) setTheyAreTyping(false)
     }
 
     /**
@@ -155,7 +212,10 @@ export function useChat({ bookingId, myRole }) {
       try {
         const cursor = syncCursorRef.current
         const page = await fetchMessages(bookingId, cursor ? { after: cursor } : { limit: 50 })
-        setMessages((current) => mergePage(current, page.data.map((m) => normalise(m, myRole))))
+        if (cancelled || !stillOn(bookingId)) return
+        setMessages((current) =>
+          mergePage(current, page.data.map((m) => normalise(m, myRole, bookingId))),
+        )
         if (page.meta.syncCursor) {
           syncCursorRef.current = page.meta.syncCursor
           setMeta((current) => ({ ...current, syncCursor: page.meta.syncCursor }))
@@ -171,20 +231,25 @@ export function useChat({ bookingId, myRole }) {
     socket.on('connect', onConnect)
 
     return () => {
+      cancelled = true
       socket.off(SOCKET_EVENTS.MESSAGE_NEW, onMessage)
       socket.off(SOCKET_EVENTS.TYPING_START, onTypingStart)
       socket.off(SOCKET_EVENTS.TYPING_STOP, onTypingStop)
       socket.off('connect', onConnect)
     }
-  }, [socket, bookingId, myRole])
+  }, [socket, bookingId, myRole, stillOn])
 
   // --- history --------------------------------------------------------------
   const loadOlder = useCallback(async () => {
     if (!meta.hasMore || !meta.nextCursor || loadingOlder) return
+    const requestedFor = bookingId
     setLoadingOlder(true)
     try {
-      const page = await fetchMessages(bookingId, { before: meta.nextCursor })
-      setMessages((current) => mergePage(current, page.data.map((m) => normalise(m, myRole))))
+      const page = await fetchMessages(requestedFor, { before: meta.nextCursor })
+      if (!stillOn(requestedFor)) return
+      setMessages((current) =>
+        mergePage(current, page.data.map((m) => normalise(m, myRole, requestedFor))),
+      )
       setMeta((current) => ({
         ...current,
         hasMore: page.meta.hasMore,
@@ -194,18 +259,18 @@ export function useChat({ bookingId, myRole }) {
       // Silent: the thread already on screen is unaffected, and an error banner
       // over history someone did not ask for would be noise.
     } finally {
-      setLoadingOlder(false)
+      if (stillOn(requestedFor)) setLoadingOlder(false)
     }
-  }, [bookingId, meta.hasMore, meta.nextCursor, loadingOlder, myRole])
+  }, [bookingId, meta.hasMore, meta.nextCursor, loadingOlder, myRole, stillOn])
 
   // --- sending --------------------------------------------------------------
   const deliver = useCallback(
-    async (clientMessageId, text) => {
+    async (targetBooking, clientMessageId, text) => {
       // Socket first for speed; REST whenever it is not available. Both reach
       // the same service, so the rules are identical either way.
       if (socket?.connected) {
         const ack = await emitWithAck(socket, SOCKET_EVENTS.MESSAGE_SEND, {
-          bookingId,
+          bookingId: targetBooking,
           text,
           clientMessageId,
         })
@@ -220,25 +285,33 @@ export function useChat({ bookingId, myRole }) {
         // Offline or timed out — fall through and try HTTP.
       }
 
-      return postMessage(bookingId, { text, clientMessageId })
+      return postMessage(targetBooking, { text, clientMessageId })
     },
-    [socket, bookingId],
+    [socket],
   )
 
   const send = useCallback(
     async (text) => {
       const trimmed = text.trim()
-      if (!trimmed) return
+      if (!trimmed || !bookingId) return
 
+      // The booking is captured NOW. A reply to Client A that is acknowledged
+      // after the therapist has moved to Client B still belongs to A — it was
+      // saved to A — and must never be drawn into B's thread.
+      const requestedFor = bookingId
       const clientMessageId = newClientMessageId()
       setMessages((current) =>
-        upsert(current, optimisticMessage({ clientMessageId, text: trimmed, senderRole: myRole })),
+        upsert(
+          current,
+          optimisticMessage({ clientMessageId, text: trimmed, senderRole: myRole, bookingId }),
+        ),
       )
 
       try {
-        const saved = await deliver(clientMessageId, trimmed)
+        const saved = await deliver(requestedFor, clientMessageId, trimmed)
+        if (!stillOn(requestedFor)) return
         setMessages((current) =>
-          upsert(current, normalise({ ...saved, clientMessageId }, myRole)),
+          upsert(current, normalise({ ...saved, clientMessageId }, myRole, requestedFor)),
         )
         // The opening message is simply the client's first message, so sending
         // one clears the requirement. No separate "unlock" call — the server
@@ -247,6 +320,7 @@ export function useChat({ bookingId, myRole }) {
           current.awaitingOpeningMessage ? { ...current, awaitingOpeningMessage: false } : current,
         )
       } catch (err) {
+        if (!stillOn(requestedFor)) return
         // THE TEXT IS NEVER LOST. The row stays exactly where it was, visibly
         // unsent, with a retry — somebody who has just written something hard
         // must not have to write it twice.
@@ -260,7 +334,7 @@ export function useChat({ bookingId, myRole }) {
         setMessages((current) => markFailed(current, clientMessageId, reasonFor(err)))
       }
     },
-    [deliver, myRole],
+    [bookingId, deliver, myRole, stillOn],
   )
 
   /**
@@ -276,31 +350,40 @@ export function useChat({ bookingId, myRole }) {
   const sendOpening = useCallback(
     async (text) => {
       const trimmed = text.trim()
-      if (!trimmed) return
+      if (!trimmed || !bookingId) return
 
+      const requestedFor = bookingId
       const clientMessageId = newClientMessageId()
-      const saved = await deliver(clientMessageId, trimmed)
+      const saved = await deliver(requestedFor, clientMessageId, trimmed)
+      if (!stillOn(requestedFor)) return
 
-      setMessages((current) => upsert(current, normalise({ ...saved, clientMessageId }, myRole)))
+      setMessages((current) =>
+        upsert(current, normalise({ ...saved, clientMessageId }, myRole, requestedFor)),
+      )
       setMeta((current) => ({ ...current, awaitingOpeningMessage: false }))
     },
-    [deliver, myRole],
+    [bookingId, deliver, myRole, stillOn],
   )
 
   const retry = useCallback(
     async (clientMessageId) => {
+      const requestedFor = bookingId
       const target = messagesRef.current.find((m) => m.clientMessageId === clientMessageId)
-      if (!target) return
+      if (!target || !requestedFor) return
 
       setMessages((current) => markSending(current, clientMessageId))
       try {
-        const saved = await deliver(clientMessageId, target.text)
-        setMessages((current) => upsert(current, normalise({ ...saved, clientMessageId }, myRole)))
+        const saved = await deliver(requestedFor, clientMessageId, target.text)
+        if (!stillOn(requestedFor)) return
+        setMessages((current) =>
+          upsert(current, normalise({ ...saved, clientMessageId }, myRole, requestedFor)),
+        )
       } catch (err) {
+        if (!stillOn(requestedFor)) return
         setMessages((current) => markFailed(current, clientMessageId, reasonFor(err)))
       }
     },
-    [deliver, myRole],
+    [bookingId, deliver, myRole, stillOn],
   )
 
   // --- read state -----------------------------------------------------------
@@ -359,7 +442,23 @@ export function useChat({ bookingId, myRole }) {
     if (socket?.connected && bookingId) socket.emit(SOCKET_EVENTS.TYPING_STOP, { bookingId })
   }, [socket, bookingId])
 
-  useEffect(() => () => clearTimeout(typingStopTimer.current), [])
+  /**
+   * Leaving a conversation mid-sentence stops "typing…" THERE, straight away.
+   *
+   * The server would clear it after five seconds anyway, but a therapist who
+   * clicks from Client A to Client B should not leave A watching an indicator
+   * for a reply that is no longer being written.
+   */
+  useEffect(
+    () => () => {
+      clearTimeout(typingStopTimer.current)
+      if (typingSentAt.current && socket?.connected && bookingId) {
+        socket.emit(SOCKET_EVENTS.TYPING_STOP, { bookingId })
+      }
+      typingSentAt.current = 0
+    },
+    [socket, bookingId],
+  )
 
   return {
     messages,
