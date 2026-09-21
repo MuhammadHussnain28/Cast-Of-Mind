@@ -16,6 +16,7 @@ import { cx } from '../../lib/cx'
 import { ClientPortalContext } from '../../lib/clientPortalContext'
 import { useKeyboardViewportHeight } from '../../lib/useVisualViewport'
 import { fetchClientMe } from '../../lib/api/clientPortalApi'
+import { useSaveBrowserTimezone } from '../../lib/client/useSaveBrowserTimezone'
 import logoInk from '../../assets/cast-of-mind-logo-singular-ink.png'
 
 /**
@@ -44,6 +45,7 @@ export default function ClientPortalShell() {
 
   // Called before the early returns below — hooks cannot sit behind a branch.
   const keyboardHeight = useKeyboardViewportHeight()
+  useSaveBrowserTimezone(state?.profile?.timezone ?? null, Boolean(state) && state.access !== 'ended')
 
   useEffect(() => {
     let cancelled = false

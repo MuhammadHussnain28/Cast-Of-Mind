@@ -23,6 +23,15 @@ import {
   update as updateNote,
   remove as removeNote,
 } from '../controllers/privateNotes.controller.js';
+import { createSessionSchema, updateSessionSchema } from '../validation/sessions.schema.js';
+import {
+  create as createSession,
+  update as updateSession,
+  cancel as cancelSession,
+  held as markSessionHeld,
+  notHeld as markSessionNotHeld,
+} from '../controllers/session.controller.js';
+import { SESSION_WRITE_RATE_LIMIT } from '../constants/sessions.js';
 
 // Everything under /api/v1/therapist — the signed-in therapist's own portal.
 //
@@ -94,5 +103,21 @@ router.get('/notes/:bookingId', validateQuery(journalQuerySchema), listNotes);
 router.post('/notes/:bookingId', validate(privateNoteSchema), createNote);
 router.patch('/notes/:bookingId/:noteId', validate(privateNoteSchema), updateNote);
 router.delete('/notes/:bookingId/:noteId', removeNote);
+
+// Sessions (9.1) — the therapist schedules, the client only reads (§7.4). Reads
+// are on the shared /sessions mount. DELETE cancels; the record is kept.
+export const therapySessionWriteRateLimiter = createRateLimiter(SESSION_WRITE_RATE_LIMIT);
+
+router.post('/sessions', therapySessionWriteRateLimiter, validate(createSessionSchema), createSession);
+router.patch(
+  '/sessions/:sessionId',
+  therapySessionWriteRateLimiter,
+  validate(updateSessionSchema),
+  updateSession,
+);
+router.delete('/sessions/:sessionId', therapySessionWriteRateLimiter, cancelSession);
+// 9.5: complete a started session now, or mark a completed one as not having taken place.
+router.post('/sessions/:sessionId/held', therapySessionWriteRateLimiter, markSessionHeld);
+router.post('/sessions/:sessionId/not-held', therapySessionWriteRateLimiter, markSessionNotHeld);
 
 export default router;

@@ -70,6 +70,17 @@ export const chat = {
   announce: '{name} says: {text}',
   announceLong: '{name} sent a long message.',
 
+  // Session notices (9.3), worded in the reader's own clock. `{when}` is
+  // "Thursday, 14 August at 18:00".
+  sessionNotice: {
+    scheduled: 'Session scheduled for {when}, your time.',
+    rescheduled: 'Session moved to {when}, your time. It was {before}.',
+    cancelled: 'Session on {when} was cancelled.',
+    not_held: 'The session on {when} did not take place and does not count.',
+    joiner: '{date} at {time}',
+    next: 'Your next session: {when}, your time.',
+  },
+
   /**
    * The empty state. It does NOT implement the mandatory first message (§7.1,
    * chunk 7.5) — it explains what this space is for, warmly and without

@@ -138,6 +138,8 @@ function ThemeRow({ theme, index, reduceMotion }) {
   )
 }
 
+
+
 export default function Services() {
   const reduceMotion = useReducedMotion()
 
@@ -239,24 +241,6 @@ export default function Services() {
         {/* Spacer so the last card has room to fully stack */}
         <div className="h-[40vh]" />
       </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         <div className="relative bg-paper">

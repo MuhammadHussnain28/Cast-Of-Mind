@@ -7,6 +7,7 @@ import {
   emailChangedOldAddress,
   emailChangedNewAddress,
 } from './templates/emailChanged.js';
+import { sessionReminderEmail } from './templates/sessionReminder.js';
 
 // Sending layer — master spec §16.
 //
@@ -125,4 +126,22 @@ export async function sendEmailChangedNotices({ previousEmail, newEmail, firstNa
     oldAddressNotified: results[0].status === 'fulfilled',
     newAddressNotified: results[1].status === 'fulfilled',
   };
+}
+
+/**
+ * A session reminder (9.6). The client's carries no meeting link — they get it
+ * on their sessions page when Join opens (9.4). The therapist's does.
+ */
+export async function sendSessionReminderEmail(to, { recipient, kind, when, otherName, meetingLink }) {
+  const portalUrl = `${env.clientOrigin}/portal${recipient === 'client' ? '/sessions' : ''}`;
+  const { subject, html, text } = sessionReminderEmail({
+    recipient,
+    kind,
+    when,
+    otherName,
+    meetingLink,
+    portalUrl,
+  });
+
+  return sendEmail({ to, subject, html, text });
 }

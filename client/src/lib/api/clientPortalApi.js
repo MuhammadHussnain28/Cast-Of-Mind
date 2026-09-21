@@ -17,3 +17,13 @@ export async function fetchClientMe() {
     throw toApiError(error)
   }
 }
+
+// The browser's own zone (9.2), so the therapist can see when a session lands.
+export async function saveClientTimezone(timezone) {
+  try {
+    const { data } = await apiClient.patch('/client/timezone', { timezone })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

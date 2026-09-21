@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button, Input, Text } from '../ui'
 import { cx } from '../../lib/cx'
 import { SortArrowIcon, SortableIcon } from './AdminIcons'
@@ -21,6 +22,13 @@ import { SortArrowIcon, SortableIcon } from './AdminIcons'
  *   render     (row) => node
  *   align      'start' | 'end'
  *   priority   'primary' shows as the card title below md
+ *
+ * Rows (10.2):
+ *   rowHref      (row) => path | null. The whole row opens it on click — but a
+ *                real link inside the row stays the keyboard and screen-reader
+ *                path, because a clickable <tr> is reachable by neither.
+ *   initialSort  { key, direction } the server has already applied, so the
+ *                header shows the order the rows are actually in.
  */
 
 const DEBOUNCE_MS = 250
@@ -73,12 +81,15 @@ export default function DataTable({
   emptyTitle = 'Nothing here yet',
   emptyBody,
   actions,
+  rowHref,
+  initialSort = null,
 }) {
   const isServer = mode === 'server'
+  const navigate = useNavigate()
 
   const [searchInput, setSearchInput] = useState('')
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState(null)
+  const [sort, setSort] = useState(initialSort)
   const [page, setPage] = useState(1)
 
   // Held in a ref so a parent passing an inline arrow does not re-fire the
@@ -164,6 +175,30 @@ export default function DataTable({
   const refreshing = loading && hasRows
   const isSearching = query.length > 0
   const primaryColumn = columns.find((column) => column.priority === 'primary') ?? columns[0]
+
+  /**
+   * Mouse users can click anywhere on a row; the link inside it remains the one
+   * real target. Returns nothing when a row has no destination, so a row is
+   * never styled as clickable and then does nothing.
+   */
+  function openRow(href) {
+    if (!href) return undefined
+
+    return (event) => {
+      if (event.defaultPrevented || event.button !== 0) return
+      // A click on a real control inside the row keeps its own meaning.
+      if (event.target.closest('a, button, input, select, textarea, label, summary')) return
+      // Someone selecting a name to copy has not asked to leave the page.
+      if (window.getSelection?.()?.toString()) return
+
+      if (event.metaKey || event.ctrlKey) {
+        window.open(href, '_blank', 'noopener')
+        return
+      }
+
+      navigate(href)
+    }
+  }
 
   function toggleSort(column) {
     setSort((previous) => {
@@ -286,24 +321,32 @@ export default function DataTable({
                 {showSkeleton ? (
                   <SkeletonRows columns={columns} rows={Math.min(pageSize, 6)} />
                 ) : hasRows ? (
-                  pageRows.map((row, index) => (
-                    <tr
-                      key={getRowKey(row, index)}
-                      className="border-t border-ink/12 transition-colors duration-200 ease-out hover:bg-mist"
-                    >
-                      {columns.map((column) => (
-                        <td
-                          key={column.key}
-                          className={cx(
-                            'px-4 py-3.5 font-body text-ui text-ink',
-                            column.align === 'end' && 'text-right tabular-nums',
-                          )}
-                        >
-                          {column.render ? column.render(row) : defaultCell(row, column)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
+                  pageRows.map((row, index) => {
+                    const href = rowHref?.(row) ?? null
+
+                    return (
+                      <tr
+                        key={getRowKey(row, index)}
+                        onClick={openRow(href)}
+                        className={cx(
+                          'border-t border-ink/12 transition-colors duration-200 ease-out hover:bg-mist',
+                          href && 'group cursor-pointer',
+                        )}
+                      >
+                        {columns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={cx(
+                              'px-4 py-3.5 font-body text-ui text-ink',
+                              column.align === 'end' && 'text-right tabular-nums',
+                            )}
+                          >
+                            {column.render ? column.render(row) : defaultCell(row, column)}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })
                 ) : (
                   <tr className="border-t border-ink/12">
                     <td colSpan={columns.length} className="px-4 py-12 text-center">
@@ -341,32 +384,40 @@ export default function DataTable({
                 </div>
               ))
             ) : hasRows ? (
-              pageRows.map((row, index) => (
-                <article
-                  key={getRowKey(row, index)}
-                  className="rounded-2xl border border-ink/12 px-4 py-4"
-                >
-                  <h3 className="font-body text-ui font-medium text-ink">
-                    {primaryColumn.render
-                      ? primaryColumn.render(row)
-                      : defaultCell(row, primaryColumn)}
-                  </h3>
-                  <dl className="mt-3 flex flex-col gap-2">
-                    {columns
-                      .filter((column) => column.key !== primaryColumn.key)
-                      .map((column) => (
-                        <div key={column.key} className="flex justify-between gap-4">
-                          <dt className="font-body text-caption text-ink/70">
-                            {column.header}
-                          </dt>
-                          <dd className="text-right font-body text-caption text-ink">
-                            {column.render ? column.render(row) : defaultCell(row, column)}
-                          </dd>
-                        </div>
-                      ))}
-                  </dl>
-                </article>
-              ))
+              pageRows.map((row, index) => {
+                const href = rowHref?.(row) ?? null
+
+                return (
+                  <article
+                    key={getRowKey(row, index)}
+                    onClick={openRow(href)}
+                    className={cx(
+                      'rounded-2xl border border-ink/12 px-4 py-4',
+                      href && 'cursor-pointer transition-colors duration-200 ease-out hover:bg-mist',
+                    )}
+                  >
+                    <h3 className="font-body text-ui font-medium text-ink">
+                      {primaryColumn.render
+                        ? primaryColumn.render(row)
+                        : defaultCell(row, primaryColumn)}
+                    </h3>
+                    <dl className="mt-3 flex flex-col gap-2">
+                      {columns
+                        .filter((column) => column.key !== primaryColumn.key)
+                        .map((column) => (
+                          <div key={column.key} className="flex justify-between gap-4">
+                            <dt className="font-body text-caption text-ink/70">
+                              {column.header}
+                            </dt>
+                            <dd className="text-right font-body text-caption text-ink">
+                              {column.render ? column.render(row) : defaultCell(row, column)}
+                            </dd>
+                          </div>
+                        ))}
+                    </dl>
+                  </article>
+                )
+              })
             ) : (
               <div className="rounded-2xl border border-ink/12 px-4 py-10 text-center">
                 <EmptyBody

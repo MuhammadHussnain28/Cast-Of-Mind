@@ -9,6 +9,7 @@ import { Button, Spinner, Text } from '../../../components/ui'
 import ChatHeader from '../../../components/portal/client/chat/ChatHeader'
 import MessageThread from '../../../components/portal/chat/MessageThread'
 import MessageAnnouncer from '../../../components/portal/chat/MessageAnnouncer'
+import { nextSessionFromNotices, nextSessionLine } from '../../../lib/chat/sessionNotice'
 import Composer from '../../../components/portal/chat/Composer'
 import OpeningMessage from '../../../components/portal/client/chat/OpeningMessage'
 import ChatEmptyState from '../../../components/portal/client/chat/ChatEmptyState'
@@ -130,6 +131,7 @@ export default function Chat() {
         </h1>
         <OpeningMessage
           therapist={therapist}
+          nextSession={nextSessionLine(nextSessionFromNotices(messages), timeZone)}
           error={openingError}
           onSend={async (text) => {
             setOpeningError(null)
@@ -159,7 +161,7 @@ export default function Chat() {
       />
 
       {/* Off screen, and the only thing in this tree that speaks. */}
-      <MessageAnnouncer incoming={lastIncoming} senderName={shortName} />
+      <MessageAnnouncer incoming={lastIncoming} senderName={shortName} timeZone={timeZone} />
 
       <MessageThread
         messages={messages}

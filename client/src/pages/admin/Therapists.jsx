@@ -63,7 +63,7 @@ export default function Therapists() {
       render: (row) => (
         <Link
           to={`/admin/therapists/${row._id}`}
-          className="font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 ease-out hover:decoration-ink"
+          className="font-medium text-ink underline decoration-ink/60 underline-offset-4 transition-colors duration-200 ease-out hover:decoration-ink"
         >
           {row.title} {row.firstName} {row.lastName}
         </Link>

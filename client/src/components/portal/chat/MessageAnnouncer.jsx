@@ -1,4 +1,5 @@
 import { chat } from '../../../data/chatContent'
+import { sessionNoticeText } from '../../../lib/chat/sessionNotice'
 
 /**
  * What a screen reader hears when a message arrives — master spec §14.
@@ -32,8 +33,11 @@ import { chat } from '../../../data/chatContent'
  */
 const FULL_TEXT_LIMIT = 400
 
-function announcementFor(incoming, senderName) {
+function announcementFor(incoming, senderName, timeZone) {
   if (!incoming?.text) return ''
+
+  // A session notice is the platform speaking: its own sentence, in this reader's clock.
+  if (incoming.type === 'system') return sessionNoticeText(incoming, timeZone)
 
   const who = senderName || 'Your therapist'
 
@@ -42,8 +46,8 @@ function announcementFor(incoming, senderName) {
     : chat.announceLong.replace('{name}', who)
 }
 
-export default function MessageAnnouncer({ incoming, senderName }) {
-  const text = announcementFor(incoming, senderName)
+export default function MessageAnnouncer({ incoming, senderName, timeZone }) {
+  const text = announcementFor(incoming, senderName, timeZone)
   // `seq` counts arrivals, so two identical messages land in different regions.
   const slot = (incoming?.seq ?? 0) % 2
 

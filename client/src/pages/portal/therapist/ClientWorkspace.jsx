@@ -1,11 +1,11 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import ClientIdentityStrip from '../../../components/portal/therapist/workspace/ClientIdentityStrip'
 import WorkspaceTabs from '../../../components/portal/therapist/workspace/WorkspaceTabs'
-import TabPending from '../../../components/portal/therapist/workspace/TabPending'
 import ClientInfo from '../../../components/portal/therapist/workspace/ClientInfo'
 import TherapistChat from '../../../components/portal/therapist/workspace/TherapistChat'
 import WorksheetsTab from '../../../components/portal/therapist/workspace/WorksheetsTab'
 import JournalNotesTab from '../../../components/portal/therapist/workspace/JournalNotesTab'
+import SessionsTab from '../../../components/portal/therapist/workspace/sessions/SessionsTab'
 import { cx } from '../../../lib/cx'
 import { useTherapistClient } from '../../../lib/therapist/useTherapistClient'
 import {
@@ -29,8 +29,8 @@ import {
  * id and clears during render, so no row of one person's record can appear
  * under another's name.
  *
- * BUILT SO FAR: Chat (8.3), Worksheets (8.4) and Client info (8.2). The remaining tabs carry an
- * honest account of what they will do and say plainly that they are not on.
+ * All five tabs are built: Chat (8.3), Worksheets (8.4), Sessions (9.2),
+ * Journal and Notes (8.6) and Client info (8.2).
  */
 export default function ClientWorkspace() {
   const { bookingId, tab } = useParams()
@@ -104,7 +104,9 @@ export default function ClientWorkspace() {
           {tab === 'journal' && (
             <JournalNotesTab key={bookingId} bookingId={bookingId} clientName={client.client.name} />
           )}
-          {tab === 'sessions' && <TabPending slug={tab} />}
+          {tab === 'sessions' && (
+            <SessionsTab key={bookingId} bookingId={bookingId} client={client} ended={ended} />
+          )}
         </div>
       )}
     </div>

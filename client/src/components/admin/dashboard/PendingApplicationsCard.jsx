@@ -41,7 +41,7 @@ export default function PendingApplicationsCard({ count }) {
           : 'Nothing waiting for review'}
       </span>
 
-      <span className="mt-5 inline-flex items-center font-body text-caption font-medium text-ink underline decoration-ink/30 underline-offset-4 transition-colors duration-200 ease-out group-hover:decoration-ink">
+      <span className="mt-5 inline-flex items-center font-body text-caption font-medium text-ink underline decoration-ink/60 underline-offset-4 transition-colors duration-200 ease-out group-hover:decoration-ink">
         {waiting ? 'Review them' : 'Open applications'}
       </span>
     </Link>

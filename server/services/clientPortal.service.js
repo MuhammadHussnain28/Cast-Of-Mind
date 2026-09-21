@@ -5,6 +5,7 @@ import { Booking } from '../models/Booking.js';
 import { AppError } from '../utils/AppError.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
 import { countPendingWorksheets } from './worksheet.service.js';
+import { completeOverdue } from './sessionCounter.service.js';
 import { resolveAccess, findCurrentSubscription } from '../middleware/requireActiveSubscription.js';
 import {
   CLIENT_SUBSCRIPTION_FIELDS,
@@ -71,6 +72,9 @@ export async function getClientPortalState(userId) {
     throw new AppError(NO_BOOKING_MESSAGE, 404, NO_BOOKING_CODE);
   }
 
+  // A session whose Join window has closed completes first, so the counter is current (9.5).
+  await completeOverdue(booking._id);
+
   const [therapist, subscription, pendingWorksheets] = await Promise.all([
     loadTherapist(booking.therapistId),
     findCurrentSubscription(userId),
@@ -99,6 +103,7 @@ export async function getClientPortalState(userId) {
           relationshipStatus: profile.relationshipStatus,
           concernTags: profile.concernTags,
           therapistGenderPreference: profile.therapistGenderPreference,
+          timezone: profile.timezone ?? null,
         }
       : null,
 
@@ -116,6 +121,21 @@ export async function getClientPortalState(userId) {
     access: resolveAccess(subscription),
     subscription: subscription ? pick(subscription, CLIENT_SUBSCRIPTION_FIELDS) : null,
   };
+}
+
+/**
+ * The client's browser timezone (9.2), so their therapist can see when a session
+ * lands for them. From the token only; a couple's one account keeps whichever
+ * browser saved last.
+ */
+export async function saveClientTimezone(userId, timezone) {
+  const profile = await ClientProfile.findOneAndUpdate(
+    { userId },
+    { $set: { timezone } },
+    { new: true, runValidators: true },
+  );
+  if (!profile) throw new AppError(NO_BOOKING_MESSAGE, 404, NO_BOOKING_CODE);
+  return { timezone: profile.timezone };
 }
 
 export default getClientPortalState;

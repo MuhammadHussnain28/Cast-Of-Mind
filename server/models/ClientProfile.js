@@ -14,6 +14,7 @@ import {
   CLIENT_PLACE_MAX,
 } from '../constants/clientProfile.js';
 import { fixedListValidator } from './fixedListValidator.js';
+import { isValidTimeZone } from '../utils/timezone.js';
 
 // `clientProfiles` — a client's questionnaire answers. Master spec §10.2.
 //
@@ -148,6 +149,19 @@ const clientProfileSchema = new mongoose.Schema(
     // `default: undefined` so an individual profile genuinely has no coupleData,
     // rather than an empty object Mongoose invented.
     coupleData: { type: coupleDataSchema, default: undefined },
+
+    // Spec addition (9.2): saved from the client's own browser so their therapist
+    // can see when a session lands for them. Never a matching filter (§15).
+    timezone: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: undefined,
+      validate: {
+        validator: (value) => value == null || isValidTimeZone(value),
+        message: 'Timezone must be a real IANA timezone.',
+      },
+    },
   },
   {
     // §10.2 lists createdAt only.

@@ -55,6 +55,18 @@ export function NoticeIcon({ size = 16, ...props }) {
   )
 }
 
+/** The same calendar, struck — a session that was called off. */
+export function NoticeCancelledIcon({ size = 16, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <rect x="3.75" y="5.25" width="16.5" height="15" rx="2" />
+      <path d="M8 3.5v3" />
+      <path d="M16 3.5v3" />
+      <path d="m9 11.5 6 6" />
+    </svg>
+  )
+}
+
 /** Failure beside an unsent message — attention, not alarm. */
 export function UnsentIcon({ size = 14, ...props }) {
   return (

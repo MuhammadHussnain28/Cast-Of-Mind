@@ -1,5 +1,29 @@
 import mongoose from 'mongoose';
-import { MESSAGE_TYPE, MESSAGE_TYPE_VALUES, MESSAGE_TEXT_MAX } from '../constants/chat.js';
+import {
+  MESSAGE_TYPE,
+  MESSAGE_TYPE_VALUES,
+  MESSAGE_TEXT_MAX,
+  SESSION_NOTICE_EVENT,
+  SESSION_NOTICE_EVENT_VALUES,
+} from '../constants/chat.js';
+
+// A session notice's data (9.3). Times are UTC instants, formatted by each reader.
+const sessionNoticeSchema = new mongoose.Schema(
+  {
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
+    event: {
+      type: String,
+      required: true,
+      enum: {
+        values: SESSION_NOTICE_EVENT_VALUES,
+        message: `Event must be one of: ${SESSION_NOTICE_EVENT_VALUES.join(', ')}.`,
+      },
+    },
+    scheduledAt: { type: Date, required: true },
+    previousScheduledAt: { type: Date, default: undefined },
+  },
+  { _id: false },
+);
 
 // `messages` — individual chat messages. Master spec §10.7, architecture §14.
 //
@@ -60,6 +84,9 @@ const messageSchema = new mongoose.Schema(
      * per-recipient read model, not another boolean.
      */
     read: { type: Boolean, default: false, required: true },
+
+    // Spec addition (9.3): the data behind a session notice. System messages only.
+    session: { type: sessionNoticeSchema, default: undefined },
   },
   {
     // §10.7 lists createdAt only. A message is never edited, so an updatedAt
@@ -73,6 +100,23 @@ const messageSchema = new mongoose.Schema(
     },
   },
 );
+
+// A person's message never carries session data; a platform notice always does.
+messageSchema.pre('validate', function checkSessionNotice() {
+  const system = this.type === MESSAGE_TYPE.SYSTEM;
+  if (!system && this.session) {
+    this.invalidate('session', 'Only a system message can carry session data.');
+  }
+  if (system && !this.session) {
+    this.invalidate('session', 'A system message must carry its session data.');
+  }
+  if (
+    this.session?.previousScheduledAt &&
+    this.session.event !== SESSION_NOTICE_EVENT.RESCHEDULED
+  ) {
+    this.invalidate('session', 'Only a moved session has a previous time.');
+  }
+});
 
 // The conversation fetch, newest first then reversed for display. Compound and
 // ordered so the cursor's `createdAt` then `_id` tiebreak is served by the

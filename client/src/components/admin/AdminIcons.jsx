@@ -123,3 +123,12 @@ export function SearchIcon(props) {
     </svg>
   )
 }
+
+/** A row that opens somewhere — the whole row is the target (10.2). */
+export function OpenRowIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9.5 6.5 15 12l-5.5 5.5" />
+    </svg>
+  )
+}

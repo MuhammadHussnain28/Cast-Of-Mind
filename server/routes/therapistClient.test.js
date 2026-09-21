@@ -286,6 +286,8 @@ describe('GET /therapist/clients/:bookingId — subscription state', () => {
     expect(res.body.subscription).toEqual({
       status: SUBSCRIPTION_STATUS.ACTIVE,
       access: PORTAL_ACCESS.ACTIVE,
+      sessionsRemaining: 4,
+      cycleEndsAt: FUTURE.toISOString(),
     });
   });
 
@@ -294,14 +296,19 @@ describe('GET /therapist/clients/:bookingId — subscription state', () => {
     expect(res.body.subscription).toEqual({
       status: SUBSCRIPTION_STATUS.PAST_DUE,
       access: PORTAL_ACCESS.PAST_DUE,
+      sessionsRemaining: 4,
+      cycleEndsAt: FUTURE.toISOString(),
     });
   });
 
   it('reports an expired subscription as ended', async () => {
     const res = await get(bookings.lapsed._id);
+    // §13: the counter reads 0 once the subscription has ended, whatever is stored.
     expect(res.body.subscription).toEqual({
       status: SUBSCRIPTION_STATUS.EXPIRED,
       access: PORTAL_ACCESS.ENDED,
+      sessionsRemaining: 0,
+      cycleEndsAt: PAST.toISOString(),
     });
   });
 
@@ -345,6 +352,18 @@ describe('GET /therapist/clients/:bookingId — what must never travel', () => {
     expect(body).not.toContain('currentPeriodEnd');
   });
 
+  // 9.5, developer's call: the session counter and the date it resets reach the
+  // therapist. Sessions, not money: still no amount, currency or Stripe id.
+  it('carries the session counter and its reset date, and nothing else about billing', async () => {
+    const res = await get(bookings.rosa._id);
+
+    expect(Object.keys(res.body.subscription).sort()).toEqual(
+      ['access', 'cycleEndsAt', 'sessionsRemaining', 'status'].sort(),
+    );
+    expect(res.body.subscription.sessionsRemaining).toBe(4);
+    expect(res.body.subscription.cycleEndsAt).toBeTruthy();
+  });
+
   it('returns exactly the agreed keys, so a later addition has to be deliberate', async () => {
     const res = await get(bookings.rosa._id);
 
@@ -366,15 +385,25 @@ describe('GET /therapist/clients/:bookingId — what must never travel', () => {
       'partners',
       'relationshipStatus',
       'therapistGenderPreference',
+      'timezone',
       'type',
     ]);
   });
 
-  it('carries no client timezone, because none is collected (§10.2)', async () => {
+  // REVERSED IN 9.2: the zone is now saved from the client's browser. It is
+  // still never guessed — until they save one it is null, whatever their country.
+  it('carries a null timezone until the client has saved one, never a guess', async () => {
     const res = await get(bookings.rosa._id);
+    expect(res.body.client.timezone).toBeNull();
+  });
 
-    // Pinned so nobody later adds a guessed or country-derived value here. The
-    // Client Info tab says plainly that it is not collected.
-    expect(JSON.stringify(res.body)).not.toContain('timezone');
+  it("carries the client's own saved timezone once there is one", async () => {
+    await ClientProfile.updateOne(
+      { userId: users.rosa._id },
+      { $set: { timezone: 'America/New_York' } },
+    );
+    const res = await get(bookings.rosa._id);
+    expect(res.body.client.timezone).toBe('America/New_York');
+    await ClientProfile.updateOne({ userId: users.rosa._id }, { $unset: { timezone: 1 } });
   });
 });

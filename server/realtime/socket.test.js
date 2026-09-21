@@ -16,6 +16,7 @@ import { SUBSCRIPTION_STATUS, SUBSCRIPTION_AMOUNT_MINOR } from '../constants/pay
 import { SOCKET_EVENTS, TYPING_TIMEOUT_MS, bookingRoom } from '../constants/socket.js';
 import { createSocketServer } from './socketServer.js';
 import { setSocketServer, getSocketServer, emitMessage } from './emitter.js';
+import { postSessionNotice } from '../services/chat.service.js';
 import { startMemoryMongo, stopMemoryMongo } from '../test/mongoMemory.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -1196,5 +1197,52 @@ describe('the therapist inbox — several clients on one socket', () => {
         expect(room?.has(socket.id) ?? false).toBe(false);
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session notices (9.3) — the platform speaking, delivered like any message
+// ---------------------------------------------------------------------------
+
+describe('session notices', () => {
+  it("reach both people live, carry the time as data, and raise only the client's badge", async () => {
+    const client = await connect(tokens.clientA);
+    const therapist = await connect(tokens.therapistA);
+
+    const toClient = waitFor(client, SOCKET_EVENTS.MESSAGE_NEW);
+    const toTherapist = waitFor(therapist, SOCKET_EVENTS.MESSAGE_NEW);
+    const badge = waitFor(client, SOCKET_EVENTS.UNREAD_UPDATE);
+    const quiet = expectNoEvent(therapist, SOCKET_EVENTS.UNREAD_UPDATE);
+
+    const at = new Date(Date.now() + 3 * DAY);
+    await postSessionNotice(bookingA, ids.therapistA, {
+      event: 'scheduled',
+      sessionId: new mongoose.Types.ObjectId(),
+      scheduledAt: at,
+    });
+
+    const [forClient, forTherapist] = await Promise.all([toClient, toTherapist]);
+    expect(forClient.type).toBe('system');
+    expect(forClient.bookingId).toBe(String(bookingA._id));
+    expect(forClient.session.event).toBe('scheduled');
+    expect(forClient.session.scheduledAt).toBe(at.toISOString());
+    expect(forClient).not.toHaveProperty('mine');
+    expect(forTherapist.id).toBe(forClient.id);
+
+    expect((await badge).total).toBe(1);
+    await quiet;
+  });
+
+  it('never reaches a third party on another booking', async () => {
+    const outsider = await connect(tokens.clientB);
+    const silent = expectNoEvent(outsider, SOCKET_EVENTS.MESSAGE_NEW);
+
+    await postSessionNotice(bookingA, ids.therapistA, {
+      event: 'cancelled',
+      sessionId: new mongoose.Types.ObjectId(),
+      scheduledAt: new Date(Date.now() + DAY),
+    });
+
+    await silent;
   });
 });

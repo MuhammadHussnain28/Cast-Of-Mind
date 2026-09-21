@@ -22,6 +22,20 @@ export const SUBSCRIPTION_STATUS = Object.freeze({
 
 export const SUBSCRIPTION_STATUS_VALUES = Object.freeze(Object.values(SUBSCRIPTION_STATUS));
 
+/**
+ * WHO ended a subscription — spec addition, approved 2026-09-20 (chunk 10.1).
+ *
+ * §10.6 stores only `cancelledAt`. A manual cancellation Asad made for a refund
+ * dispute and one the client made themselves land in the same state, and after
+ * the fact nothing says which happened — on the one record a dispute is about.
+ */
+export const CANCELLED_BY = Object.freeze({
+  CLIENT: 'client',
+  ADMIN: 'admin',
+});
+
+export const CANCELLED_BY_VALUES = Object.freeze(Object.values(CANCELLED_BY));
+
 export const PAYMENT_PLATFORM = Object.freeze({
   STRIPE: 'stripe',
   PAYPAL: 'paypal',

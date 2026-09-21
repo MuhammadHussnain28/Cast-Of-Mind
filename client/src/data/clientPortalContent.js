@@ -74,13 +74,8 @@ export const SCREENS = {
 
   sessions: {
     title: 'Sessions',
-    lead: 'Your Zoom sessions — four a month, one a week, included in your subscription.',
-    truths: [
-      // §7.4
-      'Your therapist schedules each session and posts it into your chat. You join by clicking the link when the time comes.',
-      'Times are shown in your own time zone, converted from theirs. Neither of you has to do the arithmetic.',
-      'To move a session, message your therapist in the chat and they will reschedule it.',
-    ],
+    // Zoom or Google Meet since 9.1, so the lead names neither.
+    lead: 'Four sessions a month, one a week, included in your subscription. Times are shown in your own time zone.',
   },
 }
 
@@ -193,4 +188,37 @@ export const JOURNAL = {
   loadError: 'Your journal could not be loaded.',
   retry: 'Try again',
   loadMore: 'Show older entries',
+}
+
+// ── Sessions, client side — §7.4 (9.4) ──────────────────────────────────────
+
+// View only: the therapist schedules, the client joins. Never a session length.
+export const MY_SESSIONS = {
+  nextHeading: 'Your next session',
+  withTherapist: (name) => `with ${name}`,
+  yourTime: (time) => `${time}, your time`,
+  join: 'Join session',
+  joinNewTab: 'Opens in a new tab.',
+  joinsFrom: (time) => `You can join from ${time}`,
+  joinsFromOn: (time, date) => `You can join from ${time} on ${date}`,
+  gettingLink: 'Getting your link…',
+  counter: {
+    left: (n) => `${n} of 4 sessions left this month`,
+    resets: (date) => `Resets on ${date}. Unused sessions do not roll over.`,
+    ends: (date) => `Your plan ends on ${date}.`,
+  },
+  later: 'Later',
+  earlier: 'Earlier',
+  status: { completed: 'Completed', cancelled: 'Cancelled', past: 'Past', notHeld: "Didn't take place" },
+  // The brief's own words.
+  empty: {
+    title: 'No sessions scheduled yet.',
+    body: 'Your therapist will schedule your sessions.',
+  },
+  // §7.4: the only way to change a session is to ask in the chat.
+  change: (name) => `Need a different time? Message ${name} in the chat.`,
+  openChat: 'Open chat',
+  loadError: 'Your sessions could not be loaded.',
+  retry: 'Try again',
+  loadMore: 'Show earlier sessions',
 }

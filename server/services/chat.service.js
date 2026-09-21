@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError.js';
 import { encodeCursor as encode, decodeCursor as decode } from '../utils/cursor.js';
 import { clientDisplayName } from '../utils/clientDisplayName.js';
 import { emitMessage, emitUnread, getSocketServer } from '../realtime/emitter.js';
+import { loadBookingMember } from './bookingMembership.service.js';
 import { ROLES } from '../constants/roles.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
 import {
@@ -21,6 +22,7 @@ import {
   OPENING_MESSAGE_MIN,
   OPENING_MESSAGE_MESSAGE,
   OPENING_MESSAGE_CODE,
+  SESSION_NOTICE_TEXT,
 } from '../constants/chat.js';
 
 /**
@@ -45,19 +47,10 @@ const notFound = () =>
  * A booking that does not exist, a malformed id, and a booking belonging to
  * somebody else all return the SAME 404. A 403 for the third case would confirm
  * the id is real, which is all that is needed to enumerate booking ids by
- * comparing responses.
+ * comparing responses. Shared with sessions since 9.1.
  */
 export async function loadMembership(bookingId, user) {
-  if (!mongoose.isValidObjectId(bookingId)) throw notFound();
-
-  const booking = await Booking.findById(bookingId);
-  if (!booking) throw notFound();
-
-  const isClient = String(booking.clientId) === String(user.id);
-  const isTherapist = String(booking.therapistId) === String(user.id);
-  if (!isClient && !isTherapist) throw notFound();
-
-  return { booking, role: isClient ? ROLES.CLIENT : ROLES.THERAPIST };
+  return loadBookingMember(bookingId, user, notFound);
 }
 
 /**
@@ -111,7 +104,7 @@ async function loadParticipants(booking) {
 function present(message, booking, viewerId) {
   const fromClient = String(message.senderId) === String(booking.clientId);
 
-  return {
+  const out = {
     id: String(message._id),
     text: message.text,
     type: message.type,
@@ -119,6 +112,19 @@ function present(message, booking, viewerId) {
     senderRole: fromClient ? ROLES.CLIENT : ROLES.THERAPIST,
     mine: String(message.senderId) === String(viewerId),
   };
+
+  // A session notice (9.3) travels as data, so each reader formats the time in
+  // their own zone. Never the meeting link.
+  if (message.type === MESSAGE_TYPE.SYSTEM && message.session) {
+    out.session = {
+      sessionId: String(message.session.sessionId),
+      event: message.session.event,
+      scheduledAt: message.session.scheduledAt,
+      previousScheduledAt: message.session.previousScheduledAt ?? null,
+    };
+  }
+
+  return out;
 }
 
 /**
@@ -281,6 +287,27 @@ export async function sendMessage(bookingId, user, text, { clientMessageId } = {
   emitMessage(booking._id, presented, [booking.clientId, booking.therapistId]);
 
   await pushUnreadToRecipient(booking, user);
+
+  return presented;
+}
+
+// The only writer of `type: "system"` (9.3); no route or socket event reaches it.
+// Sent as the therapist, so it is unread for the client and never for them.
+export async function postSessionNotice(booking, therapistUserId, { event, sessionId, scheduledAt, previousScheduledAt }) {
+  if (booking.status === BOOKING_STATUS.ENDED) return null;
+
+  const message = await Message.create({
+    bookingId: booking._id,
+    senderId: therapistUserId,
+    text: SESSION_NOTICE_TEXT[event],
+    type: MESSAGE_TYPE.SYSTEM,
+    read: false,
+    session: { sessionId, event, scheduledAt, previousScheduledAt: previousScheduledAt ?? undefined },
+  });
+
+  const presented = present(message, booking, therapistUserId);
+  emitMessage(booking._id, presented, [booking.clientId, booking.therapistId]);
+  await pushUnreadToRecipient(booking, { id: therapistUserId });
 
   return presented;
 }

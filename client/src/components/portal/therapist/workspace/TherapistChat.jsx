@@ -140,7 +140,7 @@ export default function TherapistChat({ bookingId, clientName }) {
 
       {/* The one thing in this tree that speaks. It only ever hears THIS
           booking — useChat filters before it is fed. */}
-      <MessageAnnouncer incoming={lastIncoming} senderName={clientName} />
+      <MessageAnnouncer incoming={lastIncoming} senderName={clientName} timeZone={timeZone} />
 
       {/* The client has not written, but the therapist has: the thread shows
           what they wrote, and this says whose turn it really is. */}

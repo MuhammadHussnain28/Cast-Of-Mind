@@ -7,6 +7,25 @@ export const MESSAGE_TYPE = Object.freeze({
 
 export const MESSAGE_TYPE_VALUES = Object.freeze(Object.values(MESSAGE_TYPE));
 
+// Session notices (9.3): the system messages a session change posts into chat.
+export const SESSION_NOTICE_EVENT = Object.freeze({
+  SCHEDULED: 'scheduled',
+  RESCHEDULED: 'rescheduled',
+  CANCELLED: 'cancelled',
+  NOT_HELD: 'not_held',
+});
+
+export const SESSION_NOTICE_EVENT_VALUES = Object.freeze(Object.values(SESSION_NOTICE_EVENT));
+
+// The stored text carries no time: each reader's screen formats the time in
+// their own zone from `session.scheduledAt`. This is only the fallback.
+export const SESSION_NOTICE_TEXT = Object.freeze({
+  scheduled: 'Session scheduled.',
+  rescheduled: 'Session moved.',
+  cancelled: 'Session cancelled.',
+  not_held: 'Session did not take place.',
+});
+
 /**
  * §10.7: "structured so voice / attachment types can be added later without a
  * rebuild." That is carried by `type` being an enum beside a text body — a new

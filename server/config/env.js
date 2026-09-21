@@ -156,6 +156,10 @@ function loadEnv() {
     // falls back to a text wordmark, which is better than a broken-image icon.
     emailLogoUrl: process.env.EMAIL_LOGO_URL || null,
 
+    // Session reminders (9.6) run inside the web server. `off` disables the
+    // timer; the manual sweep still works.
+    sessionReminders: process.env.SESSION_REMINDERS !== 'off',
+
     // Contact form destination. Null in development falls through to the
     // terminal fallback in sendEmail.
     contactTo: process.env.CONTACT_TO || null,

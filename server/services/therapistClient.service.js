@@ -7,6 +7,7 @@ import {
   resolveAccess,
   findCurrentSubscription,
 } from '../middleware/requireActiveSubscription.js';
+import { completeOverdue, counterFor } from './sessionCounter.service.js';
 import {
   THERAPIST_CLIENT_FIELDS,
   CLIENT_NOT_FOUND_MESSAGE,
@@ -67,7 +68,12 @@ export async function loadOwnBooking(bookingId, therapistUserId) {
 function presentClient(profile) {
   if (!profile) return null;
 
-  const base = { name: clientDisplayName(profile), ...pick(profile, THERAPIST_CLIENT_FIELDS) };
+  const base = {
+    name: clientDisplayName(profile),
+    ...pick(profile, THERAPIST_CLIENT_FIELDS),
+    // Saved from their browser (9.2); null until then, never a guess.
+    timezone: profile.timezone ?? null,
+  };
 
   if (profile.type !== 'couple') return { ...base, partners: null };
 
@@ -87,6 +93,8 @@ function presentClient(profile) {
 
 export async function getTherapistClient(bookingId, therapistUserId) {
   const booking = await loadOwnBooking(bookingId, therapistUserId);
+  // A session whose Join window has closed completes first, so the counter is current (9.5).
+  await completeOverdue(booking._id);
 
   const [profile, subscription] = await Promise.all([
     ClientProfile.findOne({ userId: booking.clientId }),
@@ -107,8 +115,15 @@ export async function getTherapistClient(bookingId, therapistUserId) {
     // BOTH the stored status and the resolved access, the call 7.1 made:
     // `access` decides what renders, `status` is what the screen says out loud.
     // One without the other means the UI guesses or the copy lies.
+    // 9.5 adds the session counter and the date it resets (developer's call):
+    // sessions, not money. Amounts and Stripe ids still never reach a therapist.
     subscription: subscription
-      ? { status: subscription.status, access: resolveAccess(subscription) }
+      ? {
+          status: subscription.status,
+          access: resolveAccess(subscription),
+          sessionsRemaining: counterFor(subscription, resolveAccess(subscription)).sessionsRemaining,
+          cycleEndsAt: subscription.currentPeriodEnd ?? null,
+        }
       : null,
   };
 }

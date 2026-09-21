@@ -13,6 +13,7 @@ const { TherapistProfile } = await import('../models/TherapistProfile.js');
 const { Journal } = await import('../models/Journal.js');
 const { PrivateNote } = await import('../models/PrivateNote.js');
 const { Message } = await import('../models/Message.js');
+const { Session } = await import('../models/Session.js');
 const { hashPassword } = await import('../utils/password.js');
 const { ROLES, USER_STATUS } = await import('../constants/roles.js');
 const { SUBSCRIPTION_STATUS, SUBSCRIPTION_AMOUNT_MINOR, BOOKING_STATUS } = await import(
@@ -23,6 +24,7 @@ const { loginRateLimiter, sessionRateLimiter } = await import('./auth.routes.js'
 const { therapistRateLimiter } = await import('./therapist.routes.js');
 const { clientRateLimiter, journalWriteRateLimiter } = await import('./client.routes.js');
 const { chatReadRateLimiter, chatSendRateLimiter } = await import('./chat.routes.js');
+const { sessionsReadRateLimiter } = await import('./sessions.routes.js');
 const { startMemoryMongo, stopMemoryMongo } = await import('../test/mongoMemory.js');
 
 const PASSWORD = 'correct-horse-battery-staple';
@@ -40,7 +42,7 @@ const bookings = {};
 function resetLimits() {
   LOOPBACK.forEach((key) => {
     [loginRateLimiter, sessionRateLimiter, therapistRateLimiter, clientRateLimiter,
-      journalWriteRateLimiter, chatReadRateLimiter, chatSendRateLimiter]
+      journalWriteRateLimiter, chatReadRateLimiter, chatSendRateLimiter, sessionsReadRateLimiter]
       .filter(Boolean)
       .forEach((limiter) => limiter.resetKey(key));
   });
@@ -171,7 +173,12 @@ afterAll(async () => {
 
 beforeEach(async () => {
   resetLimits();
-  await Promise.all([PrivateNote.deleteMany({}), Journal.deleteMany({}), Message.deleteMany({})]);
+  await Promise.all([
+    PrivateNote.deleteMany({}),
+    Journal.deleteMany({}),
+    Message.deleteMany({}),
+    Session.deleteMany({}),
+  ]);
   await Subscription.updateMany({}, { $set: { status: SUBSCRIPTION_STATUS.ACTIVE } });
   await Booking.updateMany({}, { $set: { status: BOOKING_STATUS.ACTIVE } });
 });
@@ -187,6 +194,22 @@ describe('*** THE privateNotes BOUNDARY ***', () => {
       text: 'My own entry, which is mine to see.',
       moodTag: 'Flat',
     });
+    // One upcoming and one cancelled session, so both session lists are non-empty.
+    await Session.create([
+      {
+        bookingId: bookings.mine._id,
+        scheduledAt: new Date(Date.now() + 3 * DAY),
+        zoomLink: 'https://zoom.us/j/100200300',
+        note: 'Bring the worksheet.',
+      },
+      {
+        bookingId: bookings.mine._id,
+        scheduledAt: new Date(Date.now() + 4 * DAY),
+        zoomLink: 'https://zoom.us/j/100200301',
+        status: 'cancelled',
+        cancelledAt: new Date(),
+      },
+    ]);
 
     const entryId = (await Journal.findOne({})).id;
     const c = (req) => auth(req, tokens.client);
@@ -197,12 +220,17 @@ describe('*** THE privateNotes BOUNDARY ***', () => {
       c(request(app).get('/api/v1/client/worksheets')),
       c(request(app).get(`/api/v1/chat/${bookings.mine._id}/messages`)),
       c(request(app).get('/api/v1/chat/unread-count')),
+      c(request(app).get(`/api/v1/sessions/${bookings.mine._id}`)),
+      c(request(app).get(`/api/v1/sessions/${bookings.mine._id}?scope=history`)),
       c(request(app).post('/api/v1/client/journal')).send({ text: 'Another entry.' }),
       c(request(app).patch(`/api/v1/client/journal/${entryId}`)).send({ text: 'Edited entry.' }),
       c(request(app).delete(`/api/v1/client/journal/${entryId}`)),
     ]);
 
     expect(responses.every((res) => res.status < 400)).toBe(true);
+    // The two session lists really carried a session each.
+    expect(responses[5].body.data).toHaveLength(1);
+    expect(responses[6].body.data).toHaveLength(1);
 
     // NOT `"note"`: `workingHours.note` is the therapist's own availability
     // note (§10.3), a public profile field with nothing clinical about it.
@@ -249,15 +277,27 @@ describe('*** THE privateNotes BOUNDARY ***', () => {
     const clientPath = reachableFrom([
       path.join(serverRoot, 'routes', 'client.routes.js'),
       path.join(serverRoot, 'routes', 'chat.routes.js'),
+      // 9.1: clients read their sessions here.
+      path.join(serverRoot, 'routes', 'sessions.routes.js'),
     ]);
 
     for (const file of forbidden) {
       expect(clientPath.has(file)).toBe(false);
     }
 
+    // 10.1: the ADMIN is the third party with no window into clinical content.
+    // §11 records that a conversation viewer was proposed and the client decided
+    // against it, so the admin's whole router must be unable to reach the notes
+    // as well — not merely lack an endpoint for them.
+    const adminPath = reachableFrom([path.join(serverRoot, 'routes', 'admin.routes.js')]);
+    for (const file of forbidden) {
+      expect(adminPath.has(file)).toBe(false);
+    }
+
     // THE WALKER MUST BE ABLE TO FIND THEM, or the assertions above are vacuous.
     const therapistPath = reachableFrom([path.join(serverRoot, 'routes', 'therapist.routes.js')]);
     expect(clientPath.size).toBeGreaterThan(10);
+    expect(adminPath.size).toBeGreaterThan(10);
     for (const file of forbidden) {
       expect(therapistPath.has(file)).toBe(true);
     }

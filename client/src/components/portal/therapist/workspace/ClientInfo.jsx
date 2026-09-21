@@ -1,5 +1,6 @@
 import ConcernChips from './ConcernChips'
 import { formatDate } from '../../../../lib/dateFormat'
+import { zoneDescription } from '../../../../lib/therapist/sessionTime'
 import { CLIENT_INFO } from '../../../../data/therapistPortalContent'
 
 /**
@@ -108,13 +109,14 @@ export default function ClientInfo({ data }) {
           {client.country && <Row label={CLIENT_INFO.labels.country}>{client.country}</Row>}
           {client.city && <Row label={CLIENT_INFO.labels.city}>{client.city}</Row>}
 
-          {/* NOT COLLECTED, AND SAID SO. `clientProfiles` has never held a
-              timezone (§10.2 lists none). A blank row would read as missing
-              data and a country-derived guess would be worse than either —
-              several countries span many zones. Carried to 9.2, where session
-              scheduling is the first place it genuinely costs something. */}
+          {/* Saved from their own browser (9.2). Until then, said plainly — never
+              guessed from the country, which can span many zones. */}
           <Row label={CLIENT_INFO.labels.timezone}>
-            <span className="text-ink/70">{CLIENT_INFO.timezoneUnknown}</span>
+            {client.timezone ? (
+              zoneDescription(client.timezone)
+            ) : (
+              <span className="text-ink/70">{CLIENT_INFO.timezoneUnknown}</span>
+            )}
           </Row>
         </Group>
 

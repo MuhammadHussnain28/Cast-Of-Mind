@@ -319,3 +319,21 @@ describe('ClientProfile — the collection name the dashboard already depends on
     expect(ClientProfile.collection.name).toBe(FUTURE_COLLECTIONS.clientProfiles);
   });
 });
+
+describe('ClientProfile — the saved timezone (9.2)', () => {
+  it('has none until the browser saves one', async () => {
+    const profile = await ClientProfile.create(individual());
+    expect(profile.timezone).toBeUndefined();
+  });
+
+  it('keeps a real IANA zone as given', async () => {
+    const profile = await ClientProfile.create(individual({ timezone: 'Asia/Kolkata' }));
+    expect(profile.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('refuses a made-up zone', async () => {
+    await expect(ClientProfile.create(individual({ timezone: 'Mars/Olympus' }))).rejects.toThrow(
+      /real IANA timezone/,
+    );
+  });
+});

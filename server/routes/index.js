@@ -9,6 +9,7 @@ import adminRoutes from './admin.routes.js';
 import therapistRoutes from './therapist.routes.js';
 import clientRoutes from './client.routes.js';
 import chatRoutes from './chat.routes.js';
+import sessionsRoutes from './sessions.routes.js';
 import matchingRoutes from './matching.routes.js';
 import therapistsRoutes from './therapists.routes.js';
 import checkoutRoutes from './checkout.routes.js';
@@ -30,6 +31,8 @@ router.use('/client', clientRoutes);
 // Shared by client and therapist — the only surface both roles reach. The
 // admin is refused by role; §11 records that decision.
 router.use('/chat', chatRoutes);
+// Read-only and shared, like chat. Writes are under /therapist/sessions.
+router.use('/sessions', sessionsRoutes);
 router.use('/matching', matchingRoutes);
 // Plural and public — the singular '/therapist' above is the authenticated
 // route where a therapist manages their own profile.

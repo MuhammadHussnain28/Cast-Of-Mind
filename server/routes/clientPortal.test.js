@@ -534,3 +534,62 @@ describe('GET /client/me ownership', () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PATCH /client/timezone — saved from the client's own browser (9.2)
+// ---------------------------------------------------------------------------
+
+describe('PATCH /client/timezone', () => {
+  const TIMEZONE = '/api/v1/client/timezone';
+  const save = (body, token) => auth(request(app).patch(TIMEZONE), token).send(body);
+  const stored = async () => (await ClientProfile.findOne({ userId: users[ROLES.CLIENT]._id })).timezone;
+
+  afterEach(async () => {
+    await ClientProfile.updateOne({ userId: users[ROLES.CLIENT]._id }, { $unset: { timezone: 1 } });
+  });
+
+  it('reports null on /client/me until one is saved', async () => {
+    expect((await getMe()).body.profile.timezone).toBeNull();
+  });
+
+  it('saves a real zone, and /client/me reports it', async () => {
+    const res = await save({ timezone: 'America/New_York' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ timezone: 'America/New_York' });
+    expect((await getMe()).body.profile.timezone).toBe('America/New_York');
+  });
+
+  // Intl would rewrite this as the legacy "Asia/Calcutta".
+  it('stores the zone exactly as the browser sent it', async () => {
+    await save({ timezone: 'Asia/Kolkata' });
+    expect(await stored()).toBe('Asia/Kolkata');
+  });
+
+  it.each([
+    ['a made-up zone', { timezone: 'Mars/Olympus' }],
+    ['an empty zone', { timezone: '' }],
+    ['no zone', {}],
+    ['an extra field', { timezone: 'Europe/Dublin', country: 'Ireland' }],
+  ])('refuses %s, and changes nothing', async (_label, body) => {
+    await save({ timezone: 'Europe/London' });
+    const res = await save(body);
+
+    expect(res.status).toBe(422);
+    expect(await stored()).toBe('Europe/London');
+  });
+
+  it('is behind the subscription gate', async () => {
+    await setSubscription({ status: SUBSCRIPTION_STATUS.EXPIRED });
+    const res = await save({ timezone: 'Europe/London' });
+
+    expect(res.status).toBe(403);
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('refuses a therapist and the admin', async () => {
+    expect((await save({ timezone: 'Europe/London' }, tokens[ROLES.THERAPIST])).status).toBe(403);
+    expect((await save({ timezone: 'Europe/London' }, tokens[ROLES.ADMIN])).status).toBe(403);
+    expect(await stored()).toBeUndefined();
+  });
+});

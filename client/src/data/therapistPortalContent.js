@@ -112,27 +112,12 @@ export const ACTIVITY_PREFIX = {
 export const WORKSPACE_TABS = [
   { slug: 'chat', label: 'Chat', icon: 'chat', chunk: null },
   { slug: 'worksheets', label: 'Worksheets', icon: 'worksheets', chunk: null },
-  { slug: 'sessions', label: 'Sessions', icon: 'sessions', chunk: '9.2' },
+  { slug: 'sessions', label: 'Sessions', icon: 'sessions', chunk: null },
   { slug: 'journal', label: 'Journal and Notes', icon: 'journal', chunk: null },
   { slug: 'info', label: 'Client info', icon: 'info', chunk: null },
 ]
 
 export const DEFAULT_WORKSPACE_TAB = 'chat'
-
-/**
- * What each unbuilt tab will do, from §8 — facts about the finished feature
- * rather than a description of software that does not exist, and no timeline
- * anywhere. Different explanations rather than one sentence repeated, so the
- * tabs are not identical rectangles wearing different titles.
- */
-export const TAB_PENDING = {
-  sessions: {
-    title: 'Sessions with this client',
-    body: 'Schedule a session with a date, time and Zoom link. A message posts into the conversation automatically, so they are told without you having to write it.',
-  },
-}
-
-export const TAB_PENDING_NOTE = 'This part is not switched on yet.'
 
 /** The identity strip that stays above the tabs. */
 export const IDENTITY_STRIP = {
@@ -172,17 +157,8 @@ export const CLIENT_INFO = {
     subscription: 'Subscription',
   },
 
-  /**
-   * THE TIMEZONE ROW.
-   *
-   * `clientProfiles` has never collected a timezone (§10.2 does not list one),
-   * and the settled pattern since 5.6 is that every portal renders times in the
-   * viewer's own browser zone. Saying so is honest; a blank row reads as
-   * missing data and a country-derived guess would be worse than either — many
-   * countries span several zones, and a session booked in the wrong one is a
-   * real cost. Carried forward to 9.2.
-   */
-  timezoneUnknown: 'Not collected. Session times appear in your own clock, and in theirs.',
+  // Saved from the client's own browser since 9.2. Never guessed from their country.
+  timezoneUnknown: 'Not known yet. Saved automatically the next time they open their portal.',
 
   genderPreferenceValues: {
     male: 'Male therapist preferred',
@@ -310,6 +286,109 @@ export const WORKSHEETS = {
   loadError: 'Worksheets could not be loaded.',
   retry: 'Try again',
   loadMore: 'Show older worksheets',
+}
+
+// ── Sessions, therapist side — §8.4 (9.2) ────────────────────────────────────
+
+// Times are typed in the therapist's own zone; the preview shows the client's.
+export const SESSIONS = {
+  heading: 'Sessions',
+  form: {
+    heading: (name) => `Schedule a session with ${name}`,
+    editHeading: 'Change this session',
+    dateLabel: 'Date',
+    timeLabel: (place) => `Time · your time (${place})`,
+    linkLabel: 'Meeting link',
+    linkPlaceholder: 'https://zoom.us/j/…',
+    linkHelper: 'Zoom or Google Meet. Paste the link for this session.',
+    noteLabel: (name) => `Note for ${name} (optional)`,
+    noteHelper: (name) => `${name} will see this. Private thoughts belong in Journal and Notes.`,
+    notePlaceholder: 'e.g. Bring last week’s thought record.',
+    submit: 'Schedule session',
+    save: 'Save changes',
+    keep: 'Keep as it was',
+    scheduled: (when) => `Scheduled for ${when}, your time.`,
+    told: (name) => `${name} is told in the chat and sees it on their Sessions page, in their own time.`,
+    errors: {
+      date: 'Choose a date.',
+      time: 'Choose a time.',
+      past: 'That time has already passed. Pick a time in the future.',
+      dateInvalid: 'That date does not exist. Check the day and month.',
+      nonexistent:
+        'That time does not exist on that day, because the clocks go forward. Pick another time.',
+      link: 'Use a Zoom or Google Meet link that starts with https://.',
+      note: (max) => `A note must be ${max} characters or fewer.`,
+    },
+  },
+  preview: {
+    label: 'The time for each of you',
+    you: 'You',
+    empty: 'Pick a date and time to see it on both clocks.',
+    skipped: 'The clocks go forward over that time, so it does not exist on that day.',
+    forYou: (date, time) => `${date}, ${time} for you`,
+    forThem: (time, name, place) => `${time} for ${name} in ${place}`,
+    onDate: (date) => `on ${date}`,
+    sameZone: (name) => `Same time for ${name}. You share a time zone.`,
+    unknownTitle: 'Not known yet',
+    unknownBody: (name) =>
+      `${name}'s time zone is saved automatically the next time they open their portal.`,
+    night: (time, name) => `That's ${time} for ${name}.`,
+  },
+  confirmMove: {
+    title: 'Move this session?',
+    move: 'Move it',
+    back: 'Go back',
+  },
+  upcoming: 'Upcoming',
+  history: 'History',
+  next: 'Next',
+  noUpcoming: 'Nothing scheduled ahead.',
+  openLink: 'Open link',
+  edit: 'Edit',
+  cancel: 'Cancel',
+  cancelConfirm: (day, name) => `Cancel ${day}'s session with ${name}? It stays in the history.`,
+  cancelYes: 'Cancel session',
+  cancelNo: 'Keep it',
+  status: {
+    completed: 'Completed',
+    cancelled: (date) => `Cancelled ${date}`,
+    past: 'Past',
+    notHeld: "Didn't take place",
+  },
+  // 9.5 — the counter and the two corrections. No session length, ever.
+  counter: {
+    left: (n) => `${n} of 4 sessions left this cycle`,
+    resets: (date) => `Resets on ${date}.`,
+    ends: (date) => `Their plan ends on ${date}.`,
+    ended: 'Their subscription has ended.',
+  },
+  held: 'Mark as held',
+  notHeld: "Didn't take place",
+  notHeldConfirm: (day, name) =>
+    `Mark ${day}'s session as not taking place? If it counted this cycle, ${name} gets the session back.`,
+  notHeldYes: 'Mark as not held',
+  notHeldNo: 'Keep it',
+  // Warned, never blocked — a business decision for Asad to confirm.
+  overLimit: (name, left, scheduled) =>
+    `${name} has ${left} ${left === 1 ? 'session' : 'sessions'} left this cycle and ${scheduled} already scheduled. You can still schedule this one.`,
+  yourTime: (time) => `${time} your time`,
+  theirTime: (time, name, place) => `${time} for ${name} in ${place}`,
+  theirTimeUnknown: (name) => `${name}'s time not known yet`,
+  sameTime: (name) => `Same time for ${name}`,
+  empty: {
+    title: (name) => `No sessions with ${name} yet.`,
+    body: 'Sessions you schedule appear here, soonest first.',
+  },
+  ended: {
+    booking: 'This booking has ended. Past sessions stay here for your record.',
+    subscription: (name) => `${name}'s subscription has ended, so new sessions can't be scheduled.`,
+  },
+  zoneMissing:
+    'Your timezone is missing from your profile, so sessions cannot be placed. Please contact support.',
+  loadError: 'Sessions could not be loaded.',
+  retry: 'Try again',
+  loadMoreHistory: 'Show earlier sessions',
+  loadMoreUpcoming: 'Show later sessions',
 }
 
 /**

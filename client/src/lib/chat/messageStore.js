@@ -51,6 +51,7 @@ export function normalise(message, myRole, bookingId = null) {
     createdAt: message.createdAt,
     senderRole: message.senderRole,
     mine: message.mine ?? message.senderRole === myRole,
+    session : message.session ?? null ,
     status: message.status ?? MESSAGE_STATUS.SENT,
     // Explicitly null rather than absent: `upsert` merges over the existing
     // row, so a failure reason left off here would survive the retry that

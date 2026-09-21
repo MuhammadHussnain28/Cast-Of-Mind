@@ -26,6 +26,7 @@ export function createEmailServiceMock(overrides = {}) {
     sendPasswordResetEmail: jest.fn(async () => ({ delivered: true })),
     sendTherapistWelcomeEmail: jest.fn(async () => ({ delivered: true })),
     sendClientWelcomeEmail: jest.fn(async () => ({ delivered: true })),
+    sendSessionReminderEmail: jest.fn(async () => ({ delivered: true })),
     sendEmailChangedNotices: jest.fn(async () => ({
       oldAddressNotified: true,
       newAddressNotified: true,

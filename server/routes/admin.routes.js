@@ -19,6 +19,15 @@ import {
   reactivateTherapistController,
   resetTherapistPasswordController,
 } from '../controllers/adminTherapists.controller.js';
+import {
+  listClientsController,
+  getClientController,
+  cancelClientSubscriptionController,
+  deactivateClientController,
+  reactivateClientController,
+  resetClientPasswordController,
+} from '../controllers/adminClients.controller.js';
+import { listBookingsController } from '../controllers/adminBookings.controller.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import {
   listApplicationsQuerySchema,
@@ -28,6 +37,8 @@ import {
   listTherapistsQuerySchema,
   updateTherapistSchema,
 } from '../validation/adminTherapists.schema.js';
+import { listClientsQuerySchema } from '../validation/adminClients.schema.js';
+import { listBookingsQuerySchema } from '../validation/adminBookings.schema.js';
 import {
   ADMIN_RATE_LIMIT_MAX,
   ADMIN_RATE_LIMIT_MESSAGE,
@@ -95,5 +106,33 @@ router.post('/therapists/:id/reactivate', reactivateTherapistController);
 // Triggers the SAME reset flow as the public endpoint. The admin never sees or
 // chooses a password — §11, hashes are one-way.
 router.post('/therapists/:id/reset-password', resetTherapistPasswordController);
+
+// Client management — master spec §9.4.
+//
+// `:id` IS THE CLIENT PROFILE ID, matching /admin/therapists/:id, and the
+// therapist's user id never appears in any response here.
+//
+// NOTHING BELOW READS messages, journals OR privateNotes, and there is
+// deliberately no route that could — §11. `routes/privateNotes.test.js` walks
+// the import graph from this file and proves it rather than trusting this note.
+router.get('/clients', validateQuery(listClientsQuerySchema), listClientsController);
+router.get('/clients/:id', getClientController);
+
+// §13's admin override. Sets Stripe to stop at the end of the paid period
+// FIRST, then writes our record — see services/adminClients.service.js for why
+// that order is not interchangeable. Immediate expiry is slice 11.
+router.post('/clients/:id/cancel-subscription', cancelClientSubscriptionController);
+
+// Stops them signing in. It does NOT stop the billing — the subscription is a
+// separate thing and has to be cancelled separately.
+router.post('/clients/:id/deactivate', deactivateClientController);
+router.post('/clients/:id/reactivate', reactivateClientController);
+
+router.post('/clients/:id/reset-password', resetClientPasswordController);
+
+// Bookings and subscriptions overview — master spec §9.5. Read-only: who is
+// paired with whom, and the state of each pairing's newest subscription. Every
+// action lives on the client's own screen, one click away.
+router.get('/bookings', validateQuery(listBookingsQuerySchema), listBookingsController);
 
 export default router;

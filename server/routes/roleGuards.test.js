@@ -237,7 +237,10 @@ describe('the dev routes are not mounted in production', () => {
             resolve();
           });
           req.on('error', () => {
-            if (Date.now() - started > 15000) reject(new Error('server did not start'));
+            // 45s, not 15: booting the whole app in a child process took longer
+            // than 15s under a full --runInBand run on this machine (10.2). A hang
+            // guard, not a claim about behaviour — alone the boot takes seconds.
+            if (Date.now() - started > 45000) reject(new Error('server did not start'));
             else setTimeout(poll, 200);
           });
         };
@@ -263,5 +266,5 @@ describe('the dev routes are not mounted in production', () => {
     } finally {
       child.kill();
     }
-  }, 30000);
+  }, 60000);
 });

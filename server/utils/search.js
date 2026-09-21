@@ -44,3 +44,20 @@ export function nameClauses(term) {
 
   return clauses;
 }
+
+/**
+ * A term against a CLIENT's name, whichever shape the account is.
+ *
+ * An individual has one `name`; a couple has two, nested under `coupleData`
+ * (§6). Searching only the first would make one partner unfindable in their
+ * own account. Extracted in chunk 10.2 — the client list (10.1) and the
+ * bookings overview both search clients, and two copies would drift.
+ */
+export function clientNameClauses(term) {
+  const like = containsIgnoringCase(term);
+  return [
+    { name: like },
+    { 'coupleData.partner1.name': like },
+    { 'coupleData.partner2.name': like },
+  ];
+}

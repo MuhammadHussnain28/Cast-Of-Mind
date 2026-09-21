@@ -3,6 +3,7 @@ import env from './config/env.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import app from './app.js';
 import { createSocketServer } from './realtime/socketServer.js';
+import { startSessionReminders, stopSessionReminders } from './services/sessionReminders.service.js';
 
 async function start() {
   await connectDB();
@@ -18,11 +19,20 @@ async function start() {
     console.log('Socket.io attached.');
   });
 
+  // Session reminders (9.6): a sweep every few minutes inside this process.
+  // Two instances are safe — each reminder is claimed atomically before sending.
+  if (env.sessionReminders) {
+    startSessionReminders();
+    console.log('Session reminders scheduled.');
+  }
+
   const shutdown = (signal) => {
     console.log(`${signal} received. Shutting down gracefully...`);
 
     // Sockets first: open connections would otherwise hold the HTTP server open
     // and server.close() would never call back.
+    stopSessionReminders();
+
     io.close(() => {
       server.close(async () => {
         await disconnectDB();

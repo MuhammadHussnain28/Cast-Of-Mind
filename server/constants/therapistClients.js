@@ -104,11 +104,8 @@ export const CLIENT_NOT_FOUND_CODE = 'CLIENT_NOT_FOUND';
  * - `privateNotes`, which is not merely absent but never reached for. See the
  *   boundary comment in services/therapistClient.service.js.
  *
- * NOT PRESENT IN THE DATA AT ALL: a client timezone. `clientProfiles` has never
- * collected one (§10.2 does not list it), and the settled pattern since 5.6 is
- * that every portal uses the viewer's own browser zone. The Client Info tab
- * says so plainly rather than leaving a blank row. Carried forward to 9.2,
- * where session scheduling is the first place it genuinely costs something.
+ * The client's timezone (9.2) is added by the service as null until their
+ * browser has saved one. It is never derived from their country.
  */
 export const THERAPIST_CLIENT_FIELDS = Object.freeze([
   'type',

@@ -3,7 +3,8 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireClient } from '../middleware/requireRole.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { requireActiveSubscription } from '../middleware/requireActiveSubscription.js';
-import { getMe } from '../controllers/clientPortal.controller.js';
+import { getMe, saveTimezone } from '../controllers/clientPortal.controller.js';
+import { clientTimezoneSchema } from '../validation/clientPortal.schema.js';
 import { CLIENT_RATE_LIMIT } from '../constants/clientPortal.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { uploadSingleFile } from '../middleware/upload.js';
@@ -55,6 +56,9 @@ router.get('/me', getMe);
  * it would have to be deliberately mounted above this line.
  */
 router.use(requireActiveSubscription);
+
+// The browser's own timezone (9.2), saved quietly when it changes.
+router.patch('/timezone', validate(clientTimezoneSchema), saveTimezone);
 
 // Worksheets (8.5) — gated above. The booking comes from the token, never the URL.
 export const clientWorksheetUploadRateLimiter = createRateLimiter(WORKSHEET_UPLOAD_RATE_LIMIT);

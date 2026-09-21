@@ -39,6 +39,7 @@ import ApplicationDetail from './pages/admin/ApplicationDetail'
 import Therapists from './pages/admin/Therapists'
 import TherapistDetail from './pages/admin/TherapistDetail'
 import Clients from './pages/admin/Clients'
+import ClientDetail from './pages/admin/ClientDetail'
 import Bookings from './pages/admin/Bookings'
 import AdminNotFound from './components/admin/AdminNotFound'
 import Privacy from './pages/legal/Privacy'
@@ -165,6 +166,7 @@ export default function App() {
               <Route path="therapists" element={<Therapists />} />
               <Route path="therapists/:id" element={<TherapistDetail />} />
               <Route path="clients" element={<Clients />} />
+              <Route path="clients/:id" element={<ClientDetail />} />
               <Route path="bookings" element={<Bookings />} />
               {/* Not the public 404 — that renders its own <main> and would
                   nest a second landmark inside this one. */}

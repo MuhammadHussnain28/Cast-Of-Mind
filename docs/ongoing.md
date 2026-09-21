@@ -294,13 +294,14 @@ I generated a simplified "brain-tree" favicon after testing showed the full logo
 
 ### False-confidence tests — the recurring failure mode of this project
 
-Five caught so far, and **every one passed while proving nothing**. Listed because the pattern repeats and mutation testing is what finds it.
+Six caught so far, and **every one passed while proving nothing**. Listed because the pattern repeats and mutation testing is what finds it.
 
 1. **1.3** — the "deactivated user cannot refresh" test reused a rotated token, so the 401 proved revocation, not deactivation.
 2. **4.2** — see the archive.
 3. **7.2** — the unread badge test seeded only therapist messages, so "drops to zero" would have passed with the `senderId ≠ me` exclusion deleted.
 4. **7.3** — "persists before it emits" passed against a deliberately inverted implementation, because the network round-trip let the save win. Rewritten to assert order. `Message.prototype.save` alone does not intercept `Model.create` in Mongoose 9 — **both must be patched.**
 5. **7.6** — the linkifier's XSS tests: widening the regex so `javascript:` matched broke *nothing*, proving the allowlist rather than the pattern carries the security.
+6. **10.2** — the case-insensitive sort fixture sorted identically in binary order, so deleting the collation broke nothing. Caught before it shipped; the fixture now uses names whose byte and human orders disagree.
 
 **Standing practice: every guard gets mutation-checked, and the number of tests it breaks is recorded.**
 
@@ -1717,6 +1718,407 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 - **Pre-launch blockers — unchanged at 13.** No placeholder content.
 
 **Not done (by design):** no per-entry privacy toggle (§7.3 rules it out) · no client sight of notes in any form · no notifications (10.4) · no admin visibility (§11).
+
+---
+
+# SLICE 9 — Sessions & Scheduling
+
+## Chunk 9.1 — Sessions model and timezone utilities
+
+**Status:** Complete. Nothing skipped. Server only, with no UI, so there was no impeccable pass and no contrast work. **Atlas not touched** (developer's instruction); every test ran in memory.
+
+**Built**
+- server new: `models/Session.js` · `utils/timezone.js` · `utils/meetingLink.js` · `constants/sessions.js` · `validation/sessions.schema.js` · `services/session.service.js` · `services/bookingMembership.service.js` · `controllers/session.controller.js` · `routes/sessions.routes.js`.
+- server tests: `utils/timezone.test.js` · `utils/meetingLink.test.js` · `models/Session.test.js` · `routes/sessions.test.js` (65).
+- routes: `POST /therapist/sessions` · `PATCH /therapist/sessions/:sessionId` · `DELETE /therapist/sessions/:sessionId` (cancels) · `GET /sessions/:bookingId?scope=upcoming|history` (both roles).
+- edits: `routes/index.js` (mount), `routes/therapist.routes.js` (3 routes), `services/chat.service.js` (uses the extracted membership check), `routes/privateNotes.test.js` (sessions added to both boundary tests), `routes/adminStats.test.js` (see Verification).
+- Packages / env vars: none.
+
+**Key decisions**
+- **The zone comes from the therapist's PROFILE, never the request.** The body carries only a wall-clock `date` + `time`. Sending `timezone` or `scheduledAt` is refused (422), not ignored, so a laptop set to the wrong zone cannot silently move a session.
+- **Intl, not date-fns-tz** (developer's call, 2026-09-19): the standing 0.6 decision, the same method as `client/src/lib/workingHours.js`, and no packages. §15 names Intl as allowed.
+- **Clock changes:** it tries every offset in force within a day either side and keeps only candidates that read back as the same wall clock. None means a skipped time → 422 *"the clocks go forward. Pick another time."* Two means a repeated time → the first one. Also handles Lord Howe's 30-minute shift and Samoa's skipped day.
+- **Meeting links: Zoom, its subdomains, zoomgov.com, and `meet.google.com` exactly** (developer's call, 2026-09-19; the spec says Zoom). Checked on the parsed host, so `zoom.us.evil.example` and `zoom.us@evil.example` are refused. The field stays `zoomLink` per §10.11.
+- **A link is returned only while the session is `scheduled`, and is never logged**: it carries the meeting passcode. A finished session's link may open a room the therapist now uses with someone else.
+- **The note is visible to the client** (developer's call, 2026-09-19). Clinical thoughts belong in Private Notes; 9.2 must label the field.
+- **Guards:** the time must be in the future and no more than 366 days ahead (a leap year still fits); ended booking → 409; client with an ended subscription → 409; past-due and cancelled-but-still-paid clients are allowed (§13). Cancelling is always allowed.
+- **Cancel is soft and idempotent.** The record stays, a second cancel keeps the first `cancelledAt`, and a completed session is refused. Edit and cancel are conditional atomic updates, so a cancel that lands mid-edit wins.
+- **`upcoming` / `history`, not the plan's "past"**, because a cancelled session whose date is still ahead belongs in history. A session stays upcoming for 60 minutes after it starts.
+- **The API returns UTC only;** each screen formats in its own zone. `formatInZone` is for 9.3's message and 9.6's emails.
+- **The membership check moved to `bookingMembership.service.js`** so chat and sessions share one; chat's behaviour is unchanged. Every refusal is the same 404, as in 7.2 and 8.2.
+- Spec additions: `updatedAt`, `cancelledAt`. Code names instances `therapySession`, because `session` means a Mongo transaction here.
+
+**Verification**
+- Tests: **1344 passing across 46 suites** (1204 before, 140 new). Server lint clean.
+- **The brief's case:** 15:00 London in summer is stored as 14:00Z and reads 10:00 AM EDT in New York. Winter is 15:00Z / 10:00 EST, and the weeks the UK and US change clocks apart give 11:00.
+- **Every hour of 2026 round-trips** in London, New York and Lord Howe (26,280 checks).
+- **Mutation-checked five times:** session ownership broke **2**; the skipped-time check **9**; the zone coming from the profile **3** (winter cases cannot catch it, because London is UTC then, which is why the Kolkata test exists); the client write refusal **2**; booking membership **1** in sessions plus **8** in chat/socket.
+- **privateNotes:** the import-graph walk now includes `sessions.routes.js`, and the client sweep reads both session lists, each seeded with a real session so the check is not vacuous.
+- The route tests find their summer, winter and mismatch dates by scanning ahead with Intl, so they pass whatever day they run.
+- **One existing test broke on the first full run, the same way 6.4's did:** `adminStats.test.js` asserted the `sessions` collection did not exist yet. The model now creates it. That assertion was removed; the dashboard's "reads zero" check stays.
+
+**Manual steps for the developer**
+1. **Restart the API server.** The new routes are read at startup. No packages, no environment variables.
+2. With a REST client, sign in as a therapist and `POST /api/v1/therapist/sessions` with `{ bookingId, date: "YYYY-MM-DD", time: "15:00", zoomLink }`. The reply gives `scheduledAt` in UTC and the `therapistTimezone` used. **This writes to whichever database the server uses, so pick a test booking.**
+3. Sign in as that client and `GET /api/v1/sessions/:bookingId`. The same UTC instant should come back; their browser will show it in their clock from 9.4.
+4. Try 01:30 on the last Sunday of March from a London therapist (422), an `http://` link (422), and a client token on `POST` (403).
+
+**Carried forward**
+- **9.2:** save the client's browser timezone on `clientProfiles` (decided 2026-09-19); label the note *"Your client will see this"*; label the time field with `therapistTimezone`.
+- **9.3:** the system message should carry the instant, not a baked string, so each reader sees their own clock.
+- **9.4:** session length for the Join window is not in the spec. Decide it there and align it with the 60-minute live window.
+- **9.6:** reminders format per recipient with `formatInZone` and will need a `{ status, scheduledAt }` index.
+- **The admin dashboard's "sessions this month" (4.4) now counts real rows.** It counts every session from the 1st onwards, including cancelled ones and those in later months. That's worth tightening in chunk 10.x; not changed here.
+- **For Asad:** a reused meeting link (a Zoom Personal Meeting Room, a fixed Meet code) lets one client walk into another's session. Therapists should use per-session links or the waiting room.
+- Double-booking a therapist across two clients is not checked. Slice 11: cancelled → expired on the 7.1 boundary.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no UI (9.2, 9.4) · no chat system message (9.3) · no completion or session counter (9.5) · no reminders (9.6) · no local time stored anywhere.
+
+---
+
+## Chunk 9.2 — Session scheduling UI
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas not touched**; every test ran in memory. The impeccable skill was loaded before design, as the standing directive requires.
+
+**Built**
+- client new: `components/portal/therapist/workspace/sessions/{SessionsTab,SessionForm,TwoClocks,ClockFace,SessionItem}.jsx` · `lib/therapist/{useSessions,sessionTime,meetingLink}.js` · `lib/api/sessionsApi.js` · `lib/client/useSaveBrowserTimezone.js` · `lib/useNow.js` · 4 icons (`VideoIcon`, `CancelledIcon`, `MoonIcon`, `NoteIcon`).
+- client edits: `lib/workingHours.js` (`resolveWallTime`), `ClientWorkspace.jsx`, `ClientInfo.jsx`, `ClientPortalShell.jsx`, `clientPortalApi.js`, `therapistPortalContent.js`. **Deleted** `TabPending.jsx` and its copy, since all five tabs are now built.
+- server: `clientProfiles.timezone` (spec addition) · `PATCH /client/timezone` behind the gate · `validation/clientPortal.schema.js` · timezone on `/client/me` and the therapist's client view · `meta.therapistTimezone` on the sessions list · `test/timezoneParity.test.js` (28).
+- Packages / env vars: none.
+
+**Key decisions**
+- **The preview is two drawn clock faces**: your time and theirs, each light by day and ink at night, with the gap drawn between them. Before a time is picked they show *now*, so the time difference is visible at once. The hands sweep in 250ms and hold still under reduced motion. The sentence below carries everything in words for screen readers (the dials are `aria-hidden`).
+- **The client's zone is saved from their own browser** (developer's call, 2026-09-19), silently, when it differs. **This reverses 8.2's "no timezone reaches the therapist"**; that test was rewritten, and the value is still never guessed from the country (null until saved). A couple's one account keeps whichever browser saved last. It is stored exactly as sent, because Intl would rewrite `Asia/Kolkata` as the legacy `Asia/Calcutta`.
+- **The preview cannot disagree with what is stored.** The browser's converter lives in `lib/workingHours.js` (no second copy), and a server parity test runs it against `utils/timezone.js`.
+- **Edit asks only when the time moves** (developer's call): it shows old → new in both clocks. Link and note changes save straight away. Cancel is confirmed inline and the session moves to History.
+- **Night note** (developer's call): 22:00–06:59 for the client adds *"That's 03:00 for Marta."* It never blocks. **No next-week shortcut** (developer's call).
+- **Honest line until 9.3/9.4:** *"Marta can't see sessions in their portal yet, so tell them in the chat for now,"* with a link to the chat. The old pending copy claimed an automatic chat message that does not exist yet, and it is gone.
+- The note field says *"[Name] will see this. Private thoughts belong in Journal and Notes."*
+- **Scheduling is hidden** (a plain notice instead) when the booking has ended, the client's subscription has ended, or the therapist's profile has no zone. It is hidden rather than left to fail with a 409.
+- The next session is a calendar leaf in ink, with gold on ink for the weekday (11.08:1). Later sessions are quiet rows. History is read-only, with drawn marks: tick for completed, struck ring for cancelled, clock for past.
+
+**Verification**
+- Tests: **1386 passing across 47 suites** (1344 before, 42 new). Server lint clean; client `oxlint` shows only the six pre-existing warnings; build passes; generated CSS confirmed for every new utility.
+- **Parity:** every quarter hour on the six days around each 2026 clock change (London, New York, Lord Howe), and 15:00 on every day of the year in four zones, give identical results in browser and server. **Mutation-checked three times:** the browser taking the later repeated time broke 3; guessing a skipped time broke 4; letting Meet subdomains through broke 2.
+- **47 client logic checks** on the preview, bounds, labels and copy rules. One check was itself wrong at first ("soon" matched "soonest"); it was fixed, and a check proving it is live was added.
+- **Contrast: 38 pairs, 0 failures.** Tightest: field error under the sage glow 4.96:1, placeholder 4.75:1, empty-state icon 4.70:1. 4 icons bounds-checked, all inside. Detector `[]`, degraded as always.
+- Found in passing: `WorksheetsTab`'s skeleton puts its "Loading" status inside an `aria-hidden` wrapper, so it is never announced. Not fixed here; the new skeleton avoids it.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh both portals.** No packages, no environment variables.
+2. **Sign in as a client first** and open their portal once. That saves their timezone.
+3. As their therapist: open that client → Sessions. **The chunk's verify step:** pick a date and time and check the right-hand clock against a world clock for the client's city. Try a time that is night for them and watch for the moon note.
+4. Schedule it; it appears as the next session. **Edit** only the note (saves at once), then move the time (asks first, showing old → new). **Cancel** it: it moves to History.
+5. A client who has never opened the portal shows a dashed clock and "Not known yet". Client info shows the same.
+6. At 360px, and with reduced motion on (the hands jump instead of sweep).
+
+**Carried forward**
+- **9.3:** post the system message and delete `notYetVisible`. **9.4:** the client Session Hub.
+- **9.5** decides completion. Until then past sessions show as "Past" in History.
+- Fix `WorksheetsTab`'s skeleton status (above).
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** client Session Hub (9.4) · chat system message (9.3) · counter or over-4 warning (9.5) · no timezone question in the questionnaire.
+
+---
+
+## Chunk 9.3 — System message on scheduling
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas not touched**; every test ran in memory.
+
+**Built**
+- server: `models/Message.js` (a `session` sub-document, a spec addition to §10.7, plus a shape guard) · `constants/chat.js` (events and fallback text) · `services/chat.service.js` (`postSessionNotice`, the presenter carries `session`) · `services/session.service.js` (`notify` on create, a real move, and a real cancel).
+- server tests: `models/Message.test.js` (5 replace 1), `routes/sessions.test.js` (+10), `routes/chat.test.js` (+1), `realtime/socket.test.js` (+2).
+- client: `lib/chat/sessionNotice.js` (new) · `SystemNotice.jsx` · `MessageAnnouncer.jsx` · `ChatIcons.jsx` (`NoticeCancelledIcon`) · `OpeningMessage.jsx` · `pages/portal/client/Chat.jsx` · `TherapistChat.jsx` · `chatContent.js` · `therapistPortalContent.js` (the 9.2 form line reworded).
+- Packages / env vars: none.
+
+**Key decisions**
+- **The time travels as data, never as words.** The notice stores `{ sessionId, event, scheduledAt, previousScheduledAt }` and its `text` is a zone-free fallback ("Session scheduled."). Each screen words it in its own clock: 15:00 for a London therapist, 10:00 AM for a New York client, from the same row. This is the brief's "each viewer's own timezone".
+- **Sent as the therapist.** The existing badge rule ("unread and not from me") then makes it unread for the client and never for the therapist, with no new badge logic.
+- **Posted only on a real change:** create; a move where the time actually differs (link or note edits post nothing); and a cancel that actually happened (not a repeat). Never into an ended booking.
+- **A chat failure never touches the session.** The notice goes after the session write, outside any transaction, in a try/catch that logs the event and session id by error name only, never the error's message.
+- **The only writer of `type: "system"` is `postSessionNotice`**; no route or socket event reaches it. The model refuses session data on a person's message and requires it on a system one.
+- **No meeting link in chat** (developer's call): a chat line is permanent, survives a cancel, and usually carries the passcode.
+- **The opening screen shows the next session** (developer's call). A client who has not written yet cannot see the thread, so a line appears above the writing page: *"Your next session: Thursday, 14 August at 18:00, your time."* It is worked out from the notices alone, and a cancelled one drops out. **"Next", not the plan's "first"**, because "first" could be untrue.
+- **The notice pill is `rounded-2xl`, not a stadium**, because the sentences now wrap to two lines at 360px. A cancelled notice gets a struck calendar mark.
+- Screen readers hear the formatted sentence in their own zone, not the fallback text.
+
+**Verification**
+- Tests: **1403 passing across 47 suites** (1386 before, 17 new). Server lint clean; client build passes; `oxlint` shows only pre-existing warnings plus two in `home/Services1.jsx`, the developer's untracked file, not touched here.
+- **Mutation-checked three times:** removing the try/catch broke **3**; posting on every edit broke **1**; sending as the client broke **4**. The first attempt at the third mutation did not apply because `chat.service.js` is CRLF; it was caught and re-run with a line-ending-aware pattern.
+- **The failure path is tested for real:** `Message.create` is made to throw, and the session is still created, moved or cancelled. The log line is checked to hold no error message, link or note.
+- **18 client logic checks**, including one stored notice reading differently in two zones, a Sydney next-day case, the moved sentence carrying both times, and the opening line's "latest notice wins, cancelled drops out".
+- **Contrast: 7 new pairs, 0 failures.** Tightest: the opening-line mark on mist at 4.93:1. New icon bounds-checked. Detector `[]`, degraded.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh both portals.** No packages, no environment variables.
+2. **The chunk's verify step:** as a therapist, schedule a session. In the client's chat (another browser), a centred notice appears in *their* clock, and their Chat badge rises without a refresh. The therapist's chat shows the same notice in *their* clock.
+3. Move the time: a "moved" notice showing both times. Change only the note: no notice. Cancel: a struck-calendar notice.
+4. A client who has not written their opening message yet should see *"Your next session: …"* on the opening screen.
+5. 360px: the notice wraps to two lines and stays a soft rectangle.
+
+**Carried forward**
+- **9.4:** the client Session Hub; then delete the form's `notYetVisible` line (it now says to share the link in chat until then).
+- 10.4: notifications can reuse `session` on the message; nothing here depends on it.
+- Fix `WorksheetsTab`'s hidden skeleton status (from 9.2).
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no meeting link in chat · no notice for link or note edits · no manual system messages · no Session Hub (9.4).
+
+**Post-9.3 fix (developer, 2026-09-19):** the notices first rendered as the plain fallback text ("Session scheduled."). `normalise()` in `lib/chat/messageStore.js` copies a fixed list of fields and dropped `session`. The developer added `session: message.session ?? null`. My checks had exercised the formatter directly, not through the store, which is why it slipped.
+
+---
+
+## Chunk 9.4 — Client Session Hub
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas not touched**; every test ran in memory. Impeccable loaded before design.
+
+**Built**
+- server: `constants/sessions.js` (`SESSION_JOIN_OPENS_BEFORE_MINUTES`), `services/session.service.js` (the join window on every scheduled session, and the client link rule), `routes/sessions.test.js` (+9, 3 updated).
+- client new: `pages/portal/client/Sessions.jsx` (replaces the 7.1 placeholder) · `components/portal/client/sessions/{NextSession,SessionCounter,MySessionRow}.jsx` · `components/portal/sessions/DateLeaf.jsx` (extracted from 9.2, now shared by both portals) · `lib/client/{mySessions,useMySessions}.js`.
+- client edits: `clientPortalContent.js` (`MY_SESSIONS`; lead no longer says "Zoom"), therapist `SessionItem.jsx` (shared leaf), `SessionForm.jsx`/`SessionsTab.jsx` (the temporary "share the link in chat" line becomes *"Marta is told in the chat and sees it on their Sessions page"*), `therapistPortalContent.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **VIEW ONLY, enforced by the server.** The client has no write route: 9.1's writes sit behind `requireTherapist`, and the shared mount is read-only. A new test sends every verb to every sessions route as a client, and nothing changes. The page has no request or reschedule control. The one way to change a session is the chat, and the page says so: *"Need a different time? Message Priya in the chat."*
+- **The join window comes from the server:** `joinOpensAt` (10 minutes before) and `joinClosesAt` (on the same boundary that keeps a session "upcoming", developer's call). The page never works the window out itself, so the screen and server cannot disagree.
+- **A client gets the meeting link ONLY inside the window** (developer's call); the therapist always does. A reused meeting room cannot be walked into early. The page refetches at each window edge, and 30 seconds later if a window is open but the link has not arrived (clock drift).
+- **NO SESSION LENGTH ANYWHERE IN THE UI** (developer's instruction, 2026-09-19): length is flexible and agreed between therapist and client. The close boundary is internal only; the page never says when Join closes. A copy check enforces it.
+- **No countdown.** Before the window: *"You can join from 17:50"* (or "…on Thu 14 Aug"). During it: a gold **Join session** link that opens in a new tab.
+- **The counter is on this screen too**, reversing 7.1's "one copy only" note. Both screens read the one stored `sessionsRemaining`, so they cannot disagree. It is four marks on a thread (filled = left), with *"Resets on 14 October. Unused sessions do not roll over."* A cancelled-but-paid plan says *"Your plan ends on …"*.
+- **Updates live:** a session notice arriving on the socket for this booking refetches the page.
+- The empty state uses the brief's exact words. History is read-only and never shows a link.
+
+**Verification**
+- Tests: **1412 passing across 47 suites** (1403 before, 9 new). Server lint clean; client build passes; `oxlint` shows only pre-existing warnings.
+- **Mutation-checked three times:** the client always getting the link broke **4**; the window opening at 15 minutes broke **2**; the window never closing broke **1**.
+- **29 client logic checks:** every window edge to the millisecond, refetch timing, the counter (resets, ends, clamped, hidden, date in the reader's zone), display in the client's zone including a Sydney day-roll, and copy rules (no length, no countdown, no request wording, no "Zoom" claim, the brief's empty line exact).
+- **Contrast: 21 pairs, 0 failures.** Tightest: the chat-link underline on mist 3.36:1 and the empty counter ring 3.44:1. Detector `[]`, degraded.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.**
+2. As a client with a session scheduled more than 10 minutes out: the next session shows in *your* clock with *"You can join from …"* and no link. DevTools → Network → the sessions response should have `zoomLink: null`.
+3. Schedule one (as the therapist) 12 minutes ahead and wait on the client page. At 10 minutes before, the gold **Join session** appears without a refresh.
+4. As the therapist, move or cancel it. The client page updates on its own.
+5. At 360px the counter sits under the session card; with reduced motion, rows appear without sliding.
+
+**Carried forward**
+- **Flagged, not changed:** the Journal transparency note (8.6, `clientPortalContent.js`) says *"…rather than only **the hour** you spend together."* That implies a session length, against today's instruction. Suggested: *"…rather than only what comes up in your sessions."* Developer's call.
+- **9.5:** completion and the counter going down; until then the counter shows the stored value.
+- Fix `WorksheetsTab`'s hidden skeleton status (from 9.2).
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no booking, request or reschedule for clients · no session length shown anywhere · no completion (9.5) · no reminders (9.6).
+
+---
+
+## Chunk 9.5 — Session counter and completion
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas not touched**; every test ran in memory. Impeccable loaded before the UI.
+
+**Built**
+- server new: `services/sessionCounter.service.js` (complete, the on-read sweep, not-held, renew, end, period maths, counter view) · `routes/sessionCounter.test.js` (32, on a replica set).
+- server edits: `models/Session.js` (`countedAt`, `notHeldAt`, spec additions) · `constants/{sessions,chat}.js` (a `not_held` notice event, refusals, warning code) · `services/session.service.js` (on-read check, `meta.counter`, `warning`, held/not-held) · `services/therapistClient.service.js` and `clientPortal.service.js` (on-read check; counter and reset date to the therapist) · routes `POST /therapist/sessions/:id/held` and `/not-held` · tests updated in `sessions.test.js` (now on a replica set) and `therapistClient.test.js` (+1).
+- client: `components/portal/sessions/SessionCounter.jsx` (shared by both portals, moved from the client folder, with a row layout) · therapist `SessionsTab`/`SessionItem`/`SessionForm` · `useSessions` (`markHeld`, `markNotHeld`, silent refresh) · `sessionsApi` · `sessionTime.overCycleLimit` · client `Sessions.jsx`/`MySessionRow`/`useMySessions` · `SystemNotice`, `sessionNotice.js` and copy files.
+- Packages / env vars: none.
+
+**Key decisions**
+- **A session completes automatically when its Join window closes**, the same internal boundary as "upcoming". The therapist can **Mark as held** once it has started, and mark a completed one as **Didn't take place** (developer's call: an emergency should not waste the credit). No session length appears in any of it.
+- **On-read, not a scheduled job.** Every read that shows sessions or the counter (the sessions list, `/client/me`, the therapist's client view) completes that booking's overdue sessions first. 9.6's reminder job can call the same `completeOverdue`.
+- **Completion and the decrement are one transaction**, and only the call that moves a session out of `scheduled` counts. Five concurrent readers take exactly one per session. **Transactions need a replica set: Atlas is one; a local standalone `mongod` is not.**
+- **Never below 0**, by an atomic `sessionsRemaining > 0` filter. At 0 a session still completes, takes nothing, and gets no `countedAt`, so "didn't take place" can never give back a credit that was never taken.
+- **Only sessions inside the current period count.** The period start is estimated as one calendar month before `currentPeriodEnd` (never before `startDate`), because no start is stored yet. **Slice 11 should store Stripe's exact `current_period_start`.**
+- **Didn't take place** turns the session into a cancelled one with `notHeldAt`. The credit comes back only if it was taken, only within the current period (no carry-over), and never above 4. The client is told in the chat (a new `not_held` notice). A completed session cannot be cancelled the ordinary way, and the refusal says to use this.
+- **Renewal and ending are built and tested, not wired:** `renewCycle` (→ 4) and `endCycle` (→ 0) wait for slice 11's webhooks. Wiring them now would half-build renewal (counter reset, period not extended).
+- **The counter shows 0 once access has ended**, whatever is stored (§13).
+- **Scheduling past what is left is warned, never blocked** (the brief). The server returns `warning: { code: 'OVER_REMAINING', remaining, scheduled }`, and the form says it before saving, as an ink note (attention, not alarm): *"Marta has 1 session left this cycle and 1 already scheduled. You can still schedule this one."* **A business decision for Asad to confirm.**
+- **The therapist now sees the counter and its reset date** (developer's call, extending 8.2): sessions, not money. The 8.2 test still refuses amounts and Stripe ids, and a new test pins the exact shape.
+- Auto-completion and Mark-as-held post nothing into the chat; only *Didn't take place* does.
+
+**Verification**
+- Tests: **1445 passing across 48 suites** (1412 before, 33 new). Server lint clean; client build passes; `oxlint` shows only pre-existing warnings.
+- **The brief's three:** completion decrements by exactly one; the counter never goes negative (including a fifth session in a cycle); renewal resets to 4, and 2 unused become 4, never 6.
+- **Mutation-checked six times:** no floor at 0 broke **3**; completing twice broke **2**; every session counting broke **3**; restoring an untaken credit broke **1**; restoring above 4 broke **1**; renewal carrying over broke **1**.
+- **15 client logic checks:** the over-limit maths (next cycle excluded, the boundary exact), notice wording, the opening line dropping a not-held session, labels agreeing across portals, and no session length in any copy. New UI pairs reuse already-measured colours; detector `[]`, degraded.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh both portals.** No packages, no env vars.
+2. As a therapist, schedule a session 12 minutes ahead. After it starts, **Mark as held** appears; press it. The counter drops to 3 in both portals.
+3. On that session in History, press **Didn't take place** and confirm. The counter goes back to 4, and the client's chat shows the notice.
+4. Leave a session to pass its window untouched, then open either portal: it is completed and counted.
+5. With 1 session left, start scheduling two more this cycle. The note appears on the second, and it still schedules.
+
+**Carried forward**
+- **For Asad:** (1) does a no-show use up a session? As built, an uncancelled session auto-completes and counts; the therapist can mark it *Didn't take place*. (2) Should scheduling past the limit be allowed at all?
+- **Slice 11:** call `renewCycle` on renewal and `endCycle` on expiry; store Stripe's `current_period_start` and use it in `periodStartOf`.
+- **9.6:** the reminder job should call `completeOverdue` too.
+- Journal copy "the hour you spend together" (from 9.4) and the `WorksheetsTab` skeleton status (from 9.2) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no carry-over logic of any kind · no hard block on over-scheduling · no scheduled job (9.6) · renewal and expiry not wired (slice 11).
+
+---
+
+## Chunk 9.6 — Session reminder emails
+
+**Status:** Complete. Nothing skipped. **SLICE 9 IS FINISHED.** No UI, so no impeccable pass. **Atlas not touched**; every test ran in memory with email mocked, so nothing was sent.
+
+**Built**
+- server new: `services/sessionReminders.service.js` (the sweep, the due rules, the claim, the scheduler) · `services/email/templates/sessionReminder.js` · `scripts/runSessionReminders.js` · `routes/sessionReminders.test.js` (23, on a replica set).
+- server edits: `models/Session.js` (`timeSetAt`, `reminders.day/hour` — spec additions) · `constants/sessions.js` (`SESSION_REMINDERS` leads and cutoffs, interval) · `services/session.service.js` (sets `timeSetAt` on create and on every move) · `email.service.js` (+ the test mock) · `config/env.js` (`SESSION_REMINDERS=off`) · `server.js` (starts and stops the sweep) · `package.json` (`npm run reminders:run`).
+- Packages / env vars: no packages. One **optional** env var, `SESSION_REMINDERS=off`.
+
+**Key decisions**
+- **THE SHORT-NOTICE RULE, which answers both of the developer's cases:** a reminder is only sent if the session was on the calendar at least that reminder's own notice before it starts. Booked 3 hours ahead → no day reminder, the hour one still goes. Booked 15 minutes ahead → neither, so nobody is emailed about something already upon them. `timeSetAt` restarts whenever the time moves, so a rescheduled session is judged afresh and a move to short notice goes quiet.
+- **Windows:** day from 24 h before until 2 h before; hour from 1 h before until 10 minutes before (when Join opens). The late edge exists so a sweep missed during a restart still lands, rather than never.
+- **Never twice:** each reminder is claimed in one atomic update keyed to the exact session time, before anything is sent. A failed send is logged and **not** retried — the brief's rule, and the cost is that a Resend outage loses that one reminder.
+- **The client's email carries NO meeting link** (developer's call) — it would outlive the session in an inbox, and 9.4 already gives the link on their Sessions page when Join opens. The therapist's does carry it.
+- **Both people are reminded** (developer's confirmation), each in their own clock, from one stored instant. A client with no saved zone gets the therapist's clock, named ("London time"), never a silent guess.
+- **Cancelled-but-still-paid clients keep their reminders** (developer's call): they paid for those sessions. Ended subscriptions, ended bookings and deactivated accounts get none, and a cancelled session is never reminded about.
+- **No session length anywhere**, in any of the four emails. A test asserts it.
+- **The log holds ids and roles only** — no address, no meeting link, no note.
+- **The sweep also completes overdue sessions** (carried from 9.5), so the counter stays right even if nobody opens a portal.
+
+**How it runs on Render (the brief asks this be written down)**
+- **In the web service**, a sweep every 5 minutes, first run 10 seconds after boot, with a flag so a slow sweep never overlaps itself. Render's paid plan keeps the service awake; the free tier sleeps and was already ruled out.
+- **Two instances are safe:** the atomic claim decides who sends, so a scaled deployment cannot double-send.
+- **The alternative, if the timer should ever leave the web service:** a Render Cron Job running `npm run reminders:run` on the same schedule. The script is the same sweep and is safe to run beside the server.
+- **Timing accuracy:** with 5-minute ticks a reminder lands within 5 minutes of its mark, which is what the wording promises ("tomorrow", "coming up") rather than an exact countdown.
+
+**Verification**
+- Tests: **1468 passing across 49 suites** (1445 before, 23 new). Server lint clean.
+- **Mutation-checked four times:** dropping the short-notice rule broke **4**; dropping the claim guard broke **1** — the three-sweeps-at-once test, which is the one that actually proves it, with the sequential case held by the separate due check; ignoring the subscription state broke **1**; never closing the window broke **1**.
+- Both developer cases are tested directly, at several moments each, as is a move to short notice.
+- Also covered: the exact window edges, each person's own clock (London 15:00 / New York 10:00 from one instant), the zone fallback, no link for the client, no length in any email, plain-text parts, log contents, and the overdue sweep completing a session nobody looked at.
+
+**Manual steps for the developer**
+1. **Restart the API server.** You should see `Session reminders scheduled.` after the socket line. No packages, no required env vars.
+2. **The chunk's own verify step:** schedule a session about 24 hours out, then run `npm run reminders:run`. It prints what it sent. **This writes to whichever database your server uses and sends real email if `RESEND_API_KEY` is set.**
+3. Check both inboxes: the client's time and the therapist's time differ if your zones do. The client's email has a button, not a link; the therapist's has the link.
+4. To test the hour one, schedule a session about 55 minutes out and run the command again.
+5. **Blocker 7 still applies:** until `castofmind.com` is verified in Resend, these emails only reach the Resend account owner.
+6. `SESSION_REMINDERS=off` in `.env` turns the timer off while leaving the manual command working.
+
+**Carried forward**
+- **Slice 11** still owns renewal (`renewCycle`) and expiry (`endCycle`), and should store Stripe's `current_period_start` for 9.5's period maths.
+- A failed reminder is not retried; if that ever matters, the claim would need a release-on-failure path.
+- Journal copy "the hour you spend together" (9.4) and the `WorksheetsTab` skeleton status (9.2) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no retry of a failed send · no reminder for cancelled sessions or ended subscriptions · no second scheduler service · no UI.
+
+---
+
+# SLICE 10 — Admin Management
+
+## Chunk 10.1 — Admin: client management
+
+**Status:** Complete. Nothing skipped. **Slice 10 has started.** Not seen rendered; see Manual steps. **Atlas and real Stripe both untouched** — Stripe is faked in tests. One branch is uncovered by the suite and is named under Verification.
+
+**Built**
+- server new: `constants/adminClients.js` · `validation/adminClients.schema.js` · `services/adminClients.service.js` · `controllers/adminClients.controller.js` · `routes/adminClients.test.js` (34).
+- server routes, on the existing `/admin` mount so they inherit its limiter, action log and guards: `GET /clients` · `GET /clients/:id` · `POST /clients/:id/cancel-subscription` · `/deactivate` · `/reactivate` · `/reset-password`.
+- server edits: `models/Subscription.js` and `constants/payments.js` (`cancelledBy`, spec addition) · `routes/admin.routes.js` · `routes/privateNotes.test.js` (the import walk now starts from the admin router too).
+- client new: `pages/admin/ClientDetail.jsx` · `components/admin/clients/{ClientHeader,ClientActions,SubscriptionPanel,SubscriptionHistory,ClientIcons}.jsx` · `lib/api/adminClientsApi.js` · `data/adminClientContent.js`. Rewritten: `pages/admin/Clients.jsx`.
+- client edits: `App.jsx` (`clients/:id`) · `data/adminNav.js` (placeholder fields removed) · `components/portal/sessions/SessionCounter.jsx` (a `bare` variant) · four admin screens (the underline fix below).
+- Packages / env vars: none.
+
+**Key decisions**
+- **STRIPE FIRST, DATABASE SECOND, and a failed Stripe call writes nothing** (approved 2026-09-20). Writing `cancelled` after a failed call would leave the screen saying one thing and the bank another, and the person who finds out is the client, on their statement. A Stripe failure is a 502 with nothing changed; Stripe's own error text never reaches the caller.
+- **`cancel_at_period_end`, never an immediate cancel** — §13 is explicit that a cancelled client keeps access to the end of the period already paid for. Immediate expiry stays with slice 11 (approved).
+- **Spec addition `cancelledBy: 'client' | 'admin'`** (approved) — §10.6 stores only `cancelledAt`, so a manual cancellation and a client's own are indistinguishable afterwards, on the one record a dispute is about. Slice 11 sets `'client'` on the self-serve path.
+- **The admin sees `platformSubscriptionId`, not `platformCustomerId` or `checkoutSessionId`** (approved) — a refund starts with finding the row in Stripe; the other two answer no question this screen asks.
+- **Deactivating does NOT stop the billing**, and both the header and the dialog say so. `clientProfiles` has no status field and should not gain one: unlike a therapist, a client is not offered to anyone by matching, so there is no second place for the state to be read from.
+- **`:id` is the client PROFILE id**, matching `/admin/therapists/:id`, and the therapist's user id appears in no response here — 5.5 and 7.1's rule, reused.
+- **The list opens on All, not Active** — the opposite of the therapist list, deliberately. That one is a roster; this one is reached with a person in mind, usually the cancelled client who has just phoned, and an Active default hides exactly them. The counts sit in the control so the shape of the business still reads.
+- **`none` is a real filter bucket, shown only when it is not empty** — a client with no subscription row is a broken state worth finding, and a permanent filter for a state that does not exist reads as though it were expected.
+- **Cancelling is idempotent and keeps the first `cancelledAt`**, via a conditional update, so a client cancelling from their own portal at the same moment (slice 11) cannot be overwritten.
+- **The screens never mention what the admin cannot see.** There is no conversation, journal or notes view, and no line explaining its absence — naming a capability that was deliberately not built only invites a request for it.
+
+**Verification**
+- Tests: **1502 passing across 50 suites** (1468 before, 34 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; the generated CSS was confirmed to carry every new utility.
+- **Mutation-checked four times:** writing the database before calling Stripe broke **2**; removing both idempotency guards on cancel broke **1**; keeping the populated user on the detail response broke **1**; widening the subscription allowlist to the customer and session ids broke **1**.
+- **The ordering test asserts order, not timing** — the Stripe fake reads the stored row as it is called, the lesson 7.3 learned when "persists before it emits" passed against an inverted implementation.
+- **One branch is deliberately untested: "no Stripe key configured at all."** Jest builds an ESM mock's namespace once, so `isStripeConfigured` cannot be flipped between cases in one suite. It is unreachable in production — `config/env.js` refuses to start without a key — and exists only so a developer without one gets a notice instead of a crash. Checked by hand, not by the suite.
+- **`privateNotes`:** the import-graph walk now starts from `admin.routes.js` as well and asserts the notes modules are unreachable from it, with a non-vacuous size check. A response sweep over both new endpoints asserts no journal, note or conversation key.
+- Contrast: **57 pairs computed, 1 failure found and fixed.** Tightest after it: the modal caption at 4.56:1, the success badge at 4.69:1, the list and panel notes at 4.74:1.
+- **The failure was a real one, and it was already shipped.** The admin's table links carried `decoration-ink/30` — **1.96:1**, and that underline is the only thing distinguishing a link from the identical-coloured text beside it. Raised to `decoration-ink/60` (**4.74:1**) here and on Applications, Therapists and the dashboard card, so all five admin screens stay identical. Same defect 7.6 found in the chat bubble.
+- **30 client logic checks** (the client has no Jest suite): icon bounds, the state wording and tones, the couple label being announced and not only drawn, the list default, the filter's appear-when-present rule, money going through the one helper that divides, and copy rules — no session length, no invented timeline, no retention pressure on the cancellation dialog.
+- **4 icons bounds-checked** against the 24 viewBox including stroke, 0 out of bounds; arcs sampled from their true centre rather than read at their endpoints (the 8.1 trap).
+- Detector `[]` — **a degraded empty**: the four parsing dependencies were re-checked this chunk and are all still absent, so it evaluates no contrast. The computed table is the compensation.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no environment variables, no external setup.
+2. Sign in as the admin → **Clients**. Both real client accounts should appear with their therapist and subscription state. Search by name, by a partner's name, and by email.
+3. Open one. Check the intake answers, the concern chips, and that the therapist links through to their admin page.
+4. **The chunk's own verify step, and it spends real money if your key is live.** Use a test-mode client. Press **Cancel subscription**: the dialog must name the real end date, the row must move to Cancelled, and **the subscription in your Stripe dashboard must show "Cancels at period end"**. If Stripe is unreachable you should get an error and *no* change here — that is the behaviour, not a bug.
+5. **This path has never run against real Stripe** — the suite fakes it. Step 4 is its first live exercise.
+6. Try **Deactivate**: they can no longer sign in, and the subscription is untouched. Reactivate afterwards.
+7. At 360px the table collapses to cards; with reduced motion on, the skeleton rows must not pulse.
+
+**Carried forward**
+- **Slice 11 must handle the webhooks an admin cancellation now produces.** `customer.subscription.updated` fires on `cancel_at_period_end`, and `customer.subscription.deleted` at the period end; both are still stubs, so nothing yet flips `cancelled` → `expired` on the 7.1 gate's boundary.
+- **Slice 11 sets `cancelledBy: 'client'`** when a client cancels from their own portal.
+- **10.2** reuses this list's shape for the bookings overview; **10.3** adds reviews, which the therapist detail already has a panel waiting for.
+- **For Asad:** manual cancellation stops the billing but issues no refund — that stays a dashboard action (§12). Worth confirming that is what he expects when he uses this button for a refund dispute.
+- Journal copy "the hour you spend together" (9.4) and the `WorksheetsTab` skeleton status (9.2) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content was created: every word in `data/adminClientContent.js` is a spec fact or a plain description of a control.
+
+**Not done (by design):** no reassign therapist (v2) · no conversation, journal or note visibility in any form (§11) · no immediate expiry (slice 11) · no refund logic · no free-text cancellation reason · nothing on these screens edits what a client told us.
+
+---
+
+## Chunk 10.2 — Admin: bookings and subscriptions overview
+
+**Status:** Complete. **CSV export was dropped by the developer at approval (2026-09-21)** — not built, not skipped. Not seen rendered; see Manual steps. **Atlas untouched**; every test ran in memory.
+
+**Built**
+- server new: `constants/adminBookings.js` · `validation/adminBookings.schema.js` · `services/adminBookings.service.js` · `controllers/adminBookings.controller.js` · `routes/adminBookings.test.js` (24). Route: `GET /admin/bookings`, on the existing guarded mount.
+- server edits: `utils/search.js` (`clientNameClauses`, moved out of 10.1's service) · `validation/adminClients.schema.js` (`SUBSCRIPTION_STATUS_FILTERS`, now shared) · `routes/admin.routes.js` · `routes/roleGuards.test.js` (see Verification).
+- client new: `components/admin/bookings/StatusLedger.jsx` · `data/subscriptionStates.js` · `data/adminBookingContent.js` · `lib/api/adminBookingsApi.js` · `OpenRowIcon`. Rewritten: `pages/admin/Bookings.jsx`.
+- client edits: `DataTable.jsx` (`rowHref`, `initialSort`) · `ui/Badge.jsx` (the contrast fix below) · 10.1's three client files (shared state wording) · `data/adminNav.js`. **Deleted** `AdminSectionPlaceholder.jsx` — all five sections are built, so nothing used it.
+- Packages / env vars: none.
+
+**Key decisions**
+- **One row per booking, carrying its NEWEST subscription** — the rule the 7.1 gate uses, so this screen and a client's portal cannot disagree about one pairing.
+- **Sort is an allowlist of five named keys, mapped server-side to computed fields.** The query string picks a key and never supplies a field; anything else is 422, not ignored — a sort silently not applied would present rows in an order the header claims.
+- **Status sorts in LIFECYCLE order** (active → payment failed → cancelled → ended → none), not alphabetically. **Missing values sort last in both directions**, so "soonest payment first" does not open on rows with no payment.
+- **Only a live subscription has a next payment.** Cancelled and expired rows still STORE `nextBillingDate` (the model requires it); showing or sorting by it would schedule money that is not coming. Cancelled rows show "Access ends …" instead.
+- **Counts are taken after the search and before the status filter** — they describe the table the admin is looking at, never the business. No money, month comparison or trend anywhere: the dashboard owns those.
+- **The ledger is the summary AND the control.** A thin bar draws the mix; the chips beneath are its legend and the filter, so each number appears once. On ink: the only ground where gold can mark the cancelled slice, and the same command surface that opens every admin detail screen. Choosing a chip dims the other slices. The bar is aria-hidden; "no subscription" is drawn hollow, so it differs from "payment failed" by shape, not only hue.
+- **Rows click through via a new `rowHref` on the shared table**, off by default so the other three lists are unchanged. The client's name stays a real link for keyboard and screen readers; clicks on links inside the row, text selection and ctrl/cmd-click all behave as they would on a link.
+- **`initialSort`** hands the table the server's default, so the header marks the order the rows are actually in.
+- **"Paired since" is `booking.matchedAt`** (approved). **The client's email is searchable but not shown** — the brief's five columns, and the email is one click away.
+- **Flags are words on the row:** "Deactivated — cannot sign in" under a departed therapist, "Deactivated" under a blocked client — the pairings this screen exists to surface.
+
+**Verification**
+- Tests: **1526 passing across 51 suites** (1502 before, 24 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed for every arbitrary value, including the `color-mix` badges.
+- **Mutation-checked seven times, each breaking at least one test:** the sort allowlist 1 · counts after the status filter 1 · next payment regardless of status 2 · missing-last removed 1 · oldest subscription deciding 1 · alphabetical status 1 · collation removed 1.
+- **A sixth false-confidence test, caught before it shipped.** The case-insensitive sort fixture (`charlie`, `Alice`, `bob`) sorts identically in binary order, so deleting the collation would have broken nothing. Rewritten with `Carl`, `Alice`, `bob`, where byte order and human order disagree.
+- **A real contrast failure, already shipped since 4.2.** Admin table rows turn mist on hover, and the `Badge` tints composited over it: success **4.27:1**, danger **4.32:1**. Fixed at the primitive — the tints are now mixed opaque into paper with `color-mix(in srgb …)`, so every badge is its paper figure (4.69 / 4.74) on any ground. Fixes every admin table, not only this one.
+- Contrast: **37 pairs computed, 0 failures after that fix.** Tightest: success badge 4.69:1, ledger note 4.74:1, the "ended" slice 3.14:1 on ink.
+- **Dataviz validator on the ledger palette (dark, ink-deep):** CVD separation ΔE 10.9, normal vision 19.1, all fills ≥ 3:1 — pass. It fails lightness band (gold) and chroma floor (sage, grey): categorical checks, on a status encoding with a fixed palette and a deliberately neutral grey. Accepted and recorded.
+- **27 client checks** (client/server parity of sort keys, default sort, filter buckets and slice order; row-click behaviour; no dashboard figures; no CSV; copy rules). `OpenRowIcon` bounds-checked. Detector `[]` — degraded, as always.
+- **Test infrastructure, beyond this chunk and flagged:** `roleGuards.test.js` boots the whole app in a child process with a 15s window; under the full run it missed it once, and passed 21/21 alone. Widened to 45s (test timeout 60s) — a hang guard, not a behaviour claim, as 7.6's were.
+- **One failure I could not reproduce.** Straight after the mutation run (seven back-to-back Jest processes) one run of three suites failed a single test I did not see; four further runs and the full suite passed. Recorded rather than called fixed.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.**
+2. Admin → **Bookings**. The ledger shows the mix; click a chip and the table filters while the other slices dim.
+3. Search a therapist's surname: every client paired with them appears, and the ledger's counts follow the search.
+4. Sort each column both ways. Next payment: ended and no-subscription rows stay at the bottom either way.
+5. Click anywhere on a row → that client's screen. Ctrl-click opens a new tab; selecting a name to copy does not navigate.
+6. Deactivate a test therapist, then return: their pairings read "Deactivated — cannot sign in". Reactivate afterwards.
+7. At 360px the table becomes cards and the ledger chips wrap; the hover badge colour should no longer shift.
+
+**Carried forward**
+- **10.3** next: reviews. **Slice 11** still owns the webhooks an admin cancellation produces, `cancelledBy: 'client'`, and cancelled → expired on the 7.1 boundary.
+- A name sort joins every matched booking before ordering — fine at tens to hundreds; past a few thousand, store a sort key.
+- Journal copy "the hour you spend together" (9.4) and the `WorksheetsTab` skeleton status (9.2) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** CSV export (dropped) · dashboard figures of any kind · editing or reassigning a pairing (v2) · any conversation or clinical content.
 
 ---
 

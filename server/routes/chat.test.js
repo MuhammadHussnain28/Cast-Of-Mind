@@ -360,6 +360,32 @@ describe('POST a message', () => {
     expect(await Message.countDocuments({ type: MESSAGE_TYPE.SYSTEM })).toBe(0);
   });
 
+  it('DROPS A FORGED session field — nobody can post a session notice by hand (9.3)', async () => {
+    const forged = {
+      event: 'scheduled',
+      scheduledAt: new Date().toISOString(),
+      sessionId: '64b7f0c2a1b2c3d4e5f60718',
+    };
+    const asClient = await send(bookingA._id, tokens.clientA, {
+      text: 'This is long enough to be an opening message.',
+      type: MESSAGE_TYPE.SYSTEM,
+      session: forged,
+    });
+    const asTherapist = await send(bookingA._id, tokens.therapistA, {
+      text: 'Session scheduled for Thursday.',
+      type: MESSAGE_TYPE.SYSTEM,
+      session: forged,
+    });
+
+    for (const res of [asClient, asTherapist]) {
+      expect(res.status).toBe(201);
+      expect(res.body.type).toBe(MESSAGE_TYPE.TEXT);
+      expect(res.body.session).toBeUndefined();
+    }
+    expect(await Message.countDocuments({ type: MESSAGE_TYPE.SYSTEM })).toBe(0);
+    expect(await Message.countDocuments({ session: { $exists: true } })).toBe(0);
+  });
+
   it('ignores a forged read flag and sender', async () => {
     await send(bookingA._id, tokens.clientA, {
       text: 'Hello, this is long enough to be an opening.',

@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { cx } from '../../../../lib/cx'
 import { Heading, Text } from '../../../ui'
 import { opening } from '../../../../data/chatContent'
-import { SendIcon } from '../../chat/ChatIcons'
+import { NoticeIcon, SendIcon } from '../../chat/ChatIcons'
 
 /**
  * The mandatory first message — master spec §7.1.
@@ -27,7 +27,7 @@ import { SendIcon } from '../../chat/ChatIcons'
  */
 const MIN = 20 // matches OPENING_MESSAGE_MIN on the server
 
-export default function OpeningMessage({ therapist, onSend, error }) {
+export default function OpeningMessage({ therapist, nextSession, onSend, error }) {
   const [value, setValue] = useState('')
   const [sending, setSending] = useState(false)
   const textareaRef = useRef(null)
@@ -99,6 +99,15 @@ export default function OpeningMessage({ therapist, onSend, error }) {
               <p className="font-body text-ui font-medium text-ink">{fullName}</p>
             </div>
           </div>
+
+          {/* A session booked before they have written (9.3): the thread is not
+              open yet, so its notice would otherwise stay out of sight. */}
+          {nextSession && (
+            <p className="mt-5 flex items-start gap-2.5 rounded-xl bg-mist px-4 py-3 font-body text-caption text-ink">
+              <NoticeIcon size={18} className="mt-0.5 shrink-0 text-sage-deep" />
+              {nextSession}
+            </p>
+          )}
 
           {/* No kicker above this heading. The heading carries its own weight. */}
           <Heading level={1} size="section" className="mt-7">

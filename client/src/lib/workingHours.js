@@ -74,6 +74,71 @@ export function wallTimeToInstant(year, month, day, hour, minute, timeZone) {
   return instant
 }
 
+export const WALL_TIME_REASON = Object.freeze({
+  INVALID_DATE: 'invalid_date',
+  INVALID_TIME: 'invalid_time',
+  INVALID_ZONE: 'invalid_zone',
+  NONEXISTENT: 'nonexistent',
+})
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function offsetAt(instant, timeZone) {
+  const at = Math.floor(instant / 60000) * 60000
+  const p = partsInZone(at, timeZone)
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - at
+}
+
+/**
+ * A dated wall-clock time (`YYYY-MM-DD`, `HH:MM`) in `timeZone`, as one instant,
+ * by the same rules as the server's `utils/timezone.js`: a skipped time is
+ * `nonexistent`, a repeated time takes the first. A server parity test holds
+ * the two together, so the scheduling preview cannot disagree with what is stored.
+ *
+ * @returns {{ instant: Date|null, reason: string|null, ambiguous: boolean }}
+ */
+export function resolveWallTime({ date, time }, timeZone) {
+  const fail = (reason) => ({ instant: null, reason, ambiguous: false })
+
+  try {
+    if (!timeZone) return fail(WALL_TIME_REASON.INVALID_ZONE)
+    partsInZone(0, timeZone)
+  } catch {
+    return fail(WALL_TIME_REASON.INVALID_ZONE)
+  }
+
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date ?? ''))
+  if (!d) return fail(WALL_TIME_REASON.INVALID_DATE)
+  const [year, month, day] = d.slice(1).map(Number)
+  const check = new Date(Date.UTC(year, month - 1, day))
+  if (year < 1970 || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    return fail(WALL_TIME_REASON.INVALID_DATE)
+  }
+
+  const t = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(time ?? ''))
+  if (!t) return fail(WALL_TIME_REASON.INVALID_TIME)
+  const hour = Number(t[1])
+  const minute = Number(t[2])
+
+  const wall = Date.UTC(year, month - 1, day, hour, minute)
+  const offsets = new Set([
+    offsetAt(wall - DAY_MS, timeZone),
+    offsetAt(wall, timeZone),
+    offsetAt(wall + DAY_MS, timeZone),
+  ])
+
+  const matches = [...offsets]
+    .map((offset) => wall - offset)
+    .filter((candidate) => {
+      const p = partsInZone(candidate, timeZone)
+      return p.year === year && p.month === month && p.day === day && p.hour === hour && p.minute === minute
+    })
+    .sort((a, b) => a - b)
+
+  if (matches.length === 0) return fail(WALL_TIME_REASON.NONEXISTENT)
+  return { instant: new Date(matches[0]), reason: null, ambiguous: matches.length > 1 }
+}
+
 function parseTime(value) {
   const match = /^(\d{2}):(\d{2})$/.exec(value ?? '')
   if (!match) return null

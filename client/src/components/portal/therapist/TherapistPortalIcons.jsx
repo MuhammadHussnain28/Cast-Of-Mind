@@ -163,3 +163,44 @@ export function ReturnedIcon({ size = 20, ...props }) {
     </svg>
   )
 }
+
+/** A camera body and lens — a video meeting, never a brand logo. */
+export function VideoIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <rect x="3.25" y="7" width="12" height="10" rx="2" />
+      <path d="m15.25 10.5 5.25-2.75v8.5l-5.25-2.75" />
+    </svg>
+  )
+}
+
+/** A struck ring — a session called off, kept on the record. */
+export function CancelledIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <circle cx="12" cy="12" r="7.25" />
+      <path d="m7 17 10-10" />
+    </svg>
+  )
+}
+
+/** A crescent — the time falls at night for the other person. */
+export function MoonIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M19.25 14.5A7.75 7.75 0 1 1 9.5 4.75a6.25 6.25 0 0 0 9.75 9.75Z" />
+    </svg>
+  )
+}
+
+/** A folded note — words written for the client to read. */
+export function NoteIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M6.25 3.75h8l3.5 3.5v13H6.25z" />
+      <path d="M14.25 3.75v3.5h3.5" />
+      <path d="M9 12h6" />
+      <path d="M9 15.5h4" />
+    </svg>
+  )
+}

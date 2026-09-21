@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import {
   BILLING_CURRENCY,
+  CANCELLED_BY_VALUES,
   PLATFORM_SUBSCRIPTION_ID_MAX,
   SESSIONS_PER_CYCLE,
   SUBSCRIPTION_AMOUNT_MINOR,
@@ -140,6 +141,20 @@ const subscriptionSchema = new mongoose.Schema(
     },
 
     cancelledAt: { type: Date, default: undefined },
+
+    // WHO stopped it — spec addition, approved 2026-09-20. §10.6 records only
+    // `cancelledAt`, so a subscription Asad cancelled over a refund dispute and
+    // one the client cancelled themselves are indistinguishable afterwards.
+    // That distinction is exactly what a dispute asks about. Unset until a
+    // cancellation happens; slice 11 sets 'client' on the self-serve path.
+    cancelledBy: {
+      type: String,
+      enum: {
+        values: CANCELLED_BY_VALUES,
+        message: `Cancelled by must be one of: ${CANCELLED_BY_VALUES.join(', ')}.`,
+      },
+      default: undefined,
+    },
   },
   {
     timestamps: true, // §10.6 lists both createdAt and updatedAt
