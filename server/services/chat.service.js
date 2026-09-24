@@ -8,6 +8,8 @@ import { encodeCursor as encode, decodeCursor as decode } from '../utils/cursor.
 import { clientDisplayName } from '../utils/clientDisplayName.js';
 import { emitMessage, emitUnread, getSocketServer } from '../realtime/emitter.js';
 import { loadBookingMember } from './bookingMembership.service.js';
+import { notifyQuietly } from './notification.service.js';
+import { NOTIFICATION_TYPE } from '../constants/notifications.js';
 import { ROLES } from '../constants/roles.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
 import {
@@ -287,6 +289,7 @@ export async function sendMessage(bookingId, user, text, { clientMessageId } = {
   emitMessage(booking._id, presented, [booking.clientId, booking.therapistId]);
 
   await pushUnreadToRecipient(booking, user);
+  await notifyRecipient(booking, user);
 
   return presented;
 }
@@ -339,6 +342,30 @@ async function pushUnreadToRecipient(booking, sender) {
     : { id: booking.clientId, role: ROLES.CLIENT };
 
   emitUnread(recipient.id, await unreadCount(recipient));
+}
+
+/**
+ * 10.4: the therapist's bell, for a message from a client they may not be
+ * looking at.
+ *
+ * ONLY WHEN THE RECIPIENT IS THE THERAPIST (approved 2026-09-23) — a client has
+ * their own unread badge, and §8.8 is a therapist feature. A system message the
+ * platform wrote (9.3) is sent as the therapist, so it lands here with the
+ * client as recipient and correctly produces nothing.
+ *
+ * UNLIKE the unread push above, the record is written whether or not a socket
+ * server is attached: the bell reads it over REST, and the socket only makes it
+ * instant. Never allowed to fail the send.
+ */
+async function notifyRecipient(booking, sender) {
+  const senderIsClient = String(booking.clientId) === String(sender.id);
+  if (!senderIsClient) return;
+
+  await notifyQuietly({
+    userId: booking.therapistId,
+    type: NOTIFICATION_TYPE.NEW_MESSAGE,
+    bookingId: booking._id,
+  });
 }
 
 /**

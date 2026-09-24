@@ -3,7 +3,11 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireAdmin } from '../middleware/requireRole.js';
 import { adminActionLog } from '../middleware/adminActionLog.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
-import { getSession, getStats } from '../controllers/admin.controller.js';
+import {
+  getSession,
+  getStats,
+  getSystemStatusController,
+} from '../controllers/admin.controller.js';
 import {
   listApplicationsController,
   getApplicationController,
@@ -28,6 +32,8 @@ import {
   resetClientPasswordController,
 } from '../controllers/adminClients.controller.js';
 import { listBookingsController } from '../controllers/adminBookings.controller.js';
+import { listReviewsController } from '../controllers/adminReviews.controller.js';
+import { listReviewsQuerySchema } from '../validation/reviews.schema.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import {
   listApplicationsQuerySchema,
@@ -69,6 +75,9 @@ router.get('/session', getSession);
 
 // The dashboard overview — §9.1. Counts and one trend, nothing derived.
 router.get('/stats', getStats);
+
+// Dashboard system status card (10.6): one check per service, on request only.
+router.get('/system-status', getSystemStatusController);
 
 // Therapist applications — master spec §9.2.
 router.get(
@@ -134,5 +143,10 @@ router.post('/clients/:id/reset-password', resetClientPasswordController);
 // paired with whom, and the state of each pairing's newest subscription. Every
 // action lives on the client's own screen, one click away.
 router.get('/bookings', validateQuery(listBookingsQuerySchema), listBookingsController);
+
+// End-of-subscription reviews — master spec §9.6. ADMIN-ONLY: this router is
+// the only one that may reach adminReviews.service.js, and a test walks every
+// other router's imports to prove none can. `?therapistId=` is a PROFILE id.
+router.get('/reviews', validateQuery(listReviewsQuerySchema), listReviewsController);
 
 export default router;

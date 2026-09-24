@@ -73,23 +73,9 @@ export const WORKSPACE_PENDING = {
   notesNote: 'Your private notes are never visible to a client.',
 }
 
-/**
- * Notifications — §8.8.
- *
- * Chunk 10.4 builds the feed. The nav entry ships now so the inbox has the
- * shape §8 describes, and this screen says plainly that it is not live.
- */
-export const NOTIFICATIONS_PENDING = {
-  title: 'Notifications',
-  lead: 'Alerts about your clients collect here, so you never have to check each conversation to find out what changed.',
-  truths: [
-    // §8.8 — the three triggers, stated as facts about the finished feature.
-    'A new message from any client, including one you are not currently viewing.',
-    'A worksheet coming back completed.',
-    'A new client matched with you.',
-  ],
-  note: 'This part is not switched on yet. Unread counts beside each client are live now.',
-}
+// The Notifications placeholder copy was removed in 10.4, when the real feed
+// replaced it.
+
 
 /** Relative time, shortened for a 320px rail. */
 export const ACTIVITY_PREFIX = {

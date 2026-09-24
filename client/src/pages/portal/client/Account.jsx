@@ -1,4 +1,5 @@
 import { ScreenHeader, BuildNote } from '../../../components/portal/client/ScreenScaffold'
+import RatingForm from '../../../components/portal/client/review/RatingForm'
 import { Text } from '../../../components/ui'
 import { useClientPortal } from '../../../lib/clientPortalContext'
 import { formatDate } from '../../../lib/dateFormat'
@@ -37,7 +38,7 @@ function Row({ term, children }) {
 }
 
 export default function Account() {
-  const { user, profile, subscription, access } = useClientPortal()
+  const { user, profile, subscription, access, therapist, reviewState } = useClientPortal()
 
   const people =
     profile?.type === 'couple'
@@ -106,6 +107,15 @@ export default function Account() {
           {user.memberSince && <Row term="With us since">{formatDate(user.memberSince)}</Row>}
         </dl>
       </div>
+
+      {/* §9.6, approved 2026-09-21: while a cancelled plan runs out the client
+          is still here to be asked — after expiry most never come back. The
+          same quiet form as the ended screen, offered once. */}
+      {access === 'ending' && reviewState === 'eligible' && (
+        <div className="mt-6 rounded-2xl bg-paper px-5 py-6 sm:px-6">
+          <RatingForm therapistName={therapist?.firstName} />
+        </div>
+      )}
 
       <BuildNote>
         Changing your card and cancelling your subscription are not switched on

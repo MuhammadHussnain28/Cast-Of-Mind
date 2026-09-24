@@ -35,5 +35,5 @@ export { SUBSCRIPTION_STATUS, BILLING_CURRENCY } from './payments.js';
 // A year reads as a trend without becoming an analytics view.
 export const TREND_MONTHS = 12;
 
-// §9.6: the dashboard shows a short feed, not the full review list.
-export const RECENT_REVIEWS_LIMIT = 5;
+// The recent-reviews limit moved to constants/reviews.js in 10.3, beside every
+// other review value.

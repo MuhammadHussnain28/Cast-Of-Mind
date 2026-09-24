@@ -223,9 +223,15 @@ describe('*** THE privateNotes BOUNDARY ***', () => {
       c(request(app).get(`/api/v1/sessions/${bookings.mine._id}`)),
       c(request(app).get(`/api/v1/sessions/${bookings.mine._id}?scope=history`)),
       c(request(app).post('/api/v1/client/journal')).send({ text: 'Another entry.' }),
-      c(request(app).patch(`/api/v1/client/journal/${entryId}`)).send({ text: 'Edited entry.' }),
-      c(request(app).delete(`/api/v1/client/journal/${entryId}`)),
     ]);
+
+    // Edit THEN delete, never together. Fired in parallel (as they were until
+    // 10.3) the delete sometimes won, the edit found nothing, and the sweep
+    // failed at random on an ordering it was never testing.
+    responses.push(
+      await c(request(app).patch(`/api/v1/client/journal/${entryId}`)).send({ text: 'Edited entry.' }),
+    );
+    responses.push(await c(request(app).delete(`/api/v1/client/journal/${entryId}`)));
 
     expect(responses.every((res) => res.status < 400)).toBe(true);
     // The two session lists really carried a session each.
@@ -252,8 +258,11 @@ describe('*** THE privateNotes BOUNDARY ***', () => {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const serverRoot = path.resolve(here, '..');
 
+    // Three import shapes, not one: `from '…'`, a bare side-effect `import '…'`,
+    // and a dynamic `import('…')`. This matched only the first until 10.3, when a
+    // mutation showed a bare import slipped past it unnoticed.
     const importsOf = (file) =>
-      [...fs.readFileSync(file, 'utf8').matchAll(/from\s+['"](\.[^'"]+)['"]/g)]
+      [...fs.readFileSync(file, 'utf8').matchAll(/(?:\bfrom\s+|\bimport\s*\(?\s*)['"](\.[^'"]+)['"]/g)]
         .map((match) => path.resolve(path.dirname(file), match[1]));
 
     const reachableFrom = (entries) => {

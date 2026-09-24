@@ -4,11 +4,11 @@ import { Button, Spinner, Text, useToast } from '../../components/ui'
 import TherapistHeader from '../../components/admin/therapists/TherapistHeader'
 import TherapistEditForm from '../../components/admin/therapists/TherapistEditForm'
 import TherapistActions from '../../components/admin/therapists/TherapistActions'
+import RatingsSection from '../../components/admin/therapists/RatingsSection'
 import FieldList from '../../components/admin/applications/FieldList'
 import WorkingHoursSummary from '../../components/admin/applications/WorkingHoursSummary'
 import { fetchTherapist } from '../../lib/api/adminTherapistsApi'
 import { toApiError } from '../../lib/api/ApiError'
-import { formatDate } from '../../lib/dateFormat'
 
 const list = (values) => (values?.length ? values.join(' · ') : '')
 
@@ -174,32 +174,8 @@ export default function TherapistDetail() {
             <WorkingHoursSummary workingHours={t.workingHours} timezone={t.timezone} />
           </Panel>
 
-          <Panel
-            title="Reviews"
-            note="Admin-only — never shown publicly"
-            className="rounded-2xl border border-ink/12 bg-paper px-5 py-5 sm:px-6"
-          >
-            {t.reviews.length === 0 ? (
-              <Text size="caption" tone="muted">
-                Nothing yet. Clients are asked to rate their therapist when a subscription ends.
-              </Text>
-            ) : (
-              <ul className="flex flex-col gap-4">
-                {t.reviews.map((review) => (
-                  <li key={review.id}>
-                    <Text size="caption" tone="muted">
-                      {review.stars} of 5 · {formatDate(review.createdAt)}
-                    </Text>
-                    {review.text && (
-                      <Text size="caption" className="mt-1">
-                        {review.text}
-                      </Text>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
+          {/* §9.6 — the rating, its shape, and every review, paged. */}
+          <RatingsSection therapist={t} />
 
           <div className="flex flex-col gap-4">
             <Button variant="secondary" className="self-start" onClick={() => setEditing(true)}>

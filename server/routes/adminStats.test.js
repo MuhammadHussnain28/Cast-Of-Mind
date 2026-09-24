@@ -1,5 +1,4 @@
 import request from 'supertest';
-import mongoose from 'mongoose';
 import app from '../app.js';
 import { User } from '../models/User.js';
 import { TherapistApplication } from '../models/TherapistApplication.js';
@@ -88,10 +87,13 @@ describe('the empty database — the chunk\'s verify step', () => {
     });
   });
 
-  test('reads collections that do not exist yet without crashing', async () => {
-    // `reviews` still has no model, so that collection has never been created.
-    // MongoDB answers 0 and [] rather than throwing, which is what lets these
-    // figures switch on by themselves when their slice ships.
+  test('reads empty collections as zeros, and an absent average as null', async () => {
+    // Every collection the dashboard reads now has a model. What still matters
+    // is that empty ones answer 0 and [] — and that "nothing rated" is null,
+    // never a 0 that would claim the lowest possible mark.
+    //
+    // UPDATED IN CHUNK 10.3: `reviews` gained its model, the last one, so the
+    // "reviews does not exist" assertion went the way of the two below.
     //
     // UPDATED IN CHUNK 6.4. This test used to assert `subscriptions` was absent
     // too. It no longer is: chunk 6.1 added the model, and Mongoose builds its
@@ -101,11 +103,6 @@ describe('the empty database — the chunk\'s verify step', () => {
     // it would only pin an accident of when a model happened to be written.
     //
     // UPDATED IN CHUNK 9.1 for the same reason: `sessions` now has its model.
-    const names = (await mongoose.connection.db.listCollections().toArray()).map(
-      (c) => c.name,
-    );
-    expect(names).not.toContain('reviews');
-
     const res = await get(STATS);
     expect(res.status).toBe(200);
     expect(res.body.activity.sessionsThisMonth).toBe(0);

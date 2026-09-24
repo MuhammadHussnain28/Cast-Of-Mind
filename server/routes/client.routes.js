@@ -14,6 +14,11 @@ import { WORKSHEET_UPLOAD_RATE_LIMIT } from '../constants/worksheets.js';
 import { journalEntrySchema, journalQuerySchema } from '../validation/journal.schema.js';
 import { listMine, create, update, remove } from '../controllers/journal.controller.js';
 import { JOURNAL_WRITE_RATE_LIMIT } from '../constants/journal.js';
+import { submitReviewSchema } from '../validation/reviews.schema.js';
+import { REVIEW_RATE_LIMIT } from '../constants/reviews.js';
+// The WRITE half only. The read half (adminReviews.service.js) must never be
+// reachable from this router — routes/reviews.test.js walks the imports.
+import { submitReviewController } from '../controllers/reviews.controller.js';
 
 // Everything under /api/v1/client — the signed-in client's own portal (§7).
 //
@@ -46,6 +51,18 @@ router.use(clientRateLimiter, requireAuth, requireClient);
  * their own subscription.
  */
 router.get('/me', getMe);
+
+/**
+ * ALSO OUTSIDE THE GATE, and for a sharper reason (10.3).
+ *
+ * §9.6 asks for a rating when a subscription ENDS — so the people who can leave
+ * one are exactly the people the gate turns away. Behind it, no client could
+ * ever rate. The service decides eligibility itself (cancelled or expired) and
+ * resolves the therapist from the client's own booking; the body is stars and
+ * optional words, nothing else.
+ */
+export const reviewRateLimiter = createRateLimiter(REVIEW_RATE_LIMIT);
+router.post('/reviews', reviewRateLimiter, validate(submitReviewSchema), submitReviewController);
 
 /**
  * EVERYTHING BELOW THIS LINE REQUIRES A LIVE SUBSCRIPTION (§13).

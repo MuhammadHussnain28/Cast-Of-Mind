@@ -4,6 +4,7 @@ import SkipLink from '../../components/layout/SkipLink'
 import SignOutButton from '../../components/auth/SignOutButton'
 import PortalSocketProvider from '../../components/portal/PortalSocketProvider'
 import UnreadProvider from '../../components/portal/UnreadProvider'
+import NotificationProvider from '../../components/portal/NotificationProvider'
 import TherapistRail from '../../components/portal/therapist/TherapistRail'
 import { BackIcon } from '../../components/portal/therapist/TherapistPortalIcons'
 import { useTherapistClients } from '../../lib/therapist/useTherapistClients'
@@ -51,9 +52,13 @@ export default function TherapistPortalShell() {
       {/* Built role-agnostic in 7.6 for exactly this. One count per booking,
           rising live the moment a client writes. */}
       <UnreadProvider myRole="therapist">
-        <DraftContext.Provider value={drafts}>
-          <TherapistPortalFrame />
-        </DraftContext.Provider>
+        {/* §8.8: cross-client awareness, beside the per-client counts rather
+            than instead of them. One fetch for the whole portal (10.4). */}
+        <NotificationProvider>
+          <DraftContext.Provider value={drafts}>
+            <TherapistPortalFrame />
+          </DraftContext.Provider>
+        </NotificationProvider>
       </UnreadProvider>
     </PortalSocketProvider>
   )

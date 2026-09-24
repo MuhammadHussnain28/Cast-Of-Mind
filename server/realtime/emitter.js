@@ -113,3 +113,13 @@ export function emitUnread(userId, counts) {
 export function emitWorksheetsUpdate(userId, pending) {
   return emit(userRoom(String(userId)), SOCKET_EVENTS.WORKSHEETS_UPDATE, { pending });
 }
+
+/**
+ * 10.4: one alert to the recipient's own sockets, with their new unread total.
+ *
+ * To their room, never a booking's — a bell is personal, and the person who
+ * caused the alert must not learn that it arrived.
+ */
+export function emitNotification(userId, notification, unread) {
+  return emit(userRoom(String(userId)), SOCKET_EVENTS.NOTIFICATION_NEW, { notification, unread });
+}

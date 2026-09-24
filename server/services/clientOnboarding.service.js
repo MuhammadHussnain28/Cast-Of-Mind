@@ -9,6 +9,8 @@ import { PendingCheckout } from '../models/PendingCheckout.js';
 import { hashPassword, generateTemporaryPassword } from '../utils/password.js';
 import { ROLES, USER_STATUS } from '../constants/roles.js';
 import { sendClientWelcomeEmail } from './email/email.service.js';
+import { notifyQuietly } from './notification.service.js';
+import { NOTIFICATION_TYPE } from '../constants/notifications.js';
 import {
   BILLING_CURRENCY,
   BOOKING_STATUS,
@@ -153,6 +155,9 @@ export async function createClientAccount(session) {
 
   const mongoSession = await mongoose.startSession();
   let createdUserId = null;
+  // Captured inside the transaction so the bell (10.4) can be told afterwards
+  // which booking to open, without a second query.
+  let createdBookingId = null;
 
   try {
     await mongoSession.withTransaction(async () => {
@@ -218,6 +223,7 @@ export async function createClientAccount(session) {
       await PendingCheckout.deleteOne({ _id: draft._id }, { session: mongoSession });
 
       createdUserId = user._id;
+      createdBookingId = booking._id;
     });
   } finally {
     await mongoSession.endSession();
@@ -243,6 +249,16 @@ export async function createClientAccount(session) {
     // The message only — never the address, never the password.
     console.error('[onboarding] welcome email failed to send:', error.message);
   }
+
+  // 10.4: the therapist's bell — "a new client has been matched with you".
+  // After the commit for the same reason the email is: a notification must
+  // never be able to roll back an account somebody has paid for. It also
+  // carries no name, only the booking to open.
+  await notifyQuietly({
+    userId: therapist.userId,
+    type: NOTIFICATION_TYPE.NEW_CLIENT,
+    bookingId: createdBookingId,
+  });
 
   return { created: true, userId: String(createdUserId), emailSent };
 }

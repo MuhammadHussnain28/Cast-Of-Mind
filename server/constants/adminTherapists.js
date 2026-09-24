@@ -50,4 +50,5 @@ export const RESET_SENT_MESSAGE =
 export const RESET_SKIPPED_INACTIVE_MESSAGE =
   'No email was sent: this therapist is deactivated, so a reset would not let them back in. Reactivate them first.';
 
-export const REVIEWS_LIMIT = 20;
+// The review list is paged by GET /admin/reviews since 10.3 — see
+// constants/reviews.js for its page sizes.

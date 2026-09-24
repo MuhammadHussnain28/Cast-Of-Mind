@@ -7,6 +7,7 @@ import { containsIgnoringCase, nameClauses } from '../utils/search.js';
 import { forgotPassword } from './auth.service.js';
 import { sendEmailChangedNotices } from './email/email.service.js';
 import { FUTURE_COLLECTIONS } from '../constants/adminStats.js';
+import { ratingSummary } from './adminReviews.service.js';
 import {
   EDITABLE_PROFILE_FIELDS,
   EDITABLE_USER_FIELDS,
@@ -14,7 +15,6 @@ import {
   NOTHING_TO_UPDATE_MESSAGE,
   RESET_SENT_MESSAGE,
   RESET_SKIPPED_INACTIVE_MESSAGE,
-  REVIEWS_LIMIT,
   STATUS_FILTER_ALL,
   THERAPIST_NOT_FOUND_MESSAGE,
 } from '../constants/adminTherapists.js';
@@ -39,24 +39,21 @@ const raw = (name) => mongoose.connection.db.collection(name);
  * themselves when slice 6 and chunk 10.3 ship.
  */
 async function practiceFigures(userId) {
+  // Ratings come through adminReviews.service.js since 10.3 — the only file
+  // that reads the reviews collection.
   const [activeClients, ratings] = await Promise.all([
     raw(FUTURE_COLLECTIONS.bookings).countDocuments({ therapistId: userId, status: 'active' }),
-    raw(FUTURE_COLLECTIONS.reviews)
-      .aggregate([
-        { $match: { therapistId: userId } },
-        { $group: { _id: null, average: { $avg: '$stars' }, count: { $sum: 1 } } },
-      ])
-      .toArray(),
+    ratingSummary(userId),
   ]);
-
-  const average = ratings[0]?.average ?? null;
 
   return {
     activeClients,
     // null, never 0 — no ratings and a rating of zero are different statements,
     // and the second one is a judgement on a person.
-    averageRating: average === null ? null : Math.round(average * 10) / 10,
-    reviewCount: ratings[0]?.count ?? 0,
+    averageRating: ratings.averageRating,
+    reviewCount: ratings.reviewCount,
+    writtenCount: ratings.writtenCount,
+    distribution: ratings.distribution,
   };
 }
 
@@ -137,14 +134,9 @@ export async function getTherapist(id) {
   const profile = await loadProfile(id);
   const userId = profile.userId?._id;
 
-  const [figures, reviews] = await Promise.all([
-    practiceFigures(userId),
-    raw(FUTURE_COLLECTIONS.reviews)
-      .find({ therapistId: userId }, { projection: { stars: 1, text: 1, createdAt: 1 } })
-      .sort({ createdAt: -1 })
-      .limit(REVIEWS_LIMIT)
-      .toArray(),
-  ]);
+  // The ratings summary rides along; the review LIST is paged separately from
+  // GET /admin/reviews?therapistId=, so a long history never loads whole.
+  const figures = await practiceFigures(userId);
 
   const plain = profile.toObject();
   // The populated user is replaced by the two fields the screen needs. Sending
@@ -156,12 +148,6 @@ export async function getTherapist(id) {
     email: profile.userId?.email ?? null,
     accountStatus: profile.userId?.status ?? null,
     ...figures,
-    reviews: reviews.map((review) => ({
-      id: review._id.toString(),
-      stars: review.stars,
-      text: review.text ?? '',
-      createdAt: review.createdAt,
-    })),
   };
 }
 

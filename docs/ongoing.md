@@ -226,7 +226,7 @@ I generated a simplified "brain-tree" favicon after testing showed the full logo
 
 ### Admin portal
 
-- **The admin action log goes to the server log, not a 15th collection** — approved 2026-09-04. **Consequence: host logs rotate, so this is accountability, not a permanent audit trail.** A durable one is chunk 10.6. (4.1)
+- **The admin action log goes to the server log, not a 15th collection** — approved 2026-09-04. **Consequence: host logs rotate, so this is accountability, not a permanent audit trail.** A durable one was not built in 10.6 — §20 defers it (developer's decision, 2026-09-24). (4.1)
 - **Idle timeout is served by the server**, not hardcoded in the browser, and the sign-out is a real `POST /auth/logout` so the session is genuinely revoked. **Gap: if the tab dies no timer fires and the cookie stays valid.** Server-side reinforcement carried to 12.3. (4.1)
 - **Approving twice is idempotent**, returning `alreadyApproved: true` rather than a 409 the admin would read as a failure. A rejected application can never be approved; an approved one can never be rejected. (4.3)
 - **Deactivation flips BOTH `users.status` and `therapistProfiles.status` in one transaction** — flipping only the first leaves a therapist who cannot sign in but is still offered to clients. (4.5)
@@ -294,7 +294,7 @@ I generated a simplified "brain-tree" favicon after testing showed the full logo
 
 ### False-confidence tests — the recurring failure mode of this project
 
-Six caught so far, and **every one passed while proving nothing**. Listed because the pattern repeats and mutation testing is what finds it.
+Seven caught so far, and **every one passed while proving nothing**. Listed because the pattern repeats and mutation testing is what finds it.
 
 1. **1.3** — the "deactivated user cannot refresh" test reused a rotated token, so the 401 proved revocation, not deactivation.
 2. **4.2** — see the archive.
@@ -302,6 +302,7 @@ Six caught so far, and **every one passed while proving nothing**. Listed becaus
 4. **7.3** — "persists before it emits" passed against a deliberately inverted implementation, because the network round-trip let the save win. Rewritten to assert order. `Message.prototype.save` alone does not intercept `Model.create` in Mongoose 9 — **both must be patched.**
 5. **7.6** — the linkifier's XSS tests: widening the regex so `javascript:` matched broke *nothing*, proving the allowlist rather than the pattern carries the security.
 6. **10.2** — the case-insensitive sort fixture sorted identically in binary order, so deleting the collation broke nothing. Caught before it shipped; the fixture now uses names whose byte and human orders disagree.
+7. **10.3** — the import-graph walker followed only `from '…'`, so a bare `import '…'` of the review read service onto the client path passed every test. 8.6's private-notes walker had the same hole; both now match bare and dynamic imports too.
 
 **Standing practice: every guard gets mutation-checked, and the number of tests it breaks is recorded.**
 
@@ -311,7 +312,7 @@ Six caught so far, and **every one passed while proving nothing**. Listed becaus
 - **The compensation wording on `/join-as-therapist`** — "guaranteed weekly session rates" — wants Asad's confirmation, since "guaranteed" is a commitment. (3.3)
 - **Chunk 12.3:** refresh-token reuse detection (1.3), server-side idle enforcement via `lastSeenAt` (4.1), the emailed password versus a set-password link (6.4).
 - **`clientProfiles` has no timezone field**, so every portal uses the browser's zone. Settled pattern since 5.6.
-- **Admin 2FA does not exist** — decided as email OTP via Resend, scheduled for chunk 10.5. Pre-launch blocker 12.
+- **Admin 2FA does not exist** — planned as email OTP via Resend; chunk 10.5 was deferred to a pre-launch security review (2026-09-24). Pre-launch blocker 12.
 - **`peace.jpg` is 5.6 MB** and still unoptimised.
 
 ---
@@ -2122,9 +2123,186 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 
 ---
 
+## Chunk 10.3 — Reviews and performance monitoring
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas untouched**; every test ran in memory. Two defects in shipped code were found and fixed on the way (Verification).
+
+**Built**
+- server new: `models/Review.js` (§10.12 + `subscriptionId`) · `constants/reviews.js` · `validation/reviews.schema.js` · `services/reviewSubmission.service.js` (write half) · `services/adminReviews.service.js` (the ONLY reader) · `controllers/reviews.controller.js` · `controllers/adminReviews.controller.js` · tests `models/Review.test.js` (7), `routes/reviews.test.js` (26).
+- routes: `POST /client/reviews` (above the subscription gate) · `GET /admin/reviews?therapistId=&page=`.
+- server edits: `clientPortal.service.js` (`reviewState` on `/me`) · `adminStats.service.js` and `adminTherapists.service.js` (the 4.4/4.5 raw-collection reads replaced) · `journal.service.js` (a real 500, below) · four existing test files.
+- client new: `components/reviews/ReviewMarks.jsx` (shared stars and marks) · `components/portal/client/review/RatingForm.jsx` · `components/admin/therapists/RatingsSection.jsx` · `lib/api/{reviewsApi,adminReviewsApi}.js` · `data/reviewContent.js`. Rewritten: `admin/dashboard/QualityPanel.jsx`.
+- client edits: `SubscriptionEnded.jsx`, `Account.jsx`, `ClientPortalShell.jsx`, `TherapistDetail.jsx`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **A client can rate once their subscription is cancelled OR expired** (approved) — on the ended screen, and on Account while a cancelled plan runs out. Someone who cancels rarely returns after expiry.
+- **The submit route sits ABOVE the subscription gate.** §9.6 asks for a rating when a subscription ends — the exact people the gate refuses. Eligibility is checked in the service instead.
+- **The therapist is resolved from the client's own booking, never the request.** The body is stars and optional words; any other key is a 422 with nothing written.
+- **One rating per subscription** (approved spec addition `subscriptionId`, unique index) — double submissions are refused by the database, and two racing requests leave exactly one row.
+- **The client never sees a review again** (approved). Submit answers `{ submitted: true }`; `/me` carries a state only (`not_yet` · `eligible` · `submitted`). Once sent it is simply gone on their next visit — no second thank-you.
+- **The admin sees who wrote it** (approved), and the form says so before they send: *"Only the Cast of Mind team reads this, with your name. Your therapist never sees your rating or your words."*
+- **The read path is one file, and the boundary is structural.** `adminReviews.service.js` is the only code that reads reviews; the split controllers keep the client router from reaching it. A test walks EVERY router but the admin's (read from the directory, so future routers are covered) and asserts it is unreachable, plus a response sweep of 20 client, therapist and public endpoints with a canary review.
+- **3 ratings before a therapist is ranked** (approved, for Asad to confirm). The ranked set splits at its middle — no name in both lists, no below-average therapist shown as "highest rated" because only two are ranked. Deactivated therapists are not ranked; unranked ones are counted, so their absence is explained.
+- **Stars are sage-deep, never gold,** on light ground (gold 1.63:1 fails even as a graphic). The form's stars are real radio buttons drawn over — native arrow keys, one tab stop, a spoken "4 of 5" — with the choice also written in words.
+
+**Verification**
+- Tests: **1560 passing across 53 suites** (1526 before, 34 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed, including the `has-[:focus-visible]` focus rings.
+- **Mutation-checked eight times — seven broke tests at once:** eligibility widened (3) · therapist from the body (1) · unique index removed (3) · ranking minimum at 1 (1) · stars optional (2) · lists not split (2) · the reply echoing the review (1).
+- **THE EIGHTH BROKE NOTHING — a seventh false-confidence test.** A bare `import '…adminReviews.service.js'` on the client path passed all 33: the import walker matched only `from '…'`. **8.6's private-notes walker had the same hole.** Both now also match bare and dynamic `import()`, and each is proven to catch all three shapes.
+- **A real 500 in shipped code (8.6).** Editing a journal entry deleted in another tab between load and save threw an uncaught `DocumentNotFoundError`. It now answers the same 404 a missing entry does; a new test forces the interleaving and fails without the fix.
+- **8.6's boundary sweep raced itself** — it fired PATCH and DELETE on one entry in parallel, and failed whenever the delete won. The two now run in order.
+- Contrast: **28 pairs computed, 0 failures.** Tightest: open star stroke 3.35:1 on its hover ground, 3.43:1 on paper; clay error 5.48:1.
+- **31 client checks** (radio semantics, 48px targets, the disclosure's exact wording, offered only while eligible, no nudge or celebration, the caveat on both admin surfaces, no hooks rule silenced, the skeleton announced). **4 icons** bounds-checked with cubic curves sampled. Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh both apps.**
+2. **The brief's verify step needs an ended subscription — set one on a TEST client yourself** (Atlas: `status: "expired"`, `currentPeriodEnd` in the past). I have not touched your data.
+3. Sign in as that client: the ended screen offers the stars. Try the arrow keys; send with and without words. Reload — the form is gone, no second thanks.
+4. As the therapist: nothing about ratings anywhere. As a visitor: nothing on their public profile or in matching.
+5. As the admin: the dashboard average, lists and caveat; the therapist's screen shows the bars and the review with the client's name.
+6. Put the test client's subscription back afterwards.
+
+**Carried forward**
+- **For Asad:** the 3-rating minimum, and the form's wording — added to the relationship-status and mood-word confirmations.
+- **Slice 11** sets `cancelled`/`expired` for real, which is what makes clients eligible outside a hand-edited test.
+- 10.4 notifications next. Journal copy "the hour you spend together" (9.4) and the `WorksheetsTab` skeleton status (9.2) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** ratings shown to therapists, publicly or back to their writer · a mandatory written review · editing, deleting or replying to reviews · any reminder to rate.
+
+---
+
+## Chunk 10.4 — Notifications
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas untouched**; every test ran in memory. Includes the star-colour fix the developer asked for (below).
+
+**Built**
+- server new: `models/Notification.js` (§10.13 + `count`, `lastAt`) · `constants/notifications.js` · `validation/notifications.schema.js` · `services/notification.service.js` · `controllers/notification.controller.js` · `routes/notifications.routes.js` · `routes/notifications.test.js` (21).
+- routes: `GET /api/v1/notifications` · `POST /:id/read` · `POST /read-all` — all scoped to the token's own user.
+- server edits: `constants/socket.js` and `realtime/emitter.js` (`notification:new`) · `chat.service.js`, `worksheet.service.js`, `clientOnboarding.service.js` (the three triggers) · `routes/index.js`.
+- client new: `components/portal/NotificationProvider.jsx` · `components/portal/therapist/notifications/{NotificationBell,NotificationRow,NotificationIcons}.jsx` · `lib/notifications/{notificationContext,notificationStore}.js` · `lib/api/notificationsApi.js` · `data/notificationContent.js`. Rewritten: `pages/portal/therapist/Notifications.jsx` (the 8.1 placeholder is gone).
+- client edits: `TherapistRail` (the bell), `TherapistPortalShell` (the provider), `socketClient.js`, `therapistPortalContent.js` (placeholder copy removed), plus the three star call sites.
+- Packages / env vars: none.
+
+**Key decisions**
+- **ONE OPEN ALERT PER CLIENT PER KIND, not one per event** (approved). Twelve messages are one row reading "12 new messages", carried by spec additions `count` and `lastAt`. Anything else turns the bell into a wall of identical lines and repeats the sidebar badge — the one thing §8.8 is not for.
+- **The grouping is an atomic upsert** against a partial unique index on `{userId, bookingId, type}` where `read: false`. Two messages landing together cannot both insert; a genuine race surfaces as a duplicate key and the retry increments the row the other request just wrote.
+- **Reading one closes it.** The next event opens a fresh alert rather than quietly raising a count the therapist has already cleared.
+- **Therapists only, in v1** (approved). A client gets an empty list, not a 403 — an empty feed is the truth for them, and a refusal would advertise a feature they do not have.
+- **No content, anywhere** (approved): not in the payload, not on screen. A row is who, what kind, how many, when. The panel sits open in a rail, which is the least private surface the therapist portal has (8.1's rule).
+- **Retention is a TTL index at 60 days from `lastAt`**, not a scheduled job (approved). Safe here for the reason it was unsafe in 1.3: the whole document is the disposable thing, where `refreshTokenExpiresAt` lived on a record that had to survive. From `lastAt`, not `createdAt`, so a group still in use does not vanish because its first event was two months ago.
+- **The record is always written; only the push is best-effort.** Unlike 7.6's unread push, which is skipped without a socket server, the bell reads over REST — so the row must exist either way. A failure is logged by error NAME only and can never fail the message, the worksheet or the account it describes.
+- **The new-client alert is written after the payment transaction commits**, never inside it — the same rule the welcome email follows. A bell must not be able to roll back an account somebody paid for.
+- **Opening the panel marks nothing read.** Reading happens on opening an alert or on "Mark all as read" — 7.6's rule, because a count that clears itself is a count that lies.
+- **The panel is `fixed`, so it escapes the rail's own scroll container** rather than being clipped by it; Escape closes it, a click outside closes it, and focus returns to the bell.
+- **Unread is weight plus a dot, never colour alone.** Gold carries the count on ink (11.08:1); on the paper feed the same dot is ink, because gold there is 1.63:1.
+
+**Verification**
+- Tests: **1581 passing across 54 suites** (1560 before, 21 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes.
+- **Mutation-checked ten times, every one broke a test:** the feed not scoped to the caller (2) · mark-read not scoped (1) · read-all clearing everybody's (1) · grouping removed (2) · a read alert reopened instead of a fresh one (1) · the therapist alerted by their own message (1) · a notification failure allowed to fail the send (1) · the client's user id added to the payload (1) · the open-alert index no longer unique (1) · retention expiring from `createdAt` (1).
+- Contrast: **29 pairs computed, 0 failures.** Tightest: the "Mark all as read" underline and the retry border, both 3.76:1 on ink-deep.
+- **34 client checks**: store rules (an incoming alert updates its row rather than adding a second, the panel limit, newest-not-unread-first ordering), the row being a real link, the count in the bell's accessible name, Escape and click-outside, 44px targets, no content anywhere, no hooks rule silenced. **4 icons** bounds-checked with arcs and curves sampled. Detector `[]` — degraded, as always.
+- **A Tailwind class that silently emitted nothing, caught by checking the built CSS:** `top-[calc(100%+0.5rem)]` is invalid because CSS needs spaces around the `+`. Written with underscores it compiles to `calc(100% + .5rem)`. The editor's "canonical class" hint suggests the broken form; the generated CSS is the evidence.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no environment variables.
+2. **The brief's own verify step:** sign in as a therapist with two clients, open Client A, and have Client B send a message from another browser. The bell's count should rise without a refresh, and opening the alert should land on Client B's chat.
+3. Have the same client send several more messages: it stays **one** row, and the count climbs.
+4. Read it, then have them write again — a fresh alert appears.
+5. Return a worksheet as a client, and check the bell says so without naming the worksheet.
+6. Check "See all" and the feed page, grouped by day, and "Mark all as read".
+7. Keyboard: tab to the bell, Enter to open, Escape to close — focus must return to the bell. At 360px the panel is full width.
+
+**Carried forward**
+- **Slice 12.5:** `notification:new` uses the same per-user rooms as the unread push, so it needs the Redis adapter alongside the sticky-sessions note already parked there.
+- A client-side bell, email or push notifications, and muting are all deliberately not built.
+- **Star colour (developer's request):** filled stars are now `fill-gold` with a `stroke-ink/70` outline (6.74:1). Gold alone is 1.63:1 on paper and would have been all but invisible on the white cards.
+- Journal copy "the hour you spend together" (9.4) and Asad's confirmations (mood words, relationship statuses, the 3-rating minimum) are still open.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no client bell · no message previews · no email or push · no preferences or muting · no admin notifications · no scheduled cleanup job.
+
+---
+
+## Chunk 10.5 — Admin 2FA (SKIPPED / DEFERRED)
+
+**Status: NOT BUILT. Deferred by the developer, 2026-09-24.** No code was written, no tests were added, and nothing in the codebase changed for this chunk. It is recorded here so the gap is visible rather than looking like an oversight.
+
+**The decision**
+- Deferred to a **pre-launch security review**, on the grounds that Asad has not requested it, and the admin account already has a strong password and the 30-minute idle timeout built in 4.1.
+- **Pre-launch blocker 12 stays open** and is updated to say so. It needs the client's explicit confirmation before launch — deferring the build is not the same as waiving the requirement.
+
+**What this leaves standing, stated plainly**
+- §18 calls admin 2FA "effectively non-negotiable" for a platform holding mental health data. That sentence is unchanged by this decision.
+- §11 records that the admin mailbox can reset the admin password. **So the admin's email inbox is, today, the master key to every record on this platform** — every client's account, every therapist's credentials, the payment ledger.
+- The idle timeout (4.1) closes an abandoned session. It does nothing about a stolen password or a compromised inbox, which are the two cases 2FA exists for. They are different risks and only one of them is currently covered.
+- The plan, if it is picked up later, is unchanged: **email OTP via Resend**, which also depends on blocker 7 (verify `castofmind.com` in Resend) — until that is done no OTP could reach anyone but the Resend account owner.
+
+**Verification**
+- None. Nothing was built, so nothing was tested. The suite stands where 10.4 left it: **1581 passing across 54 suites.**
+
+**Manual steps for the developer**
+1. Nothing to restart, install or configure.
+2. **Put admin 2FA on the agenda for the pre-launch security review**, together with blocker 7, since the intended method depends on it.
+
+**Carried forward**
+- **Blocker 12 remains on the list of 13**, now marked as deferred rather than scheduled.
+- 10.6 (admin polish and audit) is next in slice 10.
+
+---
+
+## Chunk 10.6 — Admin polish (focused scope)
+
+**Status:** Complete **for the scope the developer set at approval (2026-09-24)**. The brief's activity log, keyboard table navigation, tablet/sidebar redesign, state-component audit and a separate health page were **deliberately not built, on instruction**. Not skipped. The 7 existing confirmation dialogs were left untouched. Not seen rendered; see Manual steps. **Atlas, Stripe, Resend and Cloudinary untouched**; every test ran in memory with the vendors faked.
+
+**Built**
+- server new: `constants/systemStatus.js` · `services/systemStatus.service.js` · `routes/systemStatus.test.js` (17) · `routes/adminBulkSafety.test.js` (5). Route: `GET /admin/system-status`, on the existing guarded admin mount.
+- server edits: `controllers/admin.controller.js` · `routes/admin.routes.js` · `test/constantsParity.test.js` (+1).
+- client new: `components/admin/dashboard/SystemStatusCard.jsx` · `data/systemStatusContent.js`.
+- client edits: `therapists/TherapistEditForm.jsx` (the email-change dialog) · `AdminIcons.jsx` (Mail, Database, Card, Cloud) · `lib/api/adminApi.js` · `pages/admin/Dashboard.jsx`.
+- `ongoing.md`: blocker 7 and the Slices 0–5 open items no longer describe 10.5 as scheduled.
+- Packages / env vars: none.
+
+**Key decisions**
+- **No activity log and no new collection.** Master spec §20 defers it, and the developer chose the spec over the brief. The 4.1 server-log line stays as it is.
+- **The status is checked when the dashboard loads, and again only on "Check again". Never polled.** The server makes one call per vendor per request, and a test proves exactly one.
+- **The email check surfaces blocker 7 live.** Resend's shared test sender reads "Needs attention"; so does a sending domain Resend hasn't verified. A lookalike domain (`notcastofmind.com`) doesn't count as verified. A sending-only key is reported as reachable but uncheckable, not as a fault.
+- **Fixed words out, never vendor text.** Each service answers `operational` · `attention` · `down` · `not_configured` plus a detail code. Failures are logged by error name only, because a vendor message can carry account ids or hosts.
+- **Every check is raced against a 4-second timeout**, so one slow vendor can't hold the card and the others still report.
+- **Each state has its own mark shape** (solid, half-filled, crossed, dashed) as well as its word and hue. Nothing rests on colour alone. The state rule across the top of the card is sage / ink / clay.
+- **The card has one elevation (a soft shadow, no border)** plus the house sage glow. Service tiles are separated by hairline seams from a `gap-px` grid, so the seams stay correct at every width.
+- **The email dialog appears only for a real change.** It compares the trimmed, lower-cased address the server would store. It shows old → new drawn, says the password is unchanged and both inboxes are told, and puts the safe button first so it gets focus.
+- **Bulk safety has two layers.** (1) An import-graph walk from the admin router fails if any `admin*` file uses `updateMany`, `deleteMany`, `bulkWrite` or `insertMany`. (2) All 10 admin write routes refuse six query-operator-shaped ids with 400, and a snapshot of six collections proves nothing moved. A body naming another record or an operator gets 422. A real id still changes exactly its own record, so the guard isn't passing by refusing everything.
+
+**Verification**
+- Tests: **1604 passing across 56 suites** (1581 before, 23 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed for the arbitrary shadow, `border-[1.5px]`, the grid seams and the status fills.
+- **Mutation-checked six times, and every one broke a test:** no timeout race 1 · vendor message returned 2 · vendor message logged 1 · lookalike domain accepted 1 · unverified domain treated as verified 1 · a multi-document write added to admin code 1.
+- **The timeout mutation also hung Jest** on the request that never answers, and I had to stop it by hand. That's the failure the timeout exists to prevent.
+- Contrast: **30 pairs computed, 0 failures.** Tightest: the loading placeholder ring 3.36:1 on mist, the sage state rule 3.40:1, the header marks 4.59:1 on mist.
+- **34 client checks** (summary wording and precedence, singular/plural, no polling in the card, reduced motion, 44px targets, the dialog's guard and focus order). **4 icons + 3 status marks** bounds-checked with arcs sampled from their true centre. Detector `[]`, degraded as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no environment variables.
+2. Admin → **Dashboard**, scroll to **System status**. With your development keys you should see Database working, Payments working ("Test mode…"), and Email "Needs attention" (the test sender) until blocker 7 is done.
+3. Press **Check again**: the tiles dim, then refresh, and the time updates. Stop your internet and press it again: Payments, Email and File storage should read "Not responding" within about 4 seconds.
+4. Therapists → one therapist → **Edit** → change only the sign-in email → **Save**. The dialog shows old → new. Escape keeps the form as it was. **Change the email** saves.
+5. Change only a name and save: no dialog.
+6. At 360px the status tiles stack; at tablet width they sit two by two.
+
+**Carried forward**
+- The client-detail screen still has no breadcrumb in the top bar (the header reads "Clients"). Out of this chunk's scope as set.
+- **Slice 11** next: renewal, failure, cancellation and expiry, including the webhooks an admin cancellation produces.
+- **Pre-launch blockers: unchanged at 13.** No placeholder content.
+
+**Not done (by instruction):** activity log · keyboard table navigation · tablet/sidebar redesign · changes to loading/error/empty states · a separate status page · any background polling · changes to the 7 existing dialogs.
+
+---
+
 ## Pre-Launch Blockers
 
-**The list stands at 13.** Unchanged since chunk 5.5. Every one of these must be resolved
+**The list stands at 13.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
+10.5**, when admin 2FA was deferred rather than built. Every one of these must be resolved
 or consciously waived before the platform takes a real client.
 
 1. **`/styleguide` must be deleted** — development only. Also carries the DataTable demo rows.
@@ -2133,12 +2311,12 @@ or consciously waived before the platform takes a real client.
 4. **Favicon still missing** — client to supply. The brain mark does not survive 16px; a simplified vector is needed.
 5. **Footer tagline copy is mine, not the client's** — one sentence in `Footer.jsx` for Asad to approve or replace.
 6. **Delete `server/routes/dev.routes.js` and its mount** — guard-testing routes. Now also carries `GET /api/v1/dev/client-gated` (7.1).
-7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`. Until this is done **no email on the platform can reach anyone but the Resend account owner** — welcome emails, credentials, resets, application notices. Also blocks the admin 2FA email at chunk 10.5.
+7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`. Until this is done **no email on the platform can reach anyone but the Resend account owner** — welcome emails, credentials, resets, application notices. Also blocks the admin 2FA email, if blocker 12 is picked up (10.5 was deferred).
 8. **Create `support@castofmind.com`** and forward it — printed in every email footer and on `/contact`, and it does not exist. Also supply the misconduct escalation phone number, or confirm email-only is the intended launch state.
 9. **`client/src/assets/hero.png` has unknown provenance** — referenced by nothing. Delete it or record where it came from.
 10. **Replace or remove everything in `client/src/data/homePlaceholders.js`** — invented testimonials and figures attached to photographs of real, identifiable people.
 11. **Replace or remove everything in `client/src/data/aboutPlaceholders.js`** — invented team, including two entries carrying clinical credentials.
-12. **Admin two-factor authentication does not exist.** §18 calls it effectively non-negotiable for a platform holding mental health data; scheduled for **chunk 10.5**, decided as email OTP via Resend. Until then **the admin account is protected by a password alone**, and per §11 the admin mailbox can reset that password.
+12. **Admin two-factor authentication does not exist — and chunk 10.5 was DEFERRED, not delivered** (developer's decision, 2026-09-24). It was to be email OTP via Resend; it is now deferred to a pre-launch security review, on the grounds that Asad has not asked for it and the admin already has a strong password and a 30-minute idle timeout. **This blocker therefore stays open and needs the client's explicit confirmation before launch.** What is unchanged: §18 calls 2FA effectively non-negotiable for a platform holding mental health data, and per §11 the admin mailbox can reset the admin password — so **the admin's email inbox is currently the master key to every record on the platform**. The idle timeout limits an abandoned session; it does nothing about a stolen password or a compromised inbox. See the chunk 10.5 entry above.
 13. **Remove the seeded therapists before launch** — `npm run seed:therapists:remove`. Ten fake practitioners with placeholder photos and invented credentials sit in the development database. The script cannot run in production, but that guard does not protect a production database populated from a development one. A client choosing a therapist who does not exist, and paying €200 for it, is the failure this line exists to prevent.
 
 ---

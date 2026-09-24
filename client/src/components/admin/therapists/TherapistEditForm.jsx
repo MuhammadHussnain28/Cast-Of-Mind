@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Button, Input, Select, Text } from '../../ui'
+import { Button, Input, Modal, Select, Text } from '../../ui'
 import TagPicker from '../../join/TagPicker'
+import { MailIcon, SortArrowIcon } from '../AdminIcons'
 import { SPECIALTY_TAGS, SPECIALTY_TAGS_MIN, SPECIALTY_TAGS_MAX } from '../../../data/specialtyTags'
 import { updateTherapist } from '../../../lib/api/adminTherapistsApi'
 import { toApiError } from '../../../lib/api/ApiError'
@@ -41,10 +42,15 @@ export default function TherapistEditForm({ therapist, onSaved, onCancel }) {
   }
 
   const emailChanging = values.email !== therapist.email
+  // What the server will store: it trims and lower-cases before saving.
+  const nextEmail = values.email.trim().toLowerCase()
+  const name = `${therapist.firstName} ${therapist.lastName}`
 
-  async function handleSubmit(event) {
+  // Held while the email confirmation is open; null when it is closed.
+  const [pendingChanges, setPendingChanges] = useState(null)
+
+  function handleSubmit(event) {
     event.preventDefault()
-    setSaving(true)
     setFormError(null)
     setFieldErrors({})
 
@@ -59,10 +65,27 @@ export default function TherapistEditForm({ therapist, onSaved, onCancel }) {
     )
 
     if (Object.keys(changes).length === 0) {
-      setSaving(false)
       onCancel()
       return
     }
+
+    // A new sign-in address changes how they get in, so it is confirmed first.
+    if ('email' in changes && nextEmail !== therapist.email) {
+      setPendingChanges(changes)
+      return
+    }
+
+    save(changes)
+  }
+
+  function confirmEmailChange() {
+    const changes = pendingChanges
+    setPendingChanges(null)
+    save(changes)
+  }
+
+  async function save(changes) {
+    setSaving(true)
 
     try {
       const result = await updateTherapist(therapist._id, changes)
@@ -194,6 +217,52 @@ export default function TherapistEditForm({ therapist, onSaved, onCancel }) {
           Cancel
         </Button>
       </div>
+
+      <Modal
+        open={pendingChanges !== null}
+        onClose={() => setPendingChanges(null)}
+        title={`Change ${name}’s sign-in email?`}
+        description="From now on they sign in with the new address. Their password stays the same."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPendingChanges(null)}>
+              Keep the current email
+            </Button>
+            <Button onClick={confirmEmailChange}>Change the email</Button>
+          </>
+        }
+      >
+        <div className="rounded-xl bg-mist px-4 py-4">
+          <div className="flex items-center gap-3">
+            <MailIcon className="size-5 shrink-0 text-ink/60" />
+            <p className="min-w-0 font-body">
+              <span className="block text-caption text-ink/70">Now</span>
+              <span className="block break-all text-ui text-ink/70 line-through decoration-ink/60">
+                {therapist.email}
+              </span>
+            </p>
+          </div>
+
+          {/* The move from one to the other, drawn: a short rule and an arrow. */}
+          <div aria-hidden="true" className="flex w-5 flex-col items-center py-1">
+            <span className="h-2 w-px bg-ink/25" />
+            <SortArrowIcon className="text-ink/60" />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <MailIcon className="size-5 shrink-0 text-ink" />
+            <p className="min-w-0 font-body">
+              <span className="block text-caption text-ink/70">From now on</span>
+              <span className="block break-all text-ui font-medium text-ink">{nextEmail}</span>
+            </p>
+          </div>
+        </div>
+
+        <Text size="caption" tone="muted" className="mt-4">
+          Both addresses are emailed about the change, so the old inbox can raise the alarm if it
+          was not expected.
+        </Text>
+      </Modal>
     </form>
   )
 }

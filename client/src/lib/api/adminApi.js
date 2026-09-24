@@ -17,3 +17,9 @@ export async function fetchAdminStats() {
   const { data } = await apiClient.get('/admin/stats')
   return data
 }
+
+/** One check of each service (10.6). Only ever called on load or on request. */
+export async function fetchSystemStatus() {
+  const { data } = await apiClient.get('/admin/system-status')
+  return data
+}

@@ -82,7 +82,7 @@ export default function ClientPortalShell() {
   // §13: login still works, the portal does not. Everything is preserved, and
   // slice 12 replaces this screen with the re-subscribe flow.
   if (state.access === 'ended') {
-    return <SubscriptionEnded therapist={state.therapist} />
+    return <SubscriptionEnded therapist={state.therapist} reviewState={state.reviewState} />
   }
 
   const value = { ...state, refresh }

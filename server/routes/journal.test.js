@@ -320,6 +320,28 @@ describe('entry ownership is matched on all three fields', () => {
   });
 });
 
+describe('an edit racing a delete (10.3)', () => {
+  it('answers 404, not 500, when the entry vanishes between load and save', async () => {
+    const entry = await entryFixture('mine', 'client', 'Edited in one tab, deleted in another');
+
+    // Force the interleaving the parallel test hit by chance: the delete lands
+    // after the edit has loaded the entry and before it saves.
+    const realSave = Journal.prototype.save;
+    Journal.prototype.save = async function racedSave(...args) {
+      await Journal.deleteOne({ _id: this._id });
+      return realSave.apply(this, args);
+    };
+
+    try {
+      const res = await edit(entry._id, { text: 'Too late.' });
+      expect(res.status).toBe(404);
+      expect(await Journal.findById(entry._id)).toBeNull();
+    } finally {
+      Journal.prototype.save = realSave;
+    }
+  });
+});
+
 describe('DELETE /client/journal/:entryId', () => {
   it('removes the entry permanently', async () => {
     const entry = await entryFixture('mine', 'client', 'Written then regretted');

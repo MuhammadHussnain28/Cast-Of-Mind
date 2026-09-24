@@ -25,6 +25,8 @@ export const SOCKET_EVENTS = Object.freeze({
   AUTH_EXPIRED: 'auth:expired',
   // 8.5: the client's count of worksheets still to complete. A number only.
   WORKSHEETS_UPDATE: 'worksheets:update',
+  // 10.4: the therapist's bell. Who and what kind, never what was written.
+  NOTIFICATION_NEW: 'notification:new',
 });
 
 export const SOCKET_ERRORS = Object.freeze({

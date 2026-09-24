@@ -6,6 +6,8 @@ import { encodeCursor, decodeCursor } from '../utils/cursor.js';
 import { signedDocumentUrl } from '../utils/cloudinaryDelivery.js';
 import { isCloudinaryConfigured } from '../config/cloudinary.js';
 import { emitWorksheetsUpdate, getSocketServer } from '../realtime/emitter.js';
+import { notifyQuietly } from './notification.service.js';
+import { NOTIFICATION_TYPE } from '../constants/notifications.js';
 import { uploadFile, destroyFile } from './upload.service.js';
 import { loadOwnBooking } from './therapistClient.service.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
@@ -310,6 +312,16 @@ export async function submitWorksheet(clientUserId, worksheetId, buffer) {
   }
 
   await pushPending(booking);
+
+  // 10.4: the therapist's bell. Written after the worksheet is safely recorded,
+  // carries no title, and can never fail the return — a client's answers are in
+  // whatever the bell does.
+  await notifyQuietly({
+    userId: booking.therapistId,
+    type: NOTIFICATION_TYPE.WORKSHEET_SUBMITTED,
+    bookingId: booking._id,
+  });
+
   return present(await Worksheet.findById(existing._id));
 }
 

@@ -202,7 +202,11 @@ describe('the detail', () => {
     expect(res.body.specialtyTags).toEqual(['Anxiety', 'Depression', 'Grief']);
     expect(res.body.activeClients).toBe(0);
     expect(res.body.averageRating).toBeNull();
-    expect(res.body.reviews).toEqual([]);
+    // 10.3: the review LIST pages from GET /admin/reviews; the detail carries
+    // the summary — including every star at zero rather than a missing shape.
+    expect(res.body.reviewCount).toBe(0);
+    expect(res.body.distribution).toEqual({ 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
+    expect(res.body.reviews).toBeUndefined();
   });
 
   test('CARRIES NO CONVERSATION DATA OF ANY KIND', async () => {

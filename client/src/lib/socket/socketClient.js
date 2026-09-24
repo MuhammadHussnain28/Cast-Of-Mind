@@ -25,6 +25,8 @@ export const SOCKET_EVENTS = Object.freeze({
   UNREAD_UPDATE: 'unread:update',
   AUTH_EXPIRED: 'auth:expired',
   WORKSHEETS_UPDATE: 'worksheets:update',
+  // 10.4: the therapist's bell. Who and what kind, never what was written.
+  NOTIFICATION_NEW: 'notification:new',
 })
 
 /**

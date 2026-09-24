@@ -3,6 +3,7 @@ import { Heading, Text } from '../../ui'
 import { ENDED } from '../../../data/clientPortalContent'
 import { KeptIcon } from './ClientPortalIcons'
 import TherapistPresence from './TherapistPresence'
+import RatingForm from './review/RatingForm'
 
 /**
  * What an expired client sees instead of their portal (§13).
@@ -19,7 +20,7 @@ import TherapistPresence from './TherapistPresence'
  * reasoning as the bookmark on /checkout/cancel in 6.6, and it is static
  * because nothing here is being celebrated.
  */
-export default function SubscriptionEnded({ therapist }) {
+export default function SubscriptionEnded({ therapist, reviewState }) {
   const reduce = useReducedMotion()
 
   return (
@@ -69,6 +70,15 @@ export default function SubscriptionEnded({ therapist }) {
         <Text size="caption" tone="muted" className="mt-6 max-w-measure">
           {ENDED.note}
         </Text>
+
+        {/* §9.6: offered once, below everything they came here to know. Once
+            sent (in an earlier visit) it is simply gone — never a second thanks. */}
+        {reviewState === 'eligible' && (
+          <RatingForm
+            therapistName={therapist?.firstName}
+            className="mt-8 border-t border-ink/12 pt-8"
+          />
+        )}
       </motion.div>
     </div>
   )

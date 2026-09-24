@@ -7,6 +7,7 @@ import { BOOKING_STATUS } from '../constants/payments.js';
 import { countPendingWorksheets } from './worksheet.service.js';
 import { completeOverdue } from './sessionCounter.service.js';
 import { resolveAccess, findCurrentSubscription } from '../middleware/requireActiveSubscription.js';
+import { reviewStateFor } from './reviewSubmission.service.js';
 import {
   CLIENT_SUBSCRIPTION_FIELDS,
   CLIENT_THERAPIST_FIELDS,
@@ -120,6 +121,11 @@ export async function getClientPortalState(userId) {
     // first to decide what to show and the second to tell the truth about it.
     access: resolveAccess(subscription),
     subscription: subscription ? pick(subscription, CLIENT_SUBSCRIPTION_FIELDS) : null,
+
+    // Whether to offer the end-of-subscription rating (10.3). A STATE ONLY —
+    // 'not_yet' | 'eligible' | 'submitted' — never the stars or the words, not
+    // even the client's own (approved 2026-09-21).
+    reviewState: await reviewStateFor(subscription),
   };
 }
 

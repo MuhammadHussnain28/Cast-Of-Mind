@@ -122,7 +122,15 @@ export async function updateEntry(clientUserId, entryId, { text, moodTag }) {
   entry.moodTag = moodTag ?? undefined;
   entry.editedAt = new Date();
 
-  await entry.save();
+  try {
+    await entry.save();
+  } catch (error) {
+    // Deleted between the load and the save — an edit in one tab racing a
+    // delete in another. It is gone, so it answers as gone: the same 404 a
+    // missing entry gets, not a 500 (found by a racing test in 10.3).
+    if (error instanceof mongoose.Error.DocumentNotFoundError) throw notFound();
+    throw error;
+  }
   return present(entry);
 }
 

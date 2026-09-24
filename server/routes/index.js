@@ -10,6 +10,7 @@ import therapistRoutes from './therapist.routes.js';
 import clientRoutes from './client.routes.js';
 import chatRoutes from './chat.routes.js';
 import sessionsRoutes from './sessions.routes.js';
+import notificationsRoutes from './notifications.routes.js';
 import matchingRoutes from './matching.routes.js';
 import therapistsRoutes from './therapists.routes.js';
 import checkoutRoutes from './checkout.routes.js';
@@ -33,6 +34,10 @@ router.use('/client', clientRoutes);
 router.use('/chat', chatRoutes);
 // Read-only and shared, like chat. Writes are under /therapist/sessions.
 router.use('/sessions', sessionsRoutes);
+
+// The notification bell (§8.8). Shared by role like /chat and /sessions, and
+// scoped to the token's own user inside.
+router.use('/notifications', notificationsRoutes);
 router.use('/matching', matchingRoutes);
 // Plural and public — the singular '/therapist' above is the authenticated
 // route where a therapist manages their own profile.

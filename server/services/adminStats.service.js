@@ -3,10 +3,10 @@ import { User } from '../models/User.js';
 import { TherapistProfile } from '../models/TherapistProfile.js';
 import { TherapistApplication, APPLICATION_STATUS } from '../models/TherapistApplication.js';
 import { ROLES, USER_STATUS } from '../constants/roles.js';
+import { platformQuality } from './adminReviews.service.js';
 import {
   BILLING_CURRENCY,
   FUTURE_COLLECTIONS,
-  RECENT_REVIEWS_LIMIT,
   SUBSCRIPTION_STATUS,
   TREND_MONTHS,
 } from '../constants/adminStats.js';
@@ -159,39 +159,11 @@ async function activity(now) {
 /**
  * §9.6: reviews are admin-only and never shown publicly.
  *
- * `averageRating` is null when nothing has been rated, NOT 0. Zero would say
- * every therapist scored the lowest possible mark, which is a different and
- * damaging claim. The dashboard renders the absence instead.
+ * Read through adminReviews.service.js since 10.3 — the one file allowed to read
+ * the collection — rather than the raw driver this used while `reviews` had no
+ * model. `averageRating` stays null when nothing is rated, never 0.
  */
-async function quality() {
-  const reviews = raw(FUTURE_COLLECTIONS.reviews);
-
-  const [summary, recent] = await Promise.all([
-    reviews
-      .aggregate([
-        { $group: { _id: null, average: { $avg: '$stars' }, count: { $sum: 1 } } },
-      ])
-      .toArray(),
-    reviews
-      .find({}, { projection: { stars: 1, text: 1, createdAt: 1 } })
-      .sort({ createdAt: -1 })
-      .limit(RECENT_REVIEWS_LIMIT)
-      .toArray(),
-  ]);
-
-  const average = summary[0]?.average ?? null;
-
-  return {
-    averageRating: average === null ? null : Math.round(average * 10) / 10,
-    reviewCount: summary[0]?.count ?? 0,
-    recentReviews: recent.map((review) => ({
-      id: review._id.toString(),
-      stars: review.stars,
-      text: review.text ?? '',
-      createdAt: review.createdAt,
-    })),
-  };
-}
+const quality = () => platformQuality();
 
 export async function getDashboardStats({ now = new Date() } = {}) {
   const [moneyStats, peopleStats, activityStats, qualityStats] = await Promise.all([

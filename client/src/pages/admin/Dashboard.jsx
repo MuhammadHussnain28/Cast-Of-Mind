@@ -4,6 +4,7 @@ import MoneyBand from '../../components/admin/dashboard/MoneyBand'
 import StatFigure from '../../components/admin/dashboard/StatFigure'
 import PendingApplicationsCard from '../../components/admin/dashboard/PendingApplicationsCard'
 import QualityPanel from '../../components/admin/dashboard/QualityPanel'
+import SystemStatusCard from '../../components/admin/dashboard/SystemStatusCard'
 import { fetchAdminStats } from '../../lib/api/adminApi'
 import { toApiError } from '../../lib/api/ApiError'
 import { formatCount } from '../../lib/dashboardFormat'
@@ -152,6 +153,8 @@ export default function Dashboard() {
           <QualityPanel quality={quality} />
         </div>
       </section>
+
+      <SystemStatusCard />
     </div>
   )
 }

@@ -148,3 +148,24 @@ describe('concern themes — the questionnaire grouping covers the master list',
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
+
+// 10.6: the status card words every code the server can send; a new code with no
+// copy would silently render a fallback.
+describe('system status — every server code has client copy', () => {
+  it('names every state, detail and service the server can send', async () => {
+    const server = await import('../constants/systemStatus.js');
+    const client = await import('../../client/src/data/systemStatusContent.js');
+
+    expect(Object.values(client.SERVICE_STATE).sort()).toEqual(
+      Object.values(server.SERVICE_STATE).sort(),
+    );
+    for (const state of Object.values(server.SERVICE_STATE)) {
+      expect(client.STATE_LABEL[state]).toEqual(expect.any(String));
+      expect(client.STATE_NOTE[state]).toEqual(expect.any(String));
+    }
+    for (const detail of Object.values(server.SERVICE_DETAIL)) {
+      expect(client.DETAIL[detail]).toEqual(expect.any(String));
+    }
+    expect(Object.keys(client.SERVICES).sort()).toEqual(Object.values(server.SERVICE_KEY).sort());
+  });
+});

@@ -1,6 +1,7 @@
 import ClientListItem from './ClientListItem'
 import ClientListEmpty from './ClientListEmpty'
 import TherapistGlobalNav from './TherapistGlobalNav'
+import NotificationBell from './notifications/NotificationBell'
 import { CLIENTS_LIST } from '../../../data/therapistPortalContent'
 
 /**
@@ -34,17 +35,23 @@ export default function TherapistRail({ state, activeTab, onNavigate, footer }) 
         className="pointer-events-none absolute -left-24 -top-20 size-72 rounded-full bg-sage/10 blur-[130px]"
       />
 
-      <div className="relative flex items-baseline gap-2 px-5 pb-4 pt-6">
-        <h2 className="font-body text-ui font-medium text-paper">{CLIENTS_LIST.heading}</h2>
-        {!loading && !error && total > 0 && (
-          <>
-            {/* Decorative: the real count is announced on the list below. */}
-            <span aria-hidden="true" className="font-body text-caption tabular-nums text-paper/70">
-              {total}
-            </span>
-            <span className="sr-only">{CLIENTS_LIST.countLabel(total)}</span>
-          </>
-        )}
+      <div className="relative flex items-center justify-between gap-2 px-5 pb-4 pr-3 pt-5">
+        <div className="flex items-baseline gap-2">
+          <h2 className="font-body text-ui font-medium text-paper">{CLIENTS_LIST.heading}</h2>
+          {!loading && !error && total > 0 && (
+            <>
+              {/* Decorative: the real count is announced on the list below. */}
+              <span aria-hidden="true" className="font-body text-caption tabular-nums text-paper/70">
+                {total}
+              </span>
+              <span className="sr-only">{CLIENTS_LIST.countLabel(total)}</span>
+            </>
+          )}
+        </div>
+
+        {/* §8.8: what happened with the clients NOT on screen. It sits beside
+            the list's own heading because that is the thing it is about. */}
+        <NotificationBell />
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-y-auto px-3 pb-3">

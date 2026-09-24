@@ -124,6 +124,47 @@ export function SearchIcon(props) {
   )
 }
 
+/** An envelope — email, as a service and as a sign-in address (10.6). */
+export function MailIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="m3.75 7 8.25 6 8.25-6" />
+    </svg>
+  )
+}
+
+/** Stacked discs — the database (10.6). */
+export function DatabaseIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <ellipse cx="12" cy="6" rx="7.5" ry="2.75" />
+      <path d="M4.5 6v12c0 1.52 3.36 2.75 7.5 2.75s7.5-1.23 7.5-2.75V6" />
+      <path d="M4.5 12c0 1.52 3.36 2.75 7.5 2.75s7.5-1.23 7.5-2.75" />
+    </svg>
+  )
+}
+
+/** A card — payments (10.6). */
+export function CardIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3 9.75h18" />
+      <path d="M6.75 15h3.5" />
+    </svg>
+  )
+}
+
+/** A cloud — file storage (10.6). */
+export function CloudIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M7 18.5a4.25 4.25 0 0 1-.6-8.46 5.75 5.75 0 0 1 11.1 1.21A3.63 3.63 0 0 1 17.25 18.5Z" />
+    </svg>
+  )
+}
+
 /** A row that opens somewhere — the whole row is the target (10.2). */
 export function OpenRowIcon(props) {
   return (
