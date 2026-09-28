@@ -18,9 +18,13 @@ export const mission = {
   heading: 'Why Cast of Mind exists?',
   lede: '" The distance between deciding to get help and actually getting it is too long. "',
   body: [
-    'Too far to travel. Too long to wait. And at the end of it, too easy to be matched with someone who does not work with the thing you actually came about — which means starting over, and explaining yourself again, at the point where most people have the least left to give.',
-    'Cast of Mind is built to remove those three obstacles and nothing else. You describe what you are carrying, you see the therapists who specialise in exactly that, and you choose one. Where either of you happens to live never enters into it.',
+    'Distance, wait lists, and the exhaustion of starting over with the wrong specialist. Traditional therapy demands too much resilience exactly when you have the least to give.',
+    'Cast of Mind dismantles these barriers. Tell us what you are navigating, review exact-fit specialists, and choose your therapist. Geography never dictates your care.',
   ],
+  // body: [
+  //   'Too far to travel. Too long to wait. And at the end of it, too easy to be matched with someone who does not work with the thing you actually came about — which means starting over, and explaining yourself again, at the point where most people have the least left to give.',
+  //   'Cast of Mind is built to remove those three obstacles and nothing else. You describe what you are carrying, you see the therapists who specialise in exactly that, and you choose one. Where either of you happens to live never enters into it.',
+  // ],
 }
 
 /**

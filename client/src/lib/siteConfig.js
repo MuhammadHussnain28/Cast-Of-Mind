@@ -18,7 +18,7 @@ export const navItems = [
   { to: '/', label: 'Home' },
   { to: '/how-it-works', label: 'How it works' },
   { to: '/about', label: 'About' },
-  { to: '/join-as-therapist', label: 'Join as a therapist' },
+  { to: '/join-as-therapist', label: 'For Clinicians' },
   { to: '/contact', label: 'Contact' },
 ]
 

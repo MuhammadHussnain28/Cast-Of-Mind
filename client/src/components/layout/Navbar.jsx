@@ -56,7 +56,7 @@ export default function Navbar() {
             alt="Cast of Mind"
             width={54}
             height={44}
-            className="w-18 h-auto border-black"
+            className="w-[74px] h-auto scale-x-[1.09] origin-left border-black"
           />
         </Link>
 

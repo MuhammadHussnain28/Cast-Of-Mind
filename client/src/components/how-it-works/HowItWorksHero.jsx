@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Button, Heading, Text } from '../ui'
 import { intro } from '../../data/howItWorksContent'
-import HowItWorksPathway from './HowItWorksPathway'
+import HowItWorksPathwayModern from './HowItWorksPathwayModern'
 
 /**
  * How It Works Hero: Two-column layout with consistent 12-col grid
@@ -80,7 +80,7 @@ export default function HowItWorksHero() {
 
         {/* Right Column: The 4-Node Circular Care Pathway */}
         <motion.div {...settle(0.15)} className="lg:col-span-6 xl:col-span-7">
-          <HowItWorksPathway />
+          <HowItWorksPathwayModern />
         </motion.div>
 
       </div>
