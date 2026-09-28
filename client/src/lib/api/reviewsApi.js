@@ -8,6 +8,12 @@ import { apiClient } from './client'
  * `{ submitted: true }` and nothing else — the client never sees a review
  * again once it is sent, not even their own.
  */
+// "No thanks" (11.6): the invitation is put away for good. No body.
+export async function declineReview() {
+  const { data } = await apiClient.post('/client/reviews/decline')
+  return data
+}
+
 export async function submitReview({ stars, text }) {
   const { data } = await apiClient.post('/client/reviews', {
     stars,

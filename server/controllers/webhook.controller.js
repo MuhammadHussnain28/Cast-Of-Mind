@@ -16,7 +16,7 @@ import { SIGNATURE_HEADER } from '../constants/webhooks.js';
  * The order below is the whole design:
  *   1. verify   — reject anything unsigned or tampered with
  *   2. record   — log EVERY verified event before acting on it
- *   3. route    — act, only if this is the first time we have seen it
+ *   3. route    — act, EVERY time, duplicates included (see below)
  *
  * Processing is synchronous. A job queue is not in the stack, and at this
  * volume the handler finishes in milliseconds — well inside Stripe's timeout.
@@ -28,24 +28,21 @@ export const handlePaymentWebhook = asyncHandler(async (req, res) => {
 
   const { duplicate } = await recordEvent(event);
 
-  if (duplicate) {
-    // Already in the ledger. Stripe resends freely, so this is an ordinary
-    // event rather than a fault — 200 and nothing else, so it is not retried.
-    console.log(`[webhook] ${event.id} already processed — ignored`);
-    res.status(200).json({ received: true, duplicate: true });
-    return;
-  }
+  // A DUPLICATE IS ROUTED TOO (11.1). The ledger row is written before the
+  // handler runs, so if the handler failed, Stripe's retry arrives as a
+  // "duplicate". Skipping it lost that payment for good. Every handler guards
+  // at its effect, so running one twice changes nothing.
+  if (duplicate) console.log(`[webhook] ${event.id} seen before — re-checking its effect`);
 
   // A throw here becomes a 500, which shows in Stripe's dashboard as a failed
-  // delivery. That is deliberate: silently returning 200 would hide a payment
-  // we failed to act on. See the note in the service about why the retry alone
-  // is not enough, and what 6.4 has to do about it.
+  // delivery, and Stripe retries it. Silently returning 200 would hide a
+  // payment we failed to act on.
   // AWAITED. The handler creates four documents in a transaction, and an
   // un-awaited promise would return 200 before that finished — so a failure
   // would be invisible to Stripe and the request would look successful.
   await routeEvent(event);
 
-  res.status(200).json({ received: true });
+  res.status(200).json(duplicate ? { received: true, duplicate: true } : { received: true });
 });
 
 export default { handlePaymentWebhook };

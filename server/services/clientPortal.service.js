@@ -6,8 +6,29 @@ import { AppError } from '../utils/AppError.js';
 import { BOOKING_STATUS } from '../constants/payments.js';
 import { countPendingWorksheets } from './worksheet.service.js';
 import { completeOverdue } from './sessionCounter.service.js';
-import { resolveAccess, findCurrentSubscription } from '../middleware/requireActiveSubscription.js';
+import { resolveAccess, findCurrentSubscription, accessEndsAt } from '../middleware/requireActiveSubscription.js';
 import { reviewStateFor } from './reviewSubmission.service.js';
+import { canResubscribe } from './resubscription.service.js';
+import { Message } from '../models/Message.js';
+import { Journal } from '../models/Journal.js';
+import { Worksheet } from '../models/Worksheet.js';
+import { Session } from '../models/Session.js';
+import { SESSION_STATUS } from '../constants/sessions.js';
+import { PORTAL_ACCESS } from '../constants/clientPortal.js';
+
+/**
+ * What is kept for a client whose subscription has ended (11.4) — COUNTS ONLY,
+ * never a word of content. Reassurance that their history is safe (§13).
+ */
+async function keptCounts(bookingId) {
+  const [messages, journalEntries, worksheets, sessions] = await Promise.all([
+    Message.countDocuments({ bookingId }),
+    Journal.countDocuments({ bookingId }),
+    Worksheet.countDocuments({ bookingId }),
+    Session.countDocuments({ bookingId, status: SESSION_STATUS.COMPLETED }),
+  ]);
+  return { messages, journalEntries, worksheets, sessions };
+}
 import {
   CLIENT_SUBSCRIPTION_FIELDS,
   CLIENT_THERAPIST_FIELDS,
@@ -82,6 +103,12 @@ export async function getClientPortalState(userId) {
     countPendingWorksheets(booking._id),
   ]);
 
+  const access = resolveAccess(subscription);
+  const ended = access === PORTAL_ACCESS.ENDED;
+  const [kept, resubscribable] = ended
+    ? await Promise.all([keptCounts(booking._id), canResubscribe(userId)])
+    : [null, false];
+
   return {
     user: {
       id: String(user._id),
@@ -119,13 +146,20 @@ export async function getClientPortalState(userId) {
     // A cancelled subscription still inside its paid period reads as "ending"
     // here and as "cancelled" in `subscription.status` — the portal needs the
     // first to decide what to show and the second to tell the truth about it.
-    access: resolveAccess(subscription),
+    access,
+    // The exact moment access ends (11.3), from the one helper the gate uses.
+    accessEndsAt: accessEndsAt(subscription),
     subscription: subscription ? pick(subscription, CLIENT_SUBSCRIPTION_FIELDS) : null,
 
     // Whether to offer the end-of-subscription rating (10.3). A STATE ONLY —
     // 'not_yet' | 'eligible' | 'submitted' — never the stars or the words, not
     // even the client's own (approved 2026-09-21).
     reviewState: await reviewStateFor(subscription),
+
+    // Ended only (11.4): what is kept, and whether "Reactivate" is offered —
+    // decided here, so a deactivated therapist never shows a button that fails.
+    kept,
+    canResubscribe: resubscribable,
   };
 }
 

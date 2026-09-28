@@ -19,12 +19,13 @@ jest.unstable_mockModule('../services/email/email.service.js', () =>
  * unconfigured branch is noted where it would have been tested.
  */
 const stripeUpdate = jest.fn(async () => ({ id: 'sub_test', cancel_at_period_end: true }));
+const stripeCancel = jest.fn(async () => ({ id: 'sub_test', status: 'canceled' }));
 
 jest.unstable_mockModule('../config/stripe.js', () => ({
-  stripe: { subscriptions: { update: stripeUpdate } },
+  stripe: { subscriptions: { update: stripeUpdate, cancel: stripeCancel } },
   isStripeConfigured: true,
   isTestKey: true,
-  default: { subscriptions: { update: stripeUpdate } },
+  default: { subscriptions: { update: stripeUpdate, cancel: stripeCancel } },
 }));
 
 const { default: app } = await import('../app.js');
@@ -544,14 +545,20 @@ describe('cancelling a subscription', () => {
     expect(stripeUpdate).toHaveBeenCalledTimes(1);
   });
 
-  test('cancels a past_due subscription too — a failed card is still a live plan', async () => {
+  // 11.3: a past-due plan is stopped at Stripe AT ONCE. "At period end" left
+  // Stripe retrying the card of someone the admin had already cancelled.
+  test('cancels a past_due subscription at Stripe immediately, so no retry can charge them', async () => {
     const { profile, subscription } = await createClient({
       subscription: SUBSCRIPTION_STATUS.PAST_DUE,
     });
+    stripeCancel.mockClear();
+    stripeUpdate.mockClear();
 
     const res = await post(`${BASE}/${profile._id}/cancel-subscription`);
 
     expect(res.body.cancelled).toBe(true);
+    expect(stripeCancel).toHaveBeenCalledTimes(1);
+    expect(stripeUpdate).not.toHaveBeenCalled();
     expect((await Subscription.findById(subscription._id)).status).toBe(
       SUBSCRIPTION_STATUS.CANCELLED,
     );

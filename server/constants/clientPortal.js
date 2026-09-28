@@ -84,6 +84,10 @@ export const CLIENT_SUBSCRIPTION_FIELDS = Object.freeze([
   'nextBillingDate',
   'sessionsRemaining',
   'cancelledAt',
+  // When a failed payment's grace ends (11.2), so the banner can name the date.
+  'graceEndsAt',
+  // Who cancelled (11.3): only the client's own cancellation can be undone.
+  'cancelledBy',
 ]);
 
 // A signed-in client reading their own portal. Generous: the shell fetches on

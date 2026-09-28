@@ -1,45 +1,32 @@
-import { ScreenHeader, BuildNote } from '../../../components/portal/client/ScreenScaffold'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ScreenHeader } from '../../../components/portal/client/ScreenScaffold'
 import RatingForm from '../../../components/portal/client/review/RatingForm'
-import { Text } from '../../../components/ui'
+import SubscriptionControls from '../../../components/portal/client/account/SubscriptionControls'
+import PlanHero from '../../../components/portal/client/account/PlanHero'
+import BillingHistory from '../../../components/portal/client/account/BillingHistory'
+import { PaymentMethodCard, PasswordCard } from '../../../components/portal/client/account/AccountCards'
 import { useClientPortal } from '../../../lib/clientPortalContext'
 import { formatDate } from '../../../lib/dateFormat'
-// The one place in the client that knows money is stored in cents (6.1). Named
-// for the admin dashboard because that is where it was first needed; reusing it
-// is better than a second function that divides by 100.
-import { formatMoney } from '../../../lib/dashboardFormat'
-import { RENEWAL_NOTICE } from '../../../data/clientPortalContent'
+import { ACCOUNT } from '../../../data/clientPortalContent'
+import { SUPPORT_EMAIL } from '../../../data/contactContent'
 
 /**
- * §7.5 — READ ONLY in this chunk.
- *
- * Managing a payment method (11.5) and cancelling (11.3) are their own chunks,
- * and both are real actions with real consequences. What is here is the part
- * that is pure reporting, built now because §13 requires the renewal terms
- * visible in the portal at all times, and because `/client/me` already returns
- * every figure on the screen. A placeholder that ignored data we had already
- * fetched would read as unfinished rather than deliberate.
+ * §7.5 — Subscription & Account (rebuilt in 11.5). The plan leads on ink, with
+ * §13's renewal notice always in it; then the card, the payments, cancelling,
+ * and the details the client gave us, which only we change.
  */
 
-/** The stored status, in words a client would use. Never the raw enum. */
-function statusLabel(subscription, access) {
-  if (!subscription) return 'No subscription'
-  if (access === 'past_due') return 'Payment needed'
-  if (access === 'ending') return 'Ending'
-  return 'Active'
-}
-
-function Row({ term, children }) {
+function Detail({ term, children }) {
   return (
-    <div className="grid gap-1 py-3.5 sm:grid-cols-[11rem_1fr] sm:gap-4">
-      <dt className="font-body text-caption text-ink/70 sm:text-ui">{term}</dt>
+    <div className="flex flex-col gap-0.5 py-3.5 sm:flex-row sm:items-baseline sm:gap-6">
+      <dt className="font-body text-caption text-ink/70 sm:w-36 sm:shrink-0">{term}</dt>
       <dd className="font-body text-ui text-ink-deep">{children}</dd>
     </div>
   )
 }
 
-export default function Account() {
-  const { user, profile, subscription, access, therapist, reviewState } = useClientPortal()
-
+function DetailsCard({ user, profile }) {
+  const copy = ACCOUNT.details
   const people =
     profile?.type === 'couple'
       ? [profile.coupleData?.partner1, profile.coupleData?.partner2]
@@ -47,81 +34,101 @@ export default function Account() {
           .map((partner) => `${partner.name} · ${partner.age}`)
           .join('  and  ')
       : [profile?.name, profile?.age].filter(Boolean).join(' · ')
-
   const place = [profile?.city, profile?.country].filter(Boolean).join(', ')
+  const initials = (profile?.type === 'couple'
+    ? [profile.coupleData?.partner1?.name, profile.coupleData?.partner2?.name]
+    : (profile?.name ?? '').split(' ')
+  )
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+
+  return (
+    <section
+      aria-labelledby="details-heading"
+      className="rounded-2xl bg-paper px-5 py-6 shadow-[0_12px_32px_-20px_rgb(25_18_43/0.35)] sm:px-7"
+    >
+      <div className="flex items-center gap-3">
+        <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-ink font-body text-caption font-medium text-paper">
+          {initials || '·'}
+        </span>
+        <h2 id="details-heading" className="font-body text-ui font-medium text-ink-deep">
+          {copy.heading}
+        </h2>
+      </div>
+
+      <dl className="mt-3 divide-y divide-ink/12">
+        {people && <Detail term={profile?.type === 'couple' ? copy.couple : copy.name}>{people}</Detail>}
+        <Detail term={copy.email}>{user.email}</Detail>
+        {place && <Detail term={copy.place}>{place}</Detail>}
+        {user.memberSince && <Detail term={copy.since}>{formatDate(user.memberSince)}</Detail>}
+      </dl>
+
+      <p className="mt-4 max-w-measure font-body text-caption leading-relaxed text-ink/70">
+        {copy.note}{' '}
+        <a
+          href={`mailto:${SUPPORT_EMAIL}`}
+          className="font-medium text-ink underline decoration-ink/60 underline-offset-2 hover:decoration-2"
+        >
+          {SUPPORT_EMAIL}
+        </a>
+        .
+      </p>
+    </section>
+  )
+}
+
+export default function Account() {
+  const { user, profile, subscription, access, accessEndsAt, therapist, reviewState, refresh } =
+    useClientPortal()
+  const reduce = useReducedMotion()
+  // One gentle settle, in order, then stillness. Reduced motion: all at once.
+  const rise = (index) => ({
+    initial: reduce ? false : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.6, delay: reduce ? 0 : index * 0.08, ease: [0.16, 1, 0.3, 1] },
+  })
 
   return (
     <section>
-      <ScreenHeader
-        title="Account"
-        lead="Your subscription and the details you gave us when you signed up."
-      />
+      <ScreenHeader title={ACCOUNT.title} lead={ACCOUNT.lead} />
 
-      <div className="mt-7 rounded-2xl bg-paper px-5 py-2 sm:px-6">
-        <h2 className="sr-only">Subscription</h2>
-        <dl className="divide-y divide-ink/12">
-          <Row term="Status">{statusLabel(subscription, access)}</Row>
+      <div className="mt-7 flex flex-col gap-6">
+        <motion.div {...rise(0)}>
+          <PlanHero subscription={subscription} access={access} accessEndsAt={accessEndsAt} />
+        </motion.div>
 
-          {subscription && (
-            <Row term="Plan">
-              {formatMoney(subscription.amount, subscription.currency)} a month · 4 sessions and
-              unlimited chat
-            </Row>
-          )}
+        <motion.div {...rise(1)} className="grid gap-6 sm:grid-cols-2">
+          <PaymentMethodCard />
+          <PasswordCard email={user.email} />
+        </motion.div>
 
-          {subscription?.sessionsRemaining != null && (
-            <Row term="Sessions left">
-              {subscription.sessionsRemaining} of 4 this month
-              {/* §13: no carry-over. Said here because it is the one place a
-                  client would reasonably expect unused sessions to bank. */}
-              <Text size="caption" tone="muted" className="mt-1">
-                Unused sessions do not roll over into next month.
-              </Text>
-            </Row>
-          )}
+        <motion.div {...rise(2)}>
+          <BillingHistory />
+        </motion.div>
 
-          {access === 'ending' && subscription?.currentPeriodEnd && (
-            <Row term="Access until">{formatDate(subscription.currentPeriodEnd)}</Row>
-          )}
+        <motion.div {...rise(3)}>
+          <SubscriptionControls
+            subscription={subscription}
+            access={access}
+            accessEndsAt={accessEndsAt}
+            refresh={refresh}
+          />
+        </motion.div>
 
-          {access !== 'ending' && subscription?.nextBillingDate && (
-            <Row term="Next payment">
-              {formatDate(subscription.nextBillingDate)}
-              {/* The §13 sentence, required visible in the portal. */}
-              <Text size="caption" tone="muted" className="mt-1">
-                {RENEWAL_NOTICE}
-              </Text>
-            </Row>
-          )}
-        </dl>
+        <motion.div {...rise(4)}>
+          <DetailsCard user={user} profile={profile} />
+        </motion.div>
+
+        {/* §9.6: while a cancelled plan runs out the client is still here to be
+            asked — after expiry most never come back. Offered once. */}
+        {access === 'ending' && reviewState === 'eligible' && (
+          <div className="rounded-2xl bg-paper px-5 py-6 sm:px-7">
+            <RatingForm therapistName={therapist?.firstName} />
+          </div>
+        )}
       </div>
-
-      <div className="mt-6 rounded-2xl bg-paper px-5 py-2 sm:px-6">
-        <h2 className="sr-only">Your details</h2>
-        <dl className="divide-y divide-ink/12">
-          {people && (
-            <Row term={profile?.type === 'couple' ? 'You both' : 'Name'}>{people}</Row>
-          )}
-          <Row term="Sign in email">{user.email}</Row>
-          {place && <Row term="Where you are">{place}</Row>}
-          {user.memberSince && <Row term="With us since">{formatDate(user.memberSince)}</Row>}
-        </dl>
-      </div>
-
-      {/* §9.6, approved 2026-09-21: while a cancelled plan runs out the client
-          is still here to be asked — after expiry most never come back. The
-          same quiet form as the ended screen, offered once. */}
-      {access === 'ending' && reviewState === 'eligible' && (
-        <div className="mt-6 rounded-2xl bg-paper px-5 py-6 sm:px-6">
-          <RatingForm therapistName={therapist?.firstName} />
-        </div>
-      )}
-
-      <BuildNote>
-        Changing your card and cancelling your subscription are not switched on
-        here yet. To do either now, or to correct anything above, contact us and
-        we will take care of it.
-      </BuildNote>
     </section>
   )
 }

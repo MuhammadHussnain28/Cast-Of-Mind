@@ -512,6 +512,41 @@ describe('account creation — idempotency', () => {
     expect(sendClientWelcomeEmail).toHaveBeenCalledTimes(1);
   });
 
+  // THE GAP 11.1 CLOSED. The SAME event, failed once, then retried by Stripe.
+  // Before 11.1 the retry was a ledger "duplicate" and skipped: paid, no account.
+  it('creates the account when the SAME event is retried after a failure', async () => {
+    const { profile } = await seedTherapist();
+    const draft = await seedDraft(profile._id);
+    const event = makeEvent(draft);
+
+    const spy = jest.spyOn(Subscription, 'create').mockRejectedValueOnce(new Error('transient failure'));
+    const failed = await send(event);
+    spy.mockRestore();
+    expect(failed.status).toBe(500);
+
+    const retried = await send(event);
+
+    expect(retried.status).toBe(200);
+    expect(retried.body.duplicate).toBe(true);
+    expect(await User.countDocuments({ role: ROLES.CLIENT })).toBe(1);
+    expect(await Subscription.countDocuments()).toBe(1);
+    expect(await PaymentEvent.countDocuments()).toBe(1);
+    expect(sendClientWelcomeEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates one account when the identical event arrives twice at once', async () => {
+    const { profile } = await seedTherapist();
+    const draft = await seedDraft(profile._id);
+    const event = makeEvent(draft);
+
+    const responses = await Promise.all([send(event), send(event)]);
+
+    expect(responses.map((r) => r.status)).toEqual([200, 200]);
+    expect(await User.countDocuments({ role: ROLES.CLIENT })).toBe(1);
+    expect(await Subscription.countDocuments()).toBe(1);
+    expect(sendClientWelcomeEmail).toHaveBeenCalledTimes(1);
+  });
+
   it('does not create a second account when the identical event is replayed', async () => {
     const { profile } = await seedTherapist();
     const draft = await seedDraft(profile._id);

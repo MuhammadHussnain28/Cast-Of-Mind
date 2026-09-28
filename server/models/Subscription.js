@@ -74,6 +74,10 @@ const subscriptionSchema = new mongoose.Schema(
 
     startDate: { type: Date, required: true, default: Date.now },
 
+    // Spec addition (11.1): Stripe's exact period start, set on renewal. Unset
+    // until the first renewal; the session counter falls back to an estimate.
+    currentPeriodStart: { type: Date, default: undefined },
+
     currentPeriodEnd: {
       type: Date,
       required: [true, 'A subscription must know when the paid period ends.'],
@@ -139,6 +143,17 @@ const subscriptionSchema = new mongoose.Schema(
       maxlength: PLATFORM_SUBSCRIPTION_ID_MAX,
       default: undefined,
     },
+
+    // Spec additions (11.2): when a renewal payment failed, and when the ~3-day
+    // grace ends (§13). Cleared on recovery; kept on expiry as the record of why.
+    pastDueSince: { type: Date, default: undefined },
+    graceEndsAt: { type: Date, default: undefined },
+
+    // Spec additions (11.6). The billing date a renewal reminder was claimed
+    // for — one per cycle, never twice — and when the client said "No thanks"
+    // to the end-of-subscription rating, so it is never offered again.
+    renewalReminderFor: { type: Date, default: undefined },
+    reviewDeclinedAt: { type: Date, default: undefined },
 
     cancelledAt: { type: Date, default: undefined },
 
@@ -206,6 +221,12 @@ subscriptionSchema.index({ platformCustomerId: 1 });
 subscriptionSchema.index({ checkoutSessionId: 1 });
 subscriptionSchema.index({ nextBillingDate: 1 });
 subscriptionSchema.index({ currentPeriodEnd: 1 });
+// The grace-expiry sweep (11.2): past_due rows whose grace has run out.
+subscriptionSchema.index({ status: 1, graceEndsAt: 1 });
+// The cancelled → expired sweep (11.3).
+subscriptionSchema.index({ status: 1, currentPeriodEnd: 1 });
+// The pre-renewal reminder sweep (11.6).
+subscriptionSchema.index({ status: 1, nextBillingDate: 1 });
 
 // ONE ACTIVE SUBSCRIPTION PER BOOKING.
 //

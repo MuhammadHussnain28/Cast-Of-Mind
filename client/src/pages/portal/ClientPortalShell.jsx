@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useSearchParams } from 'react-router-dom'
 import SkipLink from '../../components/layout/SkipLink'
 import SignOutButton from '../../components/auth/SignOutButton'
 import ErrorState from '../../components/states/ErrorState'
@@ -7,6 +7,7 @@ import ClientRail from '../../components/portal/client/ClientRail'
 import ClientTabBar from '../../components/portal/client/ClientTabBar'
 import AccessNotice from '../../components/portal/client/AccessNotice'
 import SubscriptionEnded from '../../components/portal/client/SubscriptionEnded'
+import WelcomingBack from '../../components/portal/client/WelcomingBack'
 import PortalSkeleton from '../../components/portal/client/PortalSkeleton'
 import PortalSocketProvider from '../../components/portal/PortalSocketProvider'
 import UnreadProvider from '../../components/portal/UnreadProvider'
@@ -69,6 +70,15 @@ export default function ClientPortalShell() {
 
   const refresh = useCallback(() => setAttempt((n) => n + 1), [])
 
+  // Back from a re-subscribe on Stripe (11.4). Wait for the webhook, then tidy
+  // the address once the portal is open again.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const welcomingBack = searchParams.get('welcome_back') === '1'
+  const reopened = Boolean(state) && state.access !== 'ended'
+  useEffect(() => {
+    if (welcomingBack && reopened) setSearchParams({}, { replace: true })
+  }, [welcomingBack, reopened, setSearchParams])
+
   if (error && !state) {
     return (
       <div className="min-h-dvh bg-mist px-4 py-12">
@@ -80,9 +90,17 @@ export default function ClientPortalShell() {
   if (!state) return <PortalSkeleton />
 
   // §13: login still works, the portal does not. Everything is preserved, and
-  // slice 12 replaces this screen with the re-subscribe flow.
+  // the ended screen offers the way back (11.4).
   if (state.access === 'ended') {
-    return <SubscriptionEnded therapist={state.therapist} reviewState={state.reviewState} />
+    if (welcomingBack) return <WelcomingBack onCheck={refresh} />
+    return (
+      <SubscriptionEnded
+        therapist={state.therapist}
+        reviewState={state.reviewState}
+        kept={state.kept}
+        canResubscribe={state.canResubscribe}
+      />
+    )
   }
 
   const value = { ...state, refresh }
@@ -145,7 +163,11 @@ export default function ClientPortalShell() {
                 <TherapistPresence therapist={state.therapist} tone="light" />
               </div>
 
-              <AccessNotice access={state.access} subscription={state.subscription} />
+              <AccessNotice
+                access={state.access}
+                subscription={state.subscription}
+                accessEndsAt={state.accessEndsAt}
+              />
 
               {/* `flex-1 min-h-0` so a screen that wants the viewport — the
                   chat — can take it. Screens that do not simply sit at the top. */}

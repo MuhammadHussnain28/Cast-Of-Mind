@@ -13,7 +13,8 @@
     "cleanup:tokens": "node scripts/cleanupRefreshTokens.js",
     "seed:therapists": "node scripts/seedTherapists.js",
     "seed:therapists:remove": "node scripts/seedTherapists.js --remove",
-    "reminders:run": "node scripts/runSessionReminders.js"
+    "reminders:run": "node scripts/runSessionReminders.js",
+    "lifecycle:run": "node scripts/runLifecycleSweep.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -431,13 +431,17 @@ describe('POST /checkout/create-session — questionnaire validation', () => {
 
     expect(response.status).toBe(201);
 
+    // The WHOLE number and the `cvc` KEY, never a four-digit fragment: this ran
+    // green for weeks, then failed when Stripe's expires_at read 1790424269 (11.4).
     const pending = await PendingCheckout.findOne();
     const stored = JSON.stringify(pending.toObject());
-    expect(stored).not.toContain('4242');
-    expect(stored).not.toContain('cvc');
+    expect(stored).not.toContain('4242424242424242');
+    expect(stored).not.toContain('"cvc"');
 
     const sentToStripe = JSON.stringify(createSessionMock.mock.calls[0][0]);
-    expect(sentToStripe).not.toContain('4242');
+    expect(sentToStripe).not.toContain('4242424242424242');
+    expect(sentToStripe).not.toContain('"cvc"');
+    expect(sentToStripe).not.toContain('cardNumber');
   });
 });
 

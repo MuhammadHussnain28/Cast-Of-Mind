@@ -45,6 +45,8 @@ export const REVIEW_STATE = Object.freeze({
   NOT_YET: 'not_yet',
   ELIGIBLE: 'eligible',
   SUBMITTED: 'submitted',
+  // "No thanks" (11.6): never offered again for that subscription.
+  DECLINED: 'declined',
 });
 
 export const REVIEW_NOT_AVAILABLE_MESSAGE =

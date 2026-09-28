@@ -160,6 +160,10 @@ function loadEnv() {
     // timer; the manual sweep still works.
     sessionReminders: process.env.SESSION_REMINDERS !== 'off',
 
+    // The subscription lifecycle sweep (11.2): ends lapsed grace periods. `off`
+    // disables the timer; `npm run lifecycle:run` still works.
+    lifecycleSweep: process.env.LIFECYCLE_SWEEP !== 'off',
+
     // Contact form destination. Null in development falls through to the
     // terminal fallback in sendEmail.
     contactTo: process.env.CONTACT_TO || null,

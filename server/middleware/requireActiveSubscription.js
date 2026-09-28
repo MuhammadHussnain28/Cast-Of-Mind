@@ -31,6 +31,26 @@ import {
  * passed. Slice 11 flips the stored status on the same boundary; this comparison
  * is what keeps the two in step in the meantime.
  */
+/**
+ * When portal access ends, or null while it runs on (active renews itself).
+ * THE ONE PLACE this is worked out (11.3): the gate, the sweep, /me and the
+ * emails all read it. A cancelled plan runs to the paid period's end — or to
+ * the grace end, when it was cancelled while past due. Never mid-paid-period.
+ */
+export function accessEndsAt(subscription) {
+  if (!subscription) return null;
+  if (subscription.status === SUBSCRIPTION_STATUS.PAST_DUE) {
+    return subscription.graceEndsAt ? new Date(subscription.graceEndsAt) : null;
+  }
+  if (subscription.status === SUBSCRIPTION_STATUS.CANCELLED) {
+    const ends = [subscription.currentPeriodEnd, subscription.graceEndsAt]
+      .filter(Boolean)
+      .map((value) => new Date(value).getTime());
+    return ends.length ? new Date(Math.max(...ends)) : null;
+  }
+  return null;
+}
+
 export function resolveAccess(subscription, now = new Date()) {
   if (!subscription) return PORTAL_ACCESS.ENDED;
 
@@ -40,13 +60,16 @@ export function resolveAccess(subscription, now = new Date()) {
 
     case SUBSCRIPTION_STATUS.PAST_DUE:
       // Allowed on purpose. §13 gives a ~3-day grace period with a banner, not
-      // a lockout: someone whose card expired has not stopped being a client.
-      return PORTAL_ACCESS.PAST_DUE;
+      // a lockout. Once the grace has run out it reads as ended, even before
+      // the sweep (11.2) stores `expired` — the same boundary, checked twice.
+      return subscription.graceEndsAt && subscription.graceEndsAt <= now
+        ? PORTAL_ACCESS.ENDED
+        : PORTAL_ACCESS.PAST_DUE;
 
-    case SUBSCRIPTION_STATUS.CANCELLED:
-      return subscription.currentPeriodEnd && subscription.currentPeriodEnd > now
-        ? PORTAL_ACCESS.ENDING
-        : PORTAL_ACCESS.ENDED;
+    case SUBSCRIPTION_STATUS.CANCELLED: {
+      const ends = accessEndsAt(subscription);
+      return ends && ends > now ? PORTAL_ACCESS.ENDING : PORTAL_ACCESS.ENDED;
+    }
 
     default:
       return PORTAL_ACCESS.ENDED;

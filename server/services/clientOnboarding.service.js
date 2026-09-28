@@ -11,6 +11,7 @@ import { ROLES, USER_STATUS } from '../constants/roles.js';
 import { sendClientWelcomeEmail } from './email/email.service.js';
 import { notifyQuietly } from './notification.service.js';
 import { NOTIFICATION_TYPE } from '../constants/notifications.js';
+import { addOneMonth } from './subscriptionRenewal.service.js';
 import {
   BILLING_CURRENCY,
   BOOKING_STATUS,
@@ -35,12 +36,11 @@ import {
  * email address, the concern tags and the partners' names are all off limits.
  */
 
-/** One calendar month on, used only when Stripe cannot tell us the real date. */
-function oneMonthFrom(date) {
-  const end = new Date(date);
-  end.setUTCMonth(end.getUTCMonth() + 1);
-  return end;
-}
+/**
+ * One calendar month on, used only when Stripe cannot tell us the real date.
+ * Clamped (11.4): plain setUTCMonth turned 31 January into 3 March.
+ */
+const oneMonthFrom = (date) => addOneMonth(date);
 
 /**
  * Ask Stripe when the paid period actually ends.
@@ -53,7 +53,7 @@ function oneMonthFrom(date) {
  * Falls back rather than failing: a billing date that is approximately right is
  * far better than refusing to create an account somebody has paid for.
  */
-async function resolvePeriodEnd(subscriptionId, startDate) {
+export async function resolvePeriodEnd(subscriptionId, startDate) {
   if (!subscriptionId) return oneMonthFrom(startDate);
 
   try {
@@ -225,6 +225,13 @@ export async function createClientAccount(session) {
       createdUserId = user._id;
       createdBookingId = booking._id;
     });
+  } catch (error) {
+    // Two deliveries of one event at once (duplicates are routed since 11.1):
+    // the loser hits a unique index. If the winner's account now exists, the
+    // work is done. Anything else is a real failure, and Stripe retries it.
+    const winner = await alreadyProcessed(platformSubscriptionId);
+    if (winner) return { created: false, reason: 'already_processed', userId: String(winner.clientId) };
+    throw error;
   } finally {
     await mongoSession.endSession();
   }

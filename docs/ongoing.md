@@ -423,7 +423,7 @@ Spec addition, **approved 2026-09-07**. §12's golden rule puts account creation
 - **Two startup guards, and the second is the one that matters:** production refuses to start without `STRIPE_SECRET_KEY`, and **production refuses to start with an `sk_test_` key** — a test key in production would accept real subscriptions and never charge a card, and the business would not find out until the money failed to arrive.
 - **Stripe's own error text never reaches the caller** — a 502 with a fixed message.
 - **Nothing from the checkout request body is logged.** It carries an email, concern tags and, for a couple, two people's names and ages.
-- **Handlers stubbed for slice 11:** `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.deleted`, `customer.subscription.updated`.
+- **Handlers stubbed for slice 11: none remain.** `invoice.payment_succeeded` was built in 11.1 (which also started routing duplicate events to their handlers), `invoice.payment_failed` in 11.2, and both `customer.subscription.*` events in 11.3.
 
 ### 8. Subscription records and the lifecycle constraints
 
@@ -2299,9 +2299,318 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 
 ---
 
+# SLICE 11 — Subscription Lifecycle
+
+## Chunk 11.1 — Renewal handling
+
+**Status:** Complete. Nothing skipped. **Slice 11 has started.** Server only, no UI, so no impeccable pass and no contrast work. **Atlas and real Stripe untouched**; every test ran in memory with real signatures and email faked. **One real gap in shipped code (6.3) was found and fixed** (below).
+
+**Built**
+- server new: `services/subscriptionRenewal.service.js` · `services/email/templates/paymentReceipt.js` · `routes/subscriptionRenewal.test.js` (37).
+- server edits: `services/stripeWebhook.service.js` (the renewal handler, ledger linking) · `controllers/webhook.controller.js` (duplicates routed) · `services/clientOnboarding.service.js` (concurrent-delivery recovery) · `models/Subscription.js` (`currentPeriodStart`, spec addition) · `services/sessionCounter.service.js` (`periodStartOf` reads it; `renewCycle` removed) · `email.service.js`, `constants/email.js`, `test/emailServiceMock.js` · tests in `webhook`, `webhookAccountCreation`, `sessionCounter`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **THE GAP: a failed handler was lost for ever.** The ledger row is written before the handler runs, and a duplicate returned 200 without running it. So a handler that failed once turned Stripe's retry into a skipped "duplicate": paid, and never acted on. 6.4's effect guard only ever saw a *different* event id. **Duplicates are now routed again** (developer's call, 2026-09-24); every handler guards at its effect, and the reply still says `duplicate: true`.
+- **Concurrent identical checkouts now recover:** the losing delivery hits a unique index, finds the winner's subscription, and answers 200 instead of 500.
+- **The forward-only condition IS the idempotency.** One atomic update matches only while the stored `currentPeriodEnd` is earlier than the new one. Replays, a different event for the same invoice, three deliveries at once, and a late older invoice all match nothing.
+- **Period, counter and status move in one write.** `sessionsRemaining: 4` sits in the same `$set` as the dates, so they can never be applied apart. `renewCycle` is gone, so the reset has one source.
+- **The new period comes from the signed invoice's subscription line,** with no Stripe API call. **Never `invoice.period_start/period_end`:** on a renewal those are the period that just ENDED. **Fallback:** one month from `invoice.period_end`, clamped (31 Jan → 28/29 Feb). **It reads only the invoice:** anchored on our own record, every retry would add another month.
+- **Both invoice shapes are read.** API `2026-08-26.dahlia` moved the subscription id to `parent.subscription_details.subscription`; the older top-level field is the fallback.
+- **Only `billing_reason: subscription_cycle` renews.** `subscription_create` is still skipped; any other reason is recorded and left alone.
+- **A paid renewal brings `past_due` back to `active`** (developer's call). `cancelled` and `expired` are refused loudly and left unchanged: money arrived and a person must look.
+- **Unknown subscription, no period, or a refused status: a loud `RENEWAL NOT APPLIED` log and a 200.** A retry cannot fix any of them. A database error still throws, so Stripe retries.
+- **An amount other than €200 still renews** (Stripe is the truth about money) and warns with amounts only.
+- **Ledger rows are linked** to `subscriptionId` and `clientId`, read before the insert because the ledger can never be updated. Best effort: a failed lookup leaves a row unlinked, never unwritten.
+- **Our own receipt** (developer's call): amount, paid on, the period covered, next payment, and §13's *"To stop it, cancel before this date."* Dates are in the client's saved zone, or labelled UTC. No card detail, no Stripe link, no session length. Sent only when the update really changed the row, after the write; a failure is logged by error name and never undoes the renewal.
+
+**Verification**
+- Tests: **1644 passing across 57 suites** (1604 before, 40 new; one `renewCycle` test replaced by the real webhook). Server lint clean.
+- **Mutation-checked ten times, every one caught:** forward-only condition removed 4 · duplicates not routed 2 · sessions carried over 3 · receipt on a no-op 4 · first invoice renewed 2 · fallback anchored on our record 2 · the invoice's own (old) period used 17 · cancelled/expired renewable 2 · ledger not linked 1 · concurrent checkout loser not recovered 1. Each file was restored byte-for-byte and checked.
+- **The gap is tested for real on both paths:** the handler fails once (500), the SAME event is retried, and the renewal (and the account, for checkout) happens exactly once.
+- A test fake was wrong on the first run: it returned a bare promise where the service calls `.lean()`. The fake was fixed; the code was not bent to suit it.
+
+**Manual steps for the developer**
+1. **Restart the API server.** No packages, no environment variables.
+2. **The brief's verify step, with Stripe test clocks.** It writes to whichever database your server uses, so use a test client. Run `stripe listen --forward-to localhost:<port>/api/v1/webhooks/payment` and put its `whsec_` in `STRIPE_WEBHOOK_SECRET`. Stripe Dashboard (test mode) → Billing → Test clocks: create a clock, a customer and a €200 monthly subscription on it, then check out that client once. Advance the clock by one month.
+3. Expect `invoice.payment_succeeded` with `subscription_cycle`, then in Atlas: `currentPeriodEnd` one month later, `sessionsRemaining: 4`, `status: active`, and a receipt (blocker 7 applies: only the Resend owner receives it until the domain is verified).
+4. In the Stripe dashboard, **Resend** the same event: the reply says `duplicate: true` and nothing changes.
+
+**Carried forward**
+- **11.2:** failed payment and grace. The renewal already restores `past_due` → `active`; 11.2 adds the failure, the banner and the grace expiry.
+- **11.3 / 11.4:** cancellation and expiry must call `endCycle`, and flip cancelled → expired on the 7.1 gate's `currentPeriodEnd` boundary.
+- **Every future handler must be safe to run twice** — duplicates now reach them.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no past-due logic, cancellation, expiry or UI (11.2–11.5) · no renewal reminders (11.6) · no Stripe-sent receipt · no client action anywhere.
+
+---
+
+## Chunk 11.2 — Failed payment and grace period
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas and real Stripe untouched**; tests fake the Stripe API and email, with real signatures. Impeccable loaded before the banner. **One more real bug in shipped 6.3 code was found and fixed** (the ledger amount, below).
+
+**Built**
+- server new: `services/subscriptionLifecycle.service.js` (past-due, the grace sweep, the scheduler) · `services/billingPortal.service.js` · `constants/subscriptionLifecycle.js` · `services/email/templates/paymentFailed.js` · `scripts/runLifecycleSweep.js` · `routes/paymentFailure.test.js` (38).
+- server edits: `stripeWebhook.service.js` (failure handler, ledger amount fix) · `requireActiveSubscription.js` (the grace boundary) · `subscriptionRenewal.service.js` (recovery clears the grace) · `models/Subscription.js` (`pastDueSince`, `graceEndsAt`, index) · `sessionCounter.service.js` (`endCycle` removed) · `client.routes.js` + controller (`POST /client/billing/portal`) · `constants/clientPortal.js` (`graceEndsAt` on `/me`) · `server.js`, `config/env.js`, `package.json` (`lifecycle:run`) · email service, subjects, mock.
+- client: `AccessNotice.jsx` (the banner rebuilt) · `CardRenewIcon` · `openBillingPortal` in `clientPortalApi.js` · banner copy in `clientPortalContent.js`.
+- Packages: none. Env: one **optional** `LIFECYCLE_SWEEP=off`.
+
+**Key decisions**
+- **Only a failed renewal (`subscription_cycle`) on an `active` row starts the grace.** A failed first invoice means no account exists. Cancelled and expired rows are left alone.
+- **One episode, one email** (developer's call). The update matches only `active`, so Stripe's own retries failing again never restart the grace or email twice.
+- **The grace runs from Stripe's time of failure (`event.created`)**, so a retried webhook lands on the same deadline. 3 days, from `PAST_DUE_GRACE_DAYS`.
+- **A stale failure is ignored:** if 11.1 already moved the period past this invoice, it was paid, and an out-of-order failure must not undo that.
+- **The atomic filter is the real guard; the early checks only log a clearer reason.** Mutation proved it (Verification), and two race tests now pin the filter by handing the service an out-of-date read.
+- **Recovery is 11.1's renewal,** which now also clears `pastDueSince` and `graceEndsAt` in the same write, so the banner goes.
+- **The gate closes on the grace boundary itself**, even before the sweep stores `expired` — the same pattern 7.1 uses for cancelled-past-period.
+- **The sweep cancels at Stripe FIRST** (developer's call; 10.1's rule), then one conditional update → `expired`, `sessionsRemaining: 0`. Stripe keeps retrying a card for weeks by default, so without the cancel a late retry could charge someone already locked out.
+  - **Paid at Stripe → never expired:** 11.1's webhook is on its way. Already ended at Stripe → no second cancel. A Stripe failure changes nothing and the next sweep retries.
+  - The update matches only a row still past-due and past its grace, so a recovery at the same moment wins.
+  - `graceEndsAt` is **kept** on expiry, as the record of why it ended.
+  - Every 5 minutes in the web server, like 9.6; `npm run lifecycle:run` by hand. Two instances are safe.
+- **`EXPIRED_SET` replaces `endCycle`**: the status and "0 sessions" move in one write. 11.3/11.4 reuse it.
+- **"Update your card" is Stripe's Customer Portal** (developer's call; 11.5 reuses it). The customer id is read from the token's own subscription and never reaches the browser. Only an https `*.stripe.com` URL is handed back; anything else is a 502. Behind the gate, so past-due reaches it and ended does not.
+- **The email links to the portal, not to Stripe:** a Stripe portal link expires long before an email is read.
+- **The banner states a DATE, never a countdown** — a draining bar is an urgency tactic for an anxious reader. On every portal screen until fixed.
+  - A drawn card-with-renew-arrow in a soft clay disc; the date in full ink; one action.
+  - The button stays full strength while "Opening Stripe…" (an `aria-busy` override on the shared Button's fade).
+  - A failed press is the only thing announced (`role="alert"`), using the server's own safe words.
+  - The title is a paragraph, not a heading, because it sits above each screen's own h1.
+
+**Verification**
+- Tests: **1681 passing across 58 suites** (1644 before, 38 new, 1 `endCycle` test removed). The full run gave 1679 before the two race tests were added; that suite then passed 38/38 on its own. Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed (`aria-busy` override, shadow, disc).
+- **Mutation-checked 16 times.** Caught: the filter alone, active guard (1) · the filter alone, stale guard (1) · zero-day grace (4) · the gate ignoring the deadline (3) · the sweep skipping Stripe (4) · ignoring paid-at-Stripe (1) · the sweep losing its status guard (1) · recovery leaving the grace set (2) · the portal URL check (1) · the portal leaking the customer id (1) · the ledger recording €0 (1) · a second email (4) · both active checks together (5) · both stale checks together (2).
+- **MISSED, by design: removing only an early check breaks nothing,** because the atomic filter holds on its own. This was first seen as two misses with the filter itself untested — a false-confidence gap caught before it shipped. The two race tests above close it.
+- **The real 6.3 bug:** a failed invoice has `amount_paid: 0`, not null, so `??` never reached `amount_due`, and the ledger recorded a failed €200 as €0. It now reads `amount_due` for failures.
+- Contrast: **11 pairs computed, 0 failures.** Tightest: the clay title and error line 4.90:1; the icon on its disc 4.16:1 (a graphic, 3:1 floor). The caption was moved from `ink/60` (4.58:1) to `ink/70` (6.39:1) rather than sitting on the line. `CardRenewIcon` bounds-checked by hand: x 2.0–22.25, y 4.5–21.75. Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** You should see `Subscription lifecycle sweep scheduled.`
+2. **Stripe dashboard (test mode), once:**
+   - Settings → Billing → Customer portal: turn it on and allow **updating the payment method**. Without this, "Update your card" returns an error.
+   - Billing → Revenue recovery → Retries: keep the retries **inside 3 days**, so Stripe's last try comes before our grace ends.
+3. **The brief's verify step,** with `stripe listen` running and a test-clock subscription (as in 11.1). It writes to your database, so use a test client.
+   - Attach the failing test card `4000 0000 0000 0341` to the customer and advance the clock one month.
+   - The client should be past due, get one email, and see the banner with the date on every screen.
+   - Then "Update your card" opens Stripe. Add `4242 4242 4242 4242`, and Stripe retries (or pay the invoice from the dashboard). The banner clears and the status is back to active.
+4. **Expiry by hand:** in Atlas, set a test client's `graceEndsAt` to the past, then run `npm run lifecycle:run`. It cancels the test subscription at Stripe and marks it expired.
+
+**Carried forward**
+- **11.3 / 11.4:** cancelled → expired joins `runLifecycleSweep`, reusing `EXPIRED_SET`; `customer.subscription.deleted` (fired by the sweep's cancel) is still a stub.
+- **11.5** reuses `POST /client/billing/portal` on the account page.
+- **12.5:** the Customer Portal and retry settings above must be repeated on Asad's live Stripe account.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no countdown or progress bar · no email when the grace ends · no Stripe-sent dunning emails · no admin override (11.3 onwards) · no re-subscribe (11.4).
+
+---
+
+## Chunk 11.3 — Cancellation
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas and real Stripe untouched**; tests fake Stripe's API and email, with real signatures. Impeccable loaded before the UI. **A real defect in shipped 10.1 code was found and fixed** (the admin's past-due cancel, below).
+
+**Built**
+- server new: `services/clientSubscription.service.js` · `services/email/templates/subscriptionChange.js` · `routes/subscriptionCancellation.test.js` (37). Routes: `POST /client/subscription/cancel`, `POST /client/subscription/reactivate` (both gated).
+- server edits: `subscriptionLifecycle.service.js` (the shared `cancelSubscription`, the cancelled → expired sweep, both Stripe handlers) · `requireActiveSubscription.js` (`accessEndsAt`) · `adminClients.service.js` (onto the shared path) · `stripeWebhook.service.js` (the last two stubs replaced) · `clientPortal.service.js` + `constants/clientPortal.js` (`accessEndsAt`, `cancelledBy` on `/me`) · `models/Subscription.js` (index) · `constants/subscriptionLifecycle.js` · controller, routes, email service, subjects, mock, script · `adminClients.test.js`.
+- client: new `components/portal/client/account/SubscriptionControls.jsx` · `lib/client/accessDates.js` · `CardStopIcon`. Edits: `Account.jsx`, `AccessNotice.jsx` + `ClientPortalShell.jsx` (the ending banner reads the server's end), `clientPortalApi.js`, `clientPortalContent.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **ONE cancel path for client and admin** (`cancelSubscription`). Stripe first, database second; a Stripe failure writes nothing.
+  - **Active:** Stripe stops at the period end, and access runs to it.
+  - **Past due:** Stripe stops **at once**, and access runs to the grace end already promised (developer's call).
+- **The 10.1 defect:** the admin's cancel used "at period end" for past-due too. The gate then cut the client off at once while Stripe kept retrying their card, so a successful retry charged €200 to someone locked out. It now goes through the shared path, and a test proves `cancel` is called, not `update`.
+- **`accessEndsAt` is the one place the end is worked out** (the paid period, or the later grace end). The gate, the sweep, `/me`, the banner and the emails all read it. **Never mid-paid-period.**
+- **Sessions stay usable until the end**, and drop to 0 in the same write that expires the plan (`EXPIRED_SET`).
+- **Reactivation: only the client's own cancellation, and only before the end** (developer's call). An admin cancellation may be a refund dispute. A past-due one has already ended at Stripe. Each check is repeated in the atomic filter.
+- **The sweep expires a cancelled plan on its end with no Stripe call:** Stripe already stops at the period end. A reactivation racing it wins.
+- **`customer.subscription.deleted`:** paid time left → `cancelled` with access kept; none → `expired`. The filter is pinned to the status and period it read, so a renewal landing meanwhile wins.
+- **`customer.subscription.updated` re-reads Stripe's LIVE state**, never the payload, so a late event cannot flip us the wrong way. A cancel made in Stripe's own screens leaves `cancelledBy` unset, so it cannot be undone from our page.
+- **The UI has no retention pressure.** The way out is an ordinary control, never hidden. The confirmation is inline, not a modal, and draws what happens as three stations (Today · Until [date, time] · After that). Its two buttons are the same size and both filled. No discount, no "are you sure", no loss framing.
+- **The cancelled state is a drawn horizon from today to the end:** a date, never a count of days, because a countdown is an urgency tactic.
+- **Focus is handled:** it moves into the panel's heading on open (reduced motion too) and back to the trigger on close.
+
+**Verification**
+- Tests: **1718 passing across 59 suites** (1681 before, 37 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed for every new utility (the path lines, discs, horizon, edges).
+- **Mutation-checked 14 times, every one caught:** past-due stopped at period end (2) · the cancel filter losing its status (1) · the end ignoring the grace (4) · the gate cutting a cancelled plan at once (12) · the sweep ignoring the period end (1) · the sweep ignoring the grace (1) · the sweep update losing its boundary (1) · reactivating an admin cancellation (1) · the reactivation filter losing its conditions (1) · `deleted` cutting off mid-period (2) · `deleted` not pinned to what it read (1) · `updated` trusting the payload (3) · a second press erroring (2) · expiry keeping the sessions (2).
+- **Each atomic filter has its own race test**, the lesson from 11.2: two cancels at once, a sweep racing a reactivation, a reactivation racing an expiry, and a `deleted` racing a renewal.
+- Contrast: **18 pairs computed, 0 failures.** Tightest: the trigger's edge `ink/50` on paper 3.44:1, the clay icon on its disc 4.30:1 (a graphic, 3:1 floor), the station icons 4.70:1. The sage path lines are decorative. `CardStopIcon` bounds-checked by hand (x 2.0–22.25, y 4.5–21.75). Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no env vars.
+2. **Stripe dashboard (test mode) → Customer portal:** turn **off** "Cancel subscriptions" (developer's call), so every cancel goes through our page and our email.
+3. **The brief's verify step** (writes to your database, so use a test client). Account → **Cancel subscription** → read the three stations → **Cancel subscription**. The page shows the end date, the "ending" banner appears on every screen, the portal still works, and Stripe shows "Cancels at period end".
+4. Press **Reactivate**: the plan is active again and Stripe shows no pending cancellation.
+5. **End by hand:** set that test row's `currentPeriodEnd` to the past in Atlas and run `npm run lifecycle:run`. It is expired and the portal closes.
+6. At 360px the stations stack on a vertical path; from `sm` up they sit across one line. With reduced motion on, the panel appears without sliding.
+
+**Carried forward**
+- **11.4:** the re-subscribe screen for `expired`, reusing `EXPIRED_SET` and `accessEndsAt`.
+- **11.5:** the card update on the Account page (the endpoint exists since 11.2); the build note now names only that.
+- **Therapist side:** sessions a therapist scheduled after a client's end date are not flagged. Worth deciding in 11.4 or 12.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no retention offer, survey or "reason for leaving" · no countdown · no reactivation of an admin or past-due cancellation · no immediate-expiry option for the client · no refund logic (§12).
+
+---
+
+## Chunk 11.4 — Expired state and re-subscribe
+
+**Status:** Complete. Nothing skipped. Not seen rendered; see Manual steps. **Atlas and real Stripe untouched**; tests fake Stripe's API and email, with real signatures. Impeccable loaded before the UI. **A flaky test from 6.2 was found and fixed** (Verification).
+
+**Built**
+- server new: `services/resubscription.service.js` · `utils/stripeUrl.js` (shared with 11.2's portal) · `routes/resubscribe.test.js` (21). Route: `POST /client/subscription/resubscribe` (above the gate).
+- server edits: `checkout.service.js` (`subscriptionLineItem`, now shared) · `clientOnboarding.service.js` (`resolvePeriodEnd` exported; the month fallback clamped) · `stripeWebhook.service.js` (the re-subscribe branch) · `clientPortal.service.js` (`kept`, `canResubscribe` on `/me`) · `billingPortal.service.js` · `constants/subscriptionLifecycle.js` · controller, routes, the welcome-back email, subjects, mock · `checkout.test.js`.
+- client: rebuilt `components/portal/client/SubscriptionEnded.jsx` · new `WelcomingBack.jsx` · `ClientPortalShell.jsx` (`?welcome_back=1`) · `clientPortalApi.js` · `clientPortalContent.js` (`ENDED`, `WELCOME_BACK`).
+- Packages / env vars: none.
+
+**Key decisions**
+- **THE SAME BOOKING, A NEW SUBSCRIPTION ROW** (approved with the developer's mentor, 2026-09-25). The brief said to reuse the old subscription row. But every message, journal entry, worksheet, session and note hangs off the booking, so all of it resumes either way; a new row also keeps each Stripe subscription, its ledger rows and its one review (10.3) separate, and matches 6.1's one-active-per-booking index.
+- **No questionnaire.** The page reuses the booking, the therapist and the client's Stripe customer. It uses the same price line as a first checkout (one source) and states §13's renewal terms on Stripe's page. **Only our own ids go to Stripe.**
+- **Offered only once access has ENDED and the therapist is still active,** decided on the server (`canResubscribe` on `/me`), so the screen never shows a button that would fail (decision 3).
+- **Two tabs, one page:** an open re-subscribe page for this booking is handed back rather than a second one made.
+- **The golden rule holds:** the portal returns only on the webhook. It is marked by metadata we wrote and Stripe signed, and it goes to its own handler ahead of the new-client path.
+  - **Replays** are recognised before anything is written.
+  - **Two deliveries at once:** the one-active-per-booking index is the backstop.
+  - **A second payment** (including one while a cancelled plan still runs, which the index does not cover) is cancelled at Stripe at once and logged `REFUND BY HAND`.
+  - **A therapist who left while the page was open:** same.
+  - **A booking that is not this client's** fails loudly (500), so it shows in Stripe.
+- **`/me` reports what is kept as COUNTS ONLY** (messages, journal entries, worksheets, sessions held) for an ended client, never a word of content (decision 2). A test asserts no text leaks.
+- **The screen:**
+  - The therapist's portrait leads, with *"Your subscription has ended. Reactivate to continue with Dr. [Name]."*
+  - The kept counts are drawn as four tiles on hairline seams.
+  - The ink renewal panel is reused verbatim from checkout (6.5).
+  - One gold button, with the caption "Nothing is charged until you confirm on Stripe".
+  - A calm contact line instead when the therapist is gone.
+  - No guilt, no urgency, no countdown.
+- **Back from Stripe:** "Welcoming you back" with a breathing mark, asking `/me` every 2s. The portal appears on its own once the webhook lands, and the address is tidied. After ~45s it says plainly that it's taking longer, with "Check again" and a contact line. Never a false "done".
+- **The 6.4 month fallback was unclamped** (31 January → 3 March); it now uses 11.1's clamped `addOneMonth`.
+
+**Verification**
+- Tests: **1739 passing across 60 suites** (1718 before, 21 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed for the new utilities.
+- **Mutation-checked 12 times, every one caught:** re-subscribe while still subscribed (2) · a page for a departed therapist (1) · open page not reused (1) · extra data sent to Stripe (1) · a webhook forgetting it had processed an event (1) · the second-payment guard (1) · the booking not checked against the client (1) · the webhook ignoring a departed therapist (1) · `/me` offering the button regardless (1) · `/me` counting for a live client (1) · counting sessions never held (1) · the new row starting without sessions (1).
+- **Two tests tightened before the run, because of what they would have missed:**
+  - The replay test did not check that Stripe was left alone. Without the "already processed" check, a replay would have **cancelled the client's real, paid subscription at Stripe** and still passed.
+  - Nothing covered a second payment while a cancelled plan still runs, which only the early check guards.
+- **A flaky 6.2 test, found by the full run:** it searched the whole Stripe request for "4242" to prove no card number leaked, and failed when `expires_at` read `1790424269`. It now looks for the whole number and the `cvc` key.
+- Contrast: **12 pairs, 0 failures** — every pair reuses a value already measured (kept disc 4.70:1, labels 6.73:1, error on mist 4.93:1, the gold button's `ink/50` edge 3.08:1). Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no env vars.
+2. **The brief's verify step** (writes to your database, so use a TEST client). Expire one: set its subscription to `expired`, `currentPeriodEnd` in the past. Sign in: the re-subscribe screen shows their therapist and the kept counts.
+3. Press **Reactivate subscription** with `stripe listen` running. Pay with `4242 4242 4242 4242`. You return to "Welcoming you back", then the portal opens by itself. Open Chat: the history is all there.
+4. In Atlas: the same booking, **two** subscription rows (the old one expired, the new one active with 4 sessions).
+5. Deactivate that client's therapist and sign in again as an expired client: no button, the contact line instead. Reactivate the therapist afterwards.
+
+**Carried forward**
+- **Therapist side:** a returning client is not announced on the bell (10.4 has no "returning" type). Their row simply shows in the list again. Worth deciding with 11.6 or 12.
+- **Refunds are by hand** for the two "REFUND BY HAND" cases (§12, the Stripe dashboard). Worth telling Asad the log line exists.
+- **11.5:** the card update on Account. **11.6:** renewal reminders and the end-of-subscription review.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no new questionnaire · no therapist reassignment (v2) · no deletion of anything on expiry · no countdown or "we miss you" · no refund logic.
+
+---
+
+## Chunk 11.5 — Subscription & Account page
+
+**Status:** Complete. Nothing skipped. **The Account page was rebuilt, not extended** — the developer found it basic. Not seen rendered; see Manual steps. **Atlas and real Stripe untouched**; every test ran in memory. Impeccable loaded before the UI.
+
+**Built**
+- server new: `services/billingHistory.service.js` · `routes/billingHistory.test.js` (20). Route: `GET /client/billing/history?page=` (gated).
+- server edits: `models/PaymentEvent.js` (`platformSubscriptionId`, spec addition, indexed) · `stripeWebhook.service.js` (recorded on every event shape) · `validation/clientPortal.schema.js` · `constants/subscriptionLifecycle.js` · controller, routes.
+- client new: `components/portal/client/account/{PlanHero,AccountCards,BillingHistory}.jsx` · `ReceiptIcon`, `TickIcon`, `LockIcon`. Rewritten: `pages/portal/client/Account.jsx`. Edits: `SubscriptionControls.jsx` (the repeated date removed), `clientPortalContent.js` (`ACCOUNT`; the old non-verbatim `RENEWAL_NOTICE` removed), `clientPortalApi.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **§13's portal notice is quoted exactly and lives in the hero** — *"Next payment: [date]. To stop it, cancel before this date."* — at body size, whenever a renewal is due. It is the second of the three required transparency points, so it is never collapsed or put in a submenu. The old constant carried different words and is gone, so nobody reuses the wrong sentence.
+- **The plan hero is ink,** the only surface where gold is legible (11.08:1):
+  - a status mark and word (Active · Payment needed · Ending);
+  - the next payment date large, with €200;
+  - sessions left as four gold marks with "Unused sessions do not roll over".
+  - **Past due** shows the grace date and **Update your card**. **Ending** shows the end date and time and "No further payments".
+- **Billing history comes from the ledger, one row per invoice** (developer's call). Stripe's retries group into one row ("Paid after a retry"), not three alarming lines. Status is a drawn mark AND a word, never colour alone.
+- **Spec addition: every new ledger row stores its Stripe subscription id,** read before the insert. The first payment is logged before the account exists, so this is the only link that finds it. Older rows are still found through the previous links. **The ledger stays append-only.**
+- **Only derived fields leave the server:** date, amount, currency, status, period and our own row id. Never the payload, a Stripe id, or anything about the card, which the raw payload does hold (`last4`); a test asserts none of it appears.
+- **Details are read-only**, with *"To change any of these, write to us"* (developer's call). They are the intake record the therapist relies on.
+- **Change password sends the standard reset link to the account's own email** (developer's call) — the same `forgot-password` path as the sign-in page.
+- **Payment method** opens Stripe's portal (the 11.2 endpoint), where receipts and invoices also live.
+- **The cancelled state no longer shows the end date twice:** the hero owns it; the 11.3 panel keeps its drawn horizon and Reactivate.
+
+**Verification**
+- Tests: **1759 passing across 61 suites** (1739 before, 20 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes; generated CSS confirmed for all new utilities.
+- **Mutation-checked 9 times, every one caught:** reading another client's subscriptions (1) · widening the client link to anyone (1) · retries not grouped (2) · a retried payment read as failed (1) · non-payment events listed (1) · Stripe's invoice id leaking as the row id (1) · no paging (1) · the ledger forgetting the Stripe subscription (5) · the checkout shape not read (1).
+- Contrast: **17 pairs computed, 0 failures.** Tightest: the clay "Payment needed" dot on ink 3.29:1 (a graphic beside its word, 3:1 floor), the empty session ring 4.48:1, the ghost button edge 3.44:1. The thread and skeleton are decorative. 3 new icons bounds-checked by hand. Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no env vars.
+2. **The brief's verify step — every state** (writes to your database, so use a TEST client):
+   - **Active:** open Account. The ink hero shows the next payment large and the exact §13 sentence; four gold marks show sessions left.
+   - **Past due:** set the subscription `past_due` with `graceEndsAt` a day ahead. The hero reads "Payment needed" with the grace date and **Update your card**; the banner shows too.
+   - **Cancelled:** press Cancel (11.3). The hero reads "Your plan ends" with date and time; Reactivate sits below.
+3. **Billing history in development:** payments logged before this chunk may be missing, because they do not carry the new field. New payments (a test-clock renewal, 11.1) appear at once. Production starts clean.
+4. Press **Change password**: a reset email to the account address (blocker 7 applies until the domain is verified).
+5. At 360px the two small cards stack, the hero's session marks drop below the date, and nothing scrolls sideways.
+
+**Carried forward**
+- **11.6:** renewal reminders (the third transparency point) and the end-of-subscription review.
+- `BuildNote` (7.1) is now unused anywhere; it can go in a cleanup.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no self-service edits to intake details · no card fields in our UI (Stripe holds the card) · no receipt downloads of our own (Stripe's portal has them) · no countdown.
+
+---
+
+## Chunk 11.6 — Renewal reminders and end-of-subscription review
+
+**Status:** Complete. Nothing skipped. **SLICE 11 IS FINISHED.** Not seen rendered; see Manual steps. **Atlas and Resend untouched**; every test ran in memory with email faked. Impeccable loaded before the form change.
+
+**Built**
+- server new: `services/renewalReminders.service.js` · `routes/renewalReminders.test.js` (20). Route: `POST /client/reviews/decline` (above the gate, beside the rating).
+- server edits: `models/Subscription.js` (`renewalReminderFor`, `reviewDeclinedAt` — spec additions; `{status, nextBillingDate}` index) · `subscriptionLifecycle.service.js` + `scripts/runLifecycleSweep.js` (the reminder joins the sweep) · `reviewSubmission.service.js` (`declineReview`, the `declined` state) · `constants/{reviews,subscriptionLifecycle,email}.js` · the renewal-reminder email, sender, mock · controller, routes.
+- client: `RatingForm.jsx` ("No thanks") · `reviewsApi.js` · `reviewContent.js`.
+- Packages / env vars: none.
+
+**Key decisions**
+- **The reminder is §13's third transparency point, and its first sentence is §13's, verbatim:** *"Your subscription renews on [date]. No action needed to continue; cancel anytime before then."* The date is in the client's own zone (labelled UTC when none is saved), with the amount and a link to Account. No card details, no pressure.
+- **From 3 days before billing** (developer's call), with a late edge of 6 hours before the charge, so a sweep missed during a restart still lands but nobody is emailed hours before being charged.
+- **Active plans only.** A cancelled plan will not renew; a past-due one already has its own email (11.2).
+- **One per cycle, never twice.** The reminder is claimed in one atomic update keyed to the exact billing date, before anything is sent. A renewal moves the date, which starts the next cycle's reminder.
+- **A failed send is retried** (developer's call): the claim is released if Resend refuses, and the next sweep sends it. This differs from 9.6's session reminders on purpose, because this email is a legal protection for the client. The cost is a rare double email if Resend fails after actually sending.
+- **The exit review is an invitation, never a wall** (developer's decision). The developer first considered making the stars compulsory to proceed; that would be a wall, and the brief rules it out. So:
+  - stars are required **to submit** (1–5) and words are optional, as in 10.3;
+  - nothing is gated behind it — the ended screen and Account work whether they rate, decline or ignore it;
+  - **"No thanks"** sits beside Send as quiet text, and puts the invitation away for good for that subscription (`reviewDeclinedAt`). No reason is asked for.
+- **After "No thanks"** the card goes and one quiet line stays ("Understood. We will not ask again."), which also takes the keyboard focus instead of dropping it to the top of the page.
+- **No email asking for a review.** At the end of therapy that would be pressure.
+- **Reviews stay admin-only** — 10.3's walker still proves no client, therapist or public route can reach the read path.
+
+**Verification**
+- Tests: **1779 passing across 62 suites** (1759 before, 20 new). Server lint clean; client `oxlint` 0 findings on touched files; build passes.
+- **Mutation-checked 8 times, every one caught:** the claim not checking "already reminded" (1) · the claim not checking the plan is still active (1) · a failed send never retried (1) · reminders a month early (1) · reminders hours before the charge (1) · "No thanks" allowed before the plan ends (1) · a second "No thanks" overwriting the first (1) · the form returning after "No thanks" (1).
+- **Each atomic claim has its own race test:** three sweeps at once send one email, and a plan cancelled between the sweep's read and its claim is never reminded.
+- Contrast: 3 new pairs, all reusing measured values ("No thanks" `ink/70` 6.73:1, its underline `ink/60` 4.74:1, the ink focus ring). Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. **Restart the API server; hard-refresh the client.** No packages, no env vars.
+2. **The brief's verify step — the reminder** (writes to your database and sends real email if `RESEND_API_KEY` is set, so use a TEST client). Set its active subscription's `nextBillingDate` two days ahead, run `npm run lifecycle:run` and check the inbox. Run it again: nothing more is sent.
+3. **The review.** Expire (or cancel) a test subscription and sign in: the stars appear with **No thanks** beside Send. Press it: the card goes, and it does not come back after a reload. On another test client, rate with stars only.
+4. **Stripe dashboard → Settings → Billing → Customer emails:** turn off Stripe's own "upcoming renewal" email, so clients do not get two.
+5. Blocker 7 still applies: until the domain is verified in Resend, only the account owner receives these.
+
+**Carried forward**
+- **Slice 11 is complete.** Before launch, repeat on Asad's live Stripe account: the Customer Portal (card updates on, cancel off), the retry schedule inside 3 days, and Stripe's renewal emails off.
+- **Asad to confirm:** the 3-rating ranking minimum and the form's wording (10.3), the 3-day lead, and that no review email is sent.
+- **Pre-launch blockers — unchanged at 13.** No placeholder content.
+
+**Not done (by design):** no review email · no reason asked on "No thanks" · no gate on leaving · no reviews shown anywhere but the admin portal.
+
+---
+
 ## Pre-Launch Blockers
 
-**The list stands at 13.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
+**The list stands at 14.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
 10.5**, when admin 2FA was deferred rather than built. Every one of these must be resolved
 or consciously waived before the platform takes a real client.
 
@@ -2318,5 +2627,9 @@ or consciously waived before the platform takes a real client.
 11. **Replace or remove everything in `client/src/data/aboutPlaceholders.js`** — invented team, including two entries carrying clinical credentials.
 12. **Admin two-factor authentication does not exist — and chunk 10.5 was DEFERRED, not delivered** (developer's decision, 2026-09-24). It was to be email OTP via Resend; it is now deferred to a pre-launch security review, on the grounds that Asad has not asked for it and the admin already has a strong password and a 30-minute idle timeout. **This blocker therefore stays open and needs the client's explicit confirmation before launch.** What is unchanged: §18 calls 2FA effectively non-negotiable for a platform holding mental health data, and per §11 the admin mailbox can reset the admin password — so **the admin's email inbox is currently the master key to every record on the platform**. The idle timeout limits an abandoned session; it does nothing about a stolen password or a compromised inbox. See the chunk 10.5 entry above.
 13. **Remove the seeded therapists before launch** — `npm run seed:therapists:remove`. Ten fake practitioners with placeholder photos and invented credentials sit in the development database. The script cannot run in production, but that guard does not protect a production database populated from a development one. A client choosing a therapist who does not exist, and paying €200 for it, is the failure this line exists to prevent.
-
+14. **Configure Asad's live Stripe Dashboard** — three required settings from Slice 11 must be configured in live mode before taking real money:
+    - **Customer Portal** (*Settings → Billing → Customer portal*): turn **ON** "Allow customers to update payment methods" (so the card-update button works without errors) and turn **OFF** "Allow customers to cancel subscriptions" (cancellation is handled inside our own quiet portal flow).
+    - **Retry Schedule** (*Settings → Billing → Revenue recovery*): set failed payment retries to stop **within 3 days** (matches our 3-day grace period, preventing Stripe from charging someone weeks after they were locked out).
+    - **Customer Emails** (*Settings → Billing → Customer emails*): turn **OFF** "Send upcoming renewal emails" (our server sends the custom-branded reminder email from Chunk 11.6; leaving Stripe's on would send duplicate emails).
+    
 ---

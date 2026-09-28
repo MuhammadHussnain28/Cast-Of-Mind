@@ -3,6 +3,7 @@ import {
   EVENT_TYPE_MAX,
   PAYMENT_PLATFORM_VALUES,
   PLATFORM_EVENT_ID_MAX,
+  PLATFORM_SUBSCRIPTION_ID_MAX,
 } from '../constants/payments.js';
 
 // `paymentEvents` — the immutable, append-only ledger of every payment webhook
@@ -47,6 +48,17 @@ const paymentEventSchema = new mongoose.Schema(
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      default: undefined,
+      immutable: true,
+    },
+
+    // Spec addition (11.5): the platform's subscription id, read from the
+    // payload before the insert. The first payment is logged before our
+    // subscription exists, so this is the only link billing history can find.
+    platformSubscriptionId: {
+      type: String,
+      trim: true,
+      maxlength: PLATFORM_SUBSCRIPTION_ID_MAX,
       default: undefined,
       immutable: true,
     },
@@ -230,6 +242,8 @@ paymentEventSchema.index(
 paymentEventSchema.index({ subscriptionId: 1, receivedAt: -1 });
 paymentEventSchema.index({ clientId: 1, receivedAt: -1 });
 paymentEventSchema.index({ receivedAt: -1 });
+// A client's billing history (11.5).
+paymentEventSchema.index({ platformSubscriptionId: 1, receivedAt: -1 });
 
 export const PaymentEvent = mongoose.model('PaymentEvent', paymentEventSchema);
 

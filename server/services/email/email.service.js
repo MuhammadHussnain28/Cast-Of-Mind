@@ -8,6 +8,14 @@ import {
   emailChangedNewAddress,
 } from './templates/emailChanged.js';
 import { sessionReminderEmail } from './templates/sessionReminder.js';
+import { paymentReceiptEmail } from './templates/paymentReceipt.js';
+import { paymentFailedEmail } from './templates/paymentFailed.js';
+import {
+  subscriptionCancelledEmail,
+  subscriptionReactivatedEmail,
+  welcomeBackEmail,
+  renewalReminderEmail,
+} from './templates/subscriptionChange.js';
 
 // Sending layer — master spec §16.
 //
@@ -142,6 +150,65 @@ export async function sendSessionReminderEmail(to, { recipient, kind, when, othe
     meetingLink,
     portalUrl,
   });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/** The renewal receipt (11.1). Dates arrive already formatted in the client's zone. */
+export async function sendPaymentReceiptEmail(to, { name, amount, paidOn, periodFrom, periodTo, nextPayment }) {
+  const accountUrl = `${env.clientOrigin}/portal/account`;
+  const { subject, html, text } = paymentReceiptEmail({
+    name,
+    amount,
+    paidOn,
+    periodFrom,
+    periodTo,
+    nextPayment,
+    accountUrl,
+  });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/**
+ * A failed renewal (11.2). Links to the portal, where the banner opens Stripe's
+ * card page — a Stripe portal link would expire long before the email is read.
+ */
+export async function sendPaymentFailedEmail(to, { name, amount, accessUntil }) {
+  const accountUrl = `${env.clientOrigin}/portal/account`;
+  const { subject, html, text } = paymentFailedEmail({ name, amount, accessUntil, accountUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/** The client cancelled (11.3): exactly when access ends. */
+export async function sendSubscriptionCancelledEmail(to, { name, accessUntil, canReactivate }) {
+  const accountUrl = `${env.clientOrigin}/portal/account`;
+  const { subject, html, text } = subscriptionCancelledEmail({ name, accessUntil, canReactivate, accountUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/** The client reactivated before the end (11.3): billing resumes, and when. */
+export async function sendSubscriptionReactivatedEmail(to, { name, amount, nextPayment }) {
+  const accountUrl = `${env.clientOrigin}/portal/account`;
+  const { subject, html, text } = subscriptionReactivatedEmail({ name, amount, nextPayment, accountUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/** A returning client re-subscribed after expiry (11.4). */
+export async function sendWelcomeBackEmail(to, { name, therapistName, amount, nextPayment }) {
+  const portalUrl = `${env.clientOrigin}/portal`;
+  const { subject, html, text } = welcomeBackEmail({ name, therapistName, amount, nextPayment, portalUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/** The pre-renewal reminder (11.6), a few days before the charge. */
+export async function sendRenewalReminderEmail(to, { name, renewsOn, amount }) {
+  const accountUrl = `${env.clientOrigin}/portal/account`;
+  const { subject, html, text } = renewalReminderEmail({ name, renewsOn, amount, accountUrl });
 
   return sendEmail({ to, subject, html, text });
 }

@@ -1,5 +1,6 @@
 import { Booking } from '../models/Booking.js';
 import { Review } from '../models/Review.js';
+import { Subscription } from '../models/Subscription.js';
 import { AppError } from '../utils/AppError.js';
 import { SUBSCRIPTION_STATUS } from '../constants/payments.js';
 import { findCurrentSubscription } from '../middleware/requireActiveSubscription.js';
@@ -33,7 +34,26 @@ export async function reviewStateFor(subscription) {
   if (!isReviewable(subscription)) return REVIEW_STATE.NOT_YET;
 
   const already = await Review.exists({ subscriptionId: subscription._id });
-  return already ? REVIEW_STATE.SUBMITTED : REVIEW_STATE.ELIGIBLE;
+  if (already) return REVIEW_STATE.SUBMITTED;
+  return subscription.reviewDeclinedAt ? REVIEW_STATE.DECLINED : REVIEW_STATE.ELIGIBLE;
+}
+
+/**
+ * "No thanks" (11.6): the invitation is put away for good, for this
+ * subscription. No reason is asked for and nothing else changes — leaving is
+ * never gated on a rating. Safe to press twice.
+ */
+export async function declineReview(userId, { now = new Date() } = {}) {
+  const subscription = await findCurrentSubscription(userId);
+  if (!isReviewable(subscription)) {
+    throw new AppError(REVIEW_NOT_AVAILABLE_MESSAGE, 409, 'REVIEW_NOT_AVAILABLE');
+  }
+
+  await Subscription.updateOne(
+    { _id: subscription._id, status: { $in: REVIEWABLE }, reviewDeclinedAt: { $exists: false } },
+    { $set: { reviewDeclinedAt: now } },
+  );
+  return { declined: true };
 }
 
 /**

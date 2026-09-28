@@ -201,6 +201,19 @@ describe('webhook — idempotency', () => {
     expect(await PaymentEvent.countDocuments()).toBe(1);
   });
 
+  // 11.1: a duplicate is routed again, so a retry can heal a failed handler.
+  it('routes a duplicate event to its handler again', async () => {
+    const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const event = makeEvent();
+
+    await send(event);
+    await send(event);
+
+    const handled = logs.mock.calls.flat().filter((line) => /subscription updated/.test(String(line)));
+    expect(handled).toHaveLength(2);
+    logs.mockRestore();
+  });
+
   /**
    * A smoke test for simultaneous delivery.
    *
@@ -352,18 +365,22 @@ describe('webhook — routing', () => {
     logs.mockRestore();
   });
 
+  // Routed to the renewal handler (11.1). This payload names no subscription, so
+  // it must say so loudly and still answer 200. Full renewal: subscriptionRenewal.test.js.
   it('does treat a later invoice as a renewal', async () => {
-    const logs = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const errors = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await send(
+    const response = await send(
       makeEvent(STRIPE_EVENT.INVOICE_PAID, {
+        object: 'invoice',
         billing_reason: BILLING_REASON.RENEWAL,
         amount_paid: 20000,
       }),
     );
 
-    expect(logs.mock.calls.flat().join(' ')).toMatch(/renewal/i);
-    logs.mockRestore();
+    expect(response.status).toBe(200);
+    expect(errors.mock.calls.flat().join(' ')).toMatch(/RENEWAL NOT APPLIED/);
+    errors.mockRestore();
   });
 });
 

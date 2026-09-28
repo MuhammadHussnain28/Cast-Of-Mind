@@ -81,10 +81,16 @@ export const SCREENS = {
 
 /** The four states §13 defines, as the client sees them. */
 export const ACCESS_NOTICES = {
+  // A date, never a countdown: a draining timer is an urgency tactic (11.2).
   past_due: {
     title: 'Your last payment did not go through',
-    body: 'Your portal is still open. Update your card to keep it that way — your therapist, your history and everything here stay exactly as they are.',
-    action: 'Go to your account',
+    until: 'Your portal stays open until',
+    untilUnknown: 'Your portal is still open.',
+    body: 'Update your card before then and nothing changes — your therapist, your history and everything here stay exactly as they are.',
+    action: 'Update your card',
+    opening: 'Opening Stripe…',
+    caption: 'Opens Stripe’s secure page. You come back here afterwards.',
+    failed: 'We could not open the card page. Please try again in a moment.',
   },
   ending: {
     title: 'Your subscription is set to end',
@@ -94,17 +100,139 @@ export const ACCESS_NOTICES = {
   },
 }
 
+// §13's re-subscribe screen (11.4). Facts and one way back: no guilt, no
+// urgency, no countdown, no "we miss you".
 export const ENDED = {
   title: 'Your subscription has ended',
-  lead: 'Everything is still here — your conversation, your journal, your worksheets and your therapist. Nothing has been deleted.',
-  // §13: all data is preserved and re-subscribing resumes where it left off.
-  // NO reactivate button: slice 12 builds that flow, and a button that does
-  // nothing is worse than none.
-  note: 'Reactivating your subscription brings it all back exactly as you left it.',
+  continueWith: (name) => `Reactivate to continue with ${name}.`,
+  continueWithout: 'Reactivate to continue where you left off.',
+  keptHeading: 'Everything is still here',
+  keptNote: 'Nothing has been deleted. Reactivating brings it all back exactly as you left it.',
+  kept: [
+    { key: 'messages', one: 'Message', many: 'Messages' },
+    { key: 'journalEntries', one: 'Journal Entry', many: 'Journal Entries' },
+    { key: 'worksheets', one: 'Worksheet', many: 'Worksheets' },
+    { key: 'sessions', one: 'Session Held', many: 'Sessions Held' },
+  ],
+  action: 'Reactivate subscription',
+  opening: 'Opening the payment page…',
+  actionNote: 'You confirm and pay on Stripe’s secure page. Nothing is charged until you do.',
+  failed: 'We could not open the payment page. Nothing has been charged. Please try again in a moment.',
+  unavailable:
+    'Your therapist is no longer seeing clients here, so this cannot be restarted from this page. Everything you wrote is kept. Write to us at',
+  unavailableTail: 'and we will help you find a way forward.',
 }
 
-/** §13 requires this sentence visible in the portal, not only at checkout. */
-export const RENEWAL_NOTICE = 'To stop your subscription, cancel before this date.'
+// Back from Stripe (11.4): the webhook, not the redirect, opens the portal.
+export const WELCOME_BACK = {
+  title: 'Welcoming you back',
+  body: 'We are confirming your payment. Your portal opens by itself in a moment.',
+  slowTitle: 'This is taking a little longer',
+  slowBody: 'Your payment may still be on its way to us. You can wait here, or check again. If your portal has not opened within a few minutes, write to us at',
+  checkAgain: 'Check again',
+}
+
+/**
+ * Cancelling and reactivating (11.3). FACTS ONLY: no "we're sad to see you go",
+ * no discount, no warning about loss, no "are you sure". Leaving therapy is a
+ * decision to respect, and dark patterns here are excluded outright.
+ */
+export const CANCELLATION = {
+  heading: 'Cancelling',
+  intro: 'You can stop your subscription at any time. You keep everything you have paid for, and you are not charged again.',
+  open: 'Cancel subscription',
+  confirmHeading: 'What happens if you cancel',
+  stations: {
+    now: { label: 'Today', body: 'No further payments are taken.' },
+    nowPastDue: { label: 'Today', body: 'Payments stop, and your card is not tried again.' },
+    until: { label: 'Until', body: 'Everything carries on as normal: your conversation, sessions left, journal and worksheets.' },
+    after: { label: 'After that', body: 'Your portal closes. Nothing is deleted, and it is all kept should you come back.' },
+  },
+  pastDueNote: 'Because your last payment did not go through, this cannot be undone from here.',
+  keep: 'Keep my subscription',
+  confirm: 'Cancel subscription',
+  cancelling: 'Cancelling…',
+  failed: 'That did not go through, and nothing has changed. Please try again in a moment.',
+
+  endsHeading: 'Your subscription ends',
+  endsBody: 'You will not be charged again. Everything stays open until then, and nothing is deleted afterwards.',
+  today: 'Today',
+  reactivateHeading: 'Reactivate',
+  reactivateBody: (amount, date) =>
+    `Your plan carries on as before. Your card is charged ${amount} on ${date}, then monthly until you cancel.`,
+  reactivate: 'Reactivate subscription',
+  reactivating: 'Reactivating…',
+  adminCancelled: 'This subscription was stopped by the Cast of Mind team. If you would like to carry on, write to us at',
+  noUndo: 'This subscription has already stopped with our payment provider. If you would like to carry on, write to us at',
+}
+
+/**
+ * The Subscription & Account page (11.5). §13's portal notice is quoted exactly
+ * in `renewalNotice`, and is shown whenever a renewal is scheduled — never
+ * collapsed, never in a submenu.
+ */
+export const ACCOUNT = {
+  title: 'Account',
+  lead: 'Your plan, your payments and the details you gave us.',
+  status: {
+    active: 'Active',
+    past_due: 'Payment needed',
+    ending: 'Ending',
+  },
+  plan: 'Monthly plan',
+  nextPayment: 'Next payment',
+  renewalNotice: (date) => `Next payment: ${date}. To stop it, cancel before this date.`,
+  endsLabel: 'Your plan ends',
+  endsNote: 'No further payments will be taken. Everything stays open until then.',
+  pastDueLabel: 'Your portal stays open until',
+  pastDueNote: 'Your last payment did not go through. Update your card before then and nothing changes.',
+  updateCard: 'Update your card',
+  opening: 'Opening Stripe…',
+  sessionsLeft: (left, total) => `${left} of ${total} sessions left this month`,
+  noRollover: 'Unused sessions do not roll over.',
+
+  payment: {
+    heading: 'Payment method',
+    body: 'Your card is held safely by Stripe. We never see or store your card number.',
+    note: 'Update it, or find receipts and invoices, on Stripe’s secure page.',
+    action: 'Manage payment method',
+  },
+
+  history: {
+    heading: 'Billing history',
+    empty: 'Your payments will appear here.',
+    item: 'Monthly subscription',
+    paid: 'Paid',
+    failed: 'Did not go through',
+    retried: 'Paid after a retry',
+    more: 'Show earlier payments',
+    loading: 'Loading your payments',
+    failedToLoad: 'We could not load your payments just now.',
+    retry: 'Try again',
+  },
+
+  details: {
+    heading: 'Your details',
+    note: 'These are the details you gave when you joined. To change any of these, write to us at',
+    couple: 'You both',
+    name: 'Name',
+    email: 'Sign-in email',
+    place: 'Where you are',
+    since: 'With us since',
+  },
+
+  password: {
+    heading: 'Password',
+    body: 'We will email you a link to choose a new one.',
+    action: 'Change password',
+    sending: 'Sending…',
+    sent: (email) => `A link is on its way to ${email}. It works on any device.`,
+    failed: 'We could not send the link just now. Please try again in a moment.',
+  },
+
+  failed: 'That did not go through. Please try again in a moment.',
+}
+
 
 // ── Worksheets, client side — §7.2 (8.5) ─────────────────────────────────────
 

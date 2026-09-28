@@ -9,7 +9,8 @@ import { clientNameClauses, containsIgnoringCase } from '../utils/search.js';
 import { clientDisplayName } from '../utils/clientDisplayName.js';
 import { resolveAccess } from '../middleware/requireActiveSubscription.js';
 import { forgotPassword } from './auth.service.js';
-import { stripe, isStripeConfigured } from '../config/stripe.js';
+import { cancelSubscription } from './subscriptionLifecycle.service.js';
+import { SUBSCRIPTION_CHANGED_CODE, SUBSCRIPTION_CHANGED_MESSAGE } from '../constants/subscriptionLifecycle.js';
 import { CANCELLED_BY, SUBSCRIPTION_STATUS } from '../constants/payments.js';
 import {
   ADMIN_SUBSCRIPTION_FIELDS,
@@ -269,16 +270,10 @@ export async function getClient(id) {
 /**
  * Manual cancellation — §9.4 and §13's admin override.
  *
- * STRIPE FIRST, DATABASE SECOND, and the order is the whole design.
- *
- * `cancel_at_period_end` rather than an immediate cancel, because §13 is
- * explicit that a cancelled client keeps full access to the end of the period
- * they have already paid for. Cutting them off early would be a refund problem
- * as well as a broken promise.
- *
- * If Stripe fails, NOTHING is written. Marking our row cancelled while the card
- * is still on file would leave the screen saying one thing and the bank saying
- * another — and the person who finds out is the client, on their statement.
+ * THE SAME PATH AS THE CLIENT'S OWN (11.3): `cancelSubscription`. Stripe first,
+ * database second; if Stripe fails, NOTHING is written. An active plan stops at
+ * its period end with access kept; a past-due one stops at Stripe at once, so a
+ * retry cannot charge someone Asad has just cancelled.
  */
 export async function cancelClientSubscription(id) {
   const profile = await loadProfile(id);
@@ -294,7 +289,18 @@ export async function cancelClientSubscription(id) {
     throw new AppError(ALREADY_ENDED_MESSAGE, 409, 'SUBSCRIPTION_ALREADY_ENDED');
   }
 
-  if (current.status === SUBSCRIPTION_STATUS.CANCELLED) {
+  const result = await cancelSubscription(current, {
+    by: CANCELLED_BY.ADMIN,
+    stripeFailedMessage: STRIPE_FAILED_MESSAGE,
+  });
+
+  if (result.outcome === 'changed') {
+    throw new AppError(SUBSCRIPTION_CHANGED_MESSAGE, 409, SUBSCRIPTION_CHANGED_CODE);
+  }
+
+  // A client cancelling from their own portal at the same moment: whichever
+  // lands first wins and the second is reported as already cancelled.
+  if (result.outcome !== 'cancelled') {
     return {
       cancelled: false,
       alreadyCancelled: true,
@@ -303,56 +309,11 @@ export async function cancelClientSubscription(id) {
     };
   }
 
-  let notice = null;
-
-  if (!isStripeConfigured) {
-    notice = STRIPE_NOT_CONFIGURED_NOTICE;
-  } else if (!current.platformSubscriptionId) {
-    notice = NO_PLATFORM_ID_NOTICE;
-  } else {
-    try {
-      await stripe.subscriptions.update(current.platformSubscriptionId, {
-        cancel_at_period_end: true,
-      });
-    } catch (error) {
-      // Stripe's own text never reaches the caller — it can name internal
-      // objects and states an admin screen has no business repeating.
-      console.error('[admin] Stripe cancellation failed:', error?.message ?? error);
-      throw new AppError(STRIPE_FAILED_MESSAGE, 502, 'STRIPE_CANCEL_FAILED');
-    }
-  }
-
-  // Conditional, so a client cancelling from their own portal at the same
-  // moment (slice 11) cannot be overwritten — whichever lands first wins and
-  // the second is reported as already cancelled.
-  const updated = await Subscription.findOneAndUpdate(
-    {
-      _id: current._id,
-      status: { $in: [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.PAST_DUE] },
-    },
-    {
-      $set: {
-        status: SUBSCRIPTION_STATUS.CANCELLED,
-        cancelledAt: new Date(),
-        cancelledBy: CANCELLED_BY.ADMIN,
-      },
-    },
-    { new: true },
-  );
-
-  if (!updated) {
-    return {
-      cancelled: false,
-      alreadyCancelled: true,
-      message: ALREADY_CANCELLED_MESSAGE,
-      client: await getClient(id),
-    };
-  }
-
+  const NOTICES = { not_configured: STRIPE_NOT_CONFIGURED_NOTICE, no_platform_id: NO_PLATFORM_ID_NOTICE };
   return {
     cancelled: true,
     message: CANCELLED_MESSAGE,
-    notice,
+    notice: NOTICES[result.stripe] ?? null,
     client: await getClient(id),
   };
 }

@@ -3,8 +3,21 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireClient } from '../middleware/requireRole.js';
 import { createRateLimiter } from '../middleware/rateLimiter.js';
 import { requireActiveSubscription } from '../middleware/requireActiveSubscription.js';
-import { getMe, saveTimezone } from '../controllers/clientPortal.controller.js';
-import { clientTimezoneSchema } from '../validation/clientPortal.schema.js';
+import {
+  getMe,
+  saveTimezone,
+  openBillingPortal,
+  cancelSubscription,
+  reactivateSubscription,
+  resubscribe,
+  billingHistory,
+} from '../controllers/clientPortal.controller.js';
+import {
+  BILLING_PORTAL_RATE_LIMIT,
+  CANCEL_RATE_LIMIT,
+  RESUBSCRIBE_RATE_LIMIT,
+} from '../constants/subscriptionLifecycle.js';
+import { clientTimezoneSchema, billingHistoryQuerySchema } from '../validation/clientPortal.schema.js';
 import { CLIENT_RATE_LIMIT } from '../constants/clientPortal.js';
 import { validate, validateQuery } from '../middleware/validate.js';
 import { uploadSingleFile } from '../middleware/upload.js';
@@ -18,7 +31,7 @@ import { submitReviewSchema } from '../validation/reviews.schema.js';
 import { REVIEW_RATE_LIMIT } from '../constants/reviews.js';
 // The WRITE half only. The read half (adminReviews.service.js) must never be
 // reachable from this router — routes/reviews.test.js walks the imports.
-import { submitReviewController } from '../controllers/reviews.controller.js';
+import { submitReviewController, declineReviewController } from '../controllers/reviews.controller.js';
 
 // Everything under /api/v1/client — the signed-in client's own portal (§7).
 //
@@ -63,6 +76,16 @@ router.get('/me', getMe);
  */
 export const reviewRateLimiter = createRateLimiter(REVIEW_RATE_LIMIT);
 router.post('/reviews', reviewRateLimiter, validate(submitReviewSchema), submitReviewController);
+// "No thanks" (11.6) — outside the gate for the same reason as the rating.
+router.post('/reviews/decline', reviewRateLimiter, declineReviewController);
+
+/**
+ * ALSO OUTSIDE THE GATE (11.4): re-subscribing is for exactly the people the gate
+ * refuses. The service allows it only once access has ENDED and the therapist
+ * is still active. No body is read — the booking comes from the token.
+ */
+export const resubscribeRateLimiter = createRateLimiter(RESUBSCRIBE_RATE_LIMIT);
+router.post('/subscription/resubscribe', resubscribeRateLimiter, resubscribe);
 
 /**
  * EVERYTHING BELOW THIS LINE REQUIRES A LIVE SUBSCRIPTION (§13).
@@ -76,6 +99,21 @@ router.use(requireActiveSubscription);
 
 // The browser's own timezone (9.2), saved quietly when it changes.
 router.patch('/timezone', validate(clientTimezoneSchema), saveTimezone);
+
+// "Update your card" (11.2): a Stripe Customer Portal link. Gated, so past_due
+// (in grace) reaches it and an ended subscription does not. No body is read.
+export const billingPortalRateLimiter = createRateLimiter(BILLING_PORTAL_RATE_LIMIT);
+router.post('/billing/portal', billingPortalRateLimiter, openBillingPortal);
+
+// Billing history (11.5) — gated, the client's own rows only, from the ledger.
+router.get('/billing/history', validateQuery(billingHistoryQuerySchema), billingHistory);
+
+// Cancel and reactivate (11.3). Gated: a cancelled plan still inside its paid
+// time reads "ending" and reaches both; an ended one reaches neither. No body
+// is read — the subscription comes from the token.
+export const cancelRateLimiter = createRateLimiter(CANCEL_RATE_LIMIT);
+router.post('/subscription/cancel', cancelRateLimiter, cancelSubscription);
+router.post('/subscription/reactivate', cancelRateLimiter, reactivateSubscription);
 
 // Worksheets (8.5) — gated above. The booking comes from the token, never the URL.
 export const clientWorksheetUploadRateLimiter = createRateLimiter(WORKSHEET_UPLOAD_RATE_LIMIT);

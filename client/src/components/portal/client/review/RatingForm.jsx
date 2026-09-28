@@ -1,8 +1,8 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Button, Text, Textarea } from '../../../ui'
 import { StarShape, ThanksIcon, UnseenIcon } from '../../../reviews/ReviewMarks'
 import { RATE } from '../../../../data/reviewContent'
-import { submitReview } from '../../../../lib/api/reviewsApi'
+import { declineReview, submitReview } from '../../../../lib/api/reviewsApi'
 import { toApiError } from '../../../../lib/api/ApiError'
 import { cx } from '../../../../lib/cx'
 
@@ -31,8 +31,30 @@ export default function RatingForm({ therapistName, heading, onSubmitted, classN
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const [declined, setDeclined] = useState(false)
+  const declinedRef = useRef(null)
 
   const shown = preview ?? stars ?? 0
+
+  // The card goes; focus lands on the quiet line left in its place, not the page top.
+  useEffect(() => {
+    if (declined) declinedRef.current?.focus()
+  }, [declined])
+
+  // 11.6: "No thanks" — never a wall. No reason asked, nothing else changes.
+  async function decline() {
+    if (declining || busy) return
+    setDeclining(true)
+    setError(null)
+    try {
+      await declineReview()
+      setDeclined(true)
+    } catch {
+      setError(RATE.declineFailed)
+      setDeclining(false)
+    }
+  }
 
   async function send(event) {
     event.preventDefault()
@@ -63,6 +85,19 @@ export default function RatingForm({ therapistName, heading, onSubmitted, classN
     } finally {
       setBusy(false)
     }
+  }
+
+  if (declined) {
+    return (
+      <p
+        ref={declinedRef}
+        tabIndex={-1}
+        aria-live="polite"
+        className={cx('font-body text-caption text-ink/70 focus-visible:outline-none', className)}
+      >
+        {RATE.declined}
+      </p>
+    )
   }
 
   if (done) {
@@ -162,10 +197,20 @@ export default function RatingForm({ therapistName, heading, onSubmitted, classN
           </Text>
         )}
 
-        <div>
+        {/* Send leads; "No thanks" sits beside it as quiet text — findable,
+            never competing with the stars. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button type="submit" disabled={!stars} loading={busy}>
             {busy ? RATE.sending : RATE.send}
           </Button>
+          <button
+            type="button"
+            onClick={decline}
+            disabled={declining || busy}
+            className="inline-flex min-h-11 items-center rounded-lg px-2 font-body text-ui text-ink/70 underline decoration-ink/60 underline-offset-4 transition-colors duration-200 ease-out hover:text-ink hover:decoration-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-progress"
+          >
+            {RATE.noThanks}
+          </button>
         </div>
       </form>
     </section>

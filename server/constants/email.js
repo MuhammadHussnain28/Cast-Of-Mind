@@ -34,4 +34,10 @@ export const EMAIL_SUBJECTS = Object.freeze({
   therapistWelcome: 'Your Cast of Mind therapist account is ready',
   clientWelcome: 'Welcome to Cast of Mind — your account is ready',
   emailChanged: 'Your Cast of Mind sign-in email has changed',
+  paymentReceipt: 'Your Cast of Mind payment was received',
+  paymentFailed: 'Your Cast of Mind payment did not go through',
+  subscriptionCancelled: 'Your Cast of Mind subscription is cancelled',
+  subscriptionReactivated: 'Your Cast of Mind subscription will continue',
+  welcomeBack: 'Welcome back to Cast of Mind',
+  renewalReminder: 'Your Cast of Mind subscription renews soon',
 });

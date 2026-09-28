@@ -20,6 +20,10 @@ export const RATE = Object.freeze({
   privacy: 'Only the Cast of Mind team reads this, with your name. Your therapist never sees your rating or your words.',
   send: 'Send my rating',
   sending: 'Sending',
+  // 11.6: an invitation, never a wall. Declining asks for no reason.
+  noThanks: 'No thanks',
+  declined: 'Understood. We will not ask again.',
+  declineFailed: 'That did not go through. You can simply leave this be.',
   failed: 'That did not send. Everything you wrote is still here — please try again.',
   thanksTitle: 'Thank you.',
   thanksBody: 'Your rating went to the Cast of Mind team only. Your therapist never sees it.',

@@ -2,8 +2,17 @@ import env from '../config/env.js';
 import { stripe, isStripeConfigured } from '../config/stripe.js';
 import { AppError } from '../utils/AppError.js';
 import { PaymentEvent } from '../models/PaymentEvent.js';
+import { Subscription } from '../models/Subscription.js';
 import { PAYMENT_PLATFORM } from '../constants/payments.js';
 import { createClientAccount } from './clientOnboarding.service.js';
+import { invoiceSubscriptionId, renewFromInvoice } from './subscriptionRenewal.service.js';
+import { completeResubscription } from './resubscription.service.js';
+import { RESUBSCRIBE_KIND } from '../constants/subscriptionLifecycle.js';
+import {
+  handleStripeSubscriptionEnded,
+  markPastDueFromInvoice,
+  syncStripeCancellation,
+} from './subscriptionLifecycle.service.js';
 import {
   BILLING_REASON,
   INVALID_SIGNATURE_CODE,
@@ -80,16 +89,53 @@ export function verifyStripeEvent(rawBody, signatureHeader) {
 function extractAmount(event) {
   const object = event.data?.object ?? {};
 
+  // A failed invoice carries amount_paid: 0, not null, so `??` never reached
+  // amount_due and the ledger said a failed €200 was €0. Fixed in 11.2.
   const amount =
-    object.amount_total ?? // checkout.session
-    object.amount_paid ?? // invoice (succeeded)
-    object.amount_due ?? // invoice (failed)
-    null;
+    event.type === STRIPE_EVENT.INVOICE_FAILED
+      ? object.amount_due ?? null
+      : object.amount_total ?? // checkout.session
+        object.amount_paid ?? // invoice (succeeded)
+        object.amount_due ??
+        null;
 
   return {
     amount: Number.isInteger(amount) ? amount : undefined,
     currency: object.currency ? String(object.currency).toUpperCase() : undefined,
   };
+}
+
+/**
+ * Our subscription and client for this event, so a dispute can find its rows.
+ *
+ * Read BEFORE the insert, because the ledger can never be updated afterwards.
+ * Best-effort: a failed lookup leaves the row unlinked, never unwritten. A first
+ * payment has nothing to link yet (6.1).
+ */
+/** The platform subscription an event belongs to, whatever its shape. */
+function platformSubscriptionOf(object) {
+  if (object.object === 'invoice') return invoiceSubscriptionId(object);
+  if (object.object === 'subscription') return object.id;
+  if (object.object === 'checkout.session') {
+    return typeof object.subscription === 'string' ? object.subscription : object.subscription?.id;
+  }
+  return null;
+}
+
+async function ledgerLinks(event) {
+  const platformSubscriptionId = platformSubscriptionOf(event.data?.object ?? {});
+  if (typeof platformSubscriptionId !== 'string') return {};
+
+  // Stored even when our subscription does not exist yet (a first payment), so
+  // billing history can always find it (11.5).
+  const links = { platformSubscriptionId };
+  try {
+    const found = await Subscription.findOne({ platformSubscriptionId }).select('_id clientId').lean();
+    return found ? { ...links, subscriptionId: found._id, clientId: found.clientId } : links;
+  } catch (error) {
+    console.error(`[webhook] ${event.id} could not link the ledger row: ${error?.name ?? 'Error'}`);
+    return links;
+  }
 }
 
 /**
@@ -105,6 +151,7 @@ function extractAmount(event) {
  */
 export async function recordEvent(event) {
   const { amount, currency } = extractAmount(event);
+  const links = await ledgerLinks(event);
 
   try {
     const record = await PaymentEvent.create({
@@ -113,6 +160,7 @@ export async function recordEvent(event) {
       platformEventId: event.id,
       amount,
       currency,
+      ...links,
       // Stored verbatim — this is the permanent record a chargeback is argued
       // from. select: false, and stripped from toJSON, so it never leaves.
       rawPayload: event,
@@ -129,10 +177,11 @@ export async function recordEvent(event) {
 }
 
 /* -------------------------------------------------------------------------- *
- * HANDLERS — ALL STUBS IN THIS CHUNK.
+ * HANDLERS.
  *
- * Each logs its event id and type and returns. Nothing writes a user, a client
- * profile, a booking or a subscription: that is chunk 6.4 and slice 11.
+ * EVERY HANDLER MUST BE SAFE TO RUN TWICE. Since 11.1 a duplicate event is
+ * routed again, so a retry can heal a handler that failed after its ledger row
+ * was written. Each guards at its effect, never at the ledger.
  *
  * NEVER LOG THE PAYLOAD. It carries an email address and payment details, both
  * on the never-log list. Event type and event id are enough to find anything in
@@ -148,6 +197,13 @@ async function handleCheckoutCompleted(event) {
   if (session.payment_status !== 'paid') {
     console.log(`[webhook] ${event.id} checkout completed but unpaid — ignored`);
     return { handled: false, reason: 'unpaid' };
+  }
+
+  // A returning client (11.4): a new subscription on their existing booking.
+  // Marked by metadata WE wrote when making the page, and Stripe has signed it.
+  if (session.metadata?.kind === RESUBSCRIBE_KIND) {
+    const resumed = await completeResubscription(session, { eventId: event.id });
+    return { handled: resumed.created, reason: resumed.reason };
   }
 
   // IDEMPOTENT ON ITS OWN TERMS, not on the ledger row above. If that row is
@@ -168,7 +224,7 @@ async function handleCheckoutCompleted(event) {
   return { handled: true };
 }
 
-function handleInvoicePaid(event) {
+async function handleInvoicePaid(event) {
   const invoice = event.data.object;
 
   // THE FIRST INVOICE ALSO FIRES THIS EVENT. Without the billing_reason check
@@ -179,23 +235,44 @@ function handleInvoicePaid(event) {
     return { handled: false, reason: 'first_invoice' };
   }
 
-  console.log(`[webhook] ${event.id} renewal — extension is slice 11`);
-  return { handled: true, next: 'slice 11' };
+  // Only a genuine monthly cycle renews. Other reasons (a manual invoice, a
+  // plan change) are recorded and left alone rather than guessed at.
+  if (invoice.billing_reason !== BILLING_REASON.RENEWAL) {
+    console.log(`[webhook] ${event.id} paid invoice (${invoice.billing_reason ?? 'no reason'}) — not a renewal, no action`);
+    return { handled: false, reason: 'not_a_renewal' };
+  }
+
+  const result = await renewFromInvoice(invoice, { eventId: event.id });
+  return { handled: result.renewed, reason: result.reason };
 }
 
-function handleInvoiceFailed(event) {
-  console.log(`[webhook] ${event.id} payment failed — past_due and grace are slice 11`);
-  return { handled: true, next: 'slice 11' };
+async function handleInvoiceFailed(event) {
+  const invoice = event.data.object;
+
+  // Only a failed monthly renewal starts the grace. A failed FIRST invoice means
+  // the checkout never completed, so there is no account to put past due.
+  if (invoice.billing_reason !== BILLING_REASON.RENEWAL) {
+    console.log(`[webhook] ${event.id} failed invoice (${invoice.billing_reason ?? 'no reason'}) — not a renewal, no action`);
+    return { handled: false, reason: 'not_a_renewal' };
+  }
+
+  // Stripe's own time of failure, so a retried webhook lands on the same deadline.
+  const failedAt = Number.isInteger(event.created) ? new Date(event.created * 1000) : new Date();
+  const result = await markPastDueFromInvoice(invoice, { eventId: event.id, failedAt });
+  return { handled: result.markedPastDue, reason: result.reason };
 }
 
-function handleSubscriptionDeleted(event) {
-  console.log(`[webhook] ${event.id} subscription ended — slice 11`);
-  return { handled: true, next: 'slice 11' };
+// Stripe stopped billing (11.3): cancelled with access kept, or expired.
+async function handleSubscriptionDeleted(event) {
+  const result = await handleStripeSubscriptionEnded(event.data.object, { eventId: event.id });
+  return { handled: result.changed, reason: result.reason };
 }
 
-function handleSubscriptionUpdated(event) {
-  console.log(`[webhook] ${event.id} subscription updated — slice 11`);
-  return { handled: true, next: 'slice 11' };
+// A change made in Stripe's own screens (11.3). Re-reads live state, never the payload.
+async function handleSubscriptionUpdated(event) {
+  console.log(`[webhook] ${event.id} subscription updated — checking Stripe's live state`);
+  const result = await syncStripeCancellation(event.data.object?.id, { eventId: event.id });
+  return { handled: result.changed, reason: result.reason };
 }
 
 const HANDLERS = Object.freeze({

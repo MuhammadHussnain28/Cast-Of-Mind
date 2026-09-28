@@ -121,6 +121,63 @@ export function AttentionIcon({ size = 20, ...props }) {
   )
 }
 
+/** A card with a renew arrow at its corner — "update your card" (11.2). */
+export function CardRenewIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M14 15.75H4.75a2 2 0 0 1-2-2v-6.5a2 2 0 0 1 2-2h10.5a2 2 0 0 1 2 2v5.25" />
+      <path d="M2.75 8.75h14.5" />
+      <path d="M5.75 12.25h3" />
+      <path d="M21.5 17.75a3.25 3.25 0 1 1-.95-2.3" />
+      <path d="M18.75 15.45h1.8v-1.8" />
+    </svg>
+  )
+}
+
+/** A card with a stop mark at its corner — "no further payments" (11.3). */
+export function CardStopIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M14 15.75H4.75a2 2 0 0 1-2-2v-6.5a2 2 0 0 1 2-2h10.5a2 2 0 0 1 2 2v5.25" />
+      <path d="M2.75 8.75h14.5" />
+      <path d="M5.75 12.25h3" />
+      <circle cx="18.25" cy="17.75" r="3.25" />
+      <path d="m16.95 19.05 2.6-2.6" />
+    </svg>
+  )
+}
+
+/** A receipt with a torn edge — billing history (11.5). */
+export function ReceiptIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="M6.5 3.75h11v16.5l-1.85-1.25-1.85 1.25-1.8-1.25-1.85 1.25-1.8-1.25-1.85 1.25V3.75Z" />
+      <path d="M9.5 8.25h5" />
+      <path d="M9.5 11.75h5" />
+    </svg>
+  )
+}
+
+/** A settled mark — a payment that went through (11.5). */
+export function TickIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <path d="m6 12.5 3.75 3.75L18 8" />
+    </svg>
+  )
+}
+
+/** A padlock — the sign-in and password area (11.5). */
+export function LockIcon({ size = 20, ...props }) {
+  return (
+    <svg {...base} width={size} height={size} {...props}>
+      <rect x="5.75" y="10.75" width="12.5" height="9.5" rx="2" />
+      <path d="M8.5 10.75V8a3.5 3.5 0 0 1 7 0v2.75" />
+      <path d="M12 14.5v2" />
+    </svg>
+  )
+}
+
 /** A bookmark — a place kept, used on the ended-subscription screen. */
 export function KeptIcon({ size = 20, ...props }) {
   return (

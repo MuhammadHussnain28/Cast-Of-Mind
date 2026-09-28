@@ -16,17 +16,20 @@ function currentSubscription(bookingId, txn) {
 }
 
 /**
- * The start of the current billing period. There is no stored start yet, so it
- * is one calendar month before `currentPeriodEnd` (Stripe bills monthly on the
- * same day), and never earlier than the subscription began. Slice 11 can store
- * the exact start from Stripe.
+ * The start of the current billing period: Stripe's exact start once a renewal
+ * has stored it (11.1). Before that, one calendar month before `currentPeriodEnd`.
+ * Never earlier than the subscription began.
  */
 export function periodStartOf(subscription) {
-  const end = new Date(subscription.currentPeriodEnd);
-  const monthBefore = new Date(end);
-  monthBefore.setUTCMonth(monthBefore.getUTCMonth() - 1);
-  const start = subscription.startDate ? new Date(subscription.startDate) : monthBefore;
-  return start > monthBefore ? start : monthBefore;
+  let periodStart;
+  if (subscription.currentPeriodStart) {
+    periodStart = new Date(subscription.currentPeriodStart);
+  } else {
+    periodStart = new Date(subscription.currentPeriodEnd);
+    periodStart.setUTCMonth(periodStart.getUTCMonth() - 1);
+  }
+  const began = subscription.startDate ? new Date(subscription.startDate) : periodStart;
+  return began > periodStart ? began : periodStart;
 }
 
 /** Does a session at this time belong to the subscription's current period? */
@@ -135,17 +138,9 @@ export async function markNotHeld(sessionId, { now = new Date() } = {}) {
   });
 }
 
-// Slice 11 calls these from the renewal and expiry webhooks.
-
-/** A successful renewal: back to 4. Unused sessions are gone, never added on. */
-export async function renewCycle(subscriptionId) {
-  await Subscription.updateOne({ _id: subscriptionId }, { $set: { sessionsRemaining: SESSIONS_PER_CYCLE } });
-}
-
-/** The subscription has ended: 0 (§13). */
-export async function endCycle(subscriptionId) {
-  await Subscription.updateOne({ _id: subscriptionId }, { $set: { sessionsRemaining: 0 } });
-}
+// Renewal's reset to 4 (subscriptionRenewal.service.js) and expiry's drop to 0
+// (EXPIRED_SET, subscriptionLifecycle.service.js) each sit inside the one atomic
+// update that changes the status, so the count can never be applied apart.
 
 /** What the counter shows: 0 once access has ended, whatever is stored. */
 export function counterFor(subscription, access) {

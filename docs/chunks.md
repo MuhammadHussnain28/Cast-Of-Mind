@@ -2860,46 +2860,6 @@ Plan first and show me. Do not write code until I approve.
 When done, update @docs/ongoing.md.
 ```
 
----
-
-### Chunk 11.5 — Subscription & Account page
-
-```
-Read @docs/04-features-and-flows.md (Section 7.5: Subscription & Account)
-and @docs/03-core-systems.md (Section 13, Auto-Renewal Transparency).
-
-CHUNK 11.5 — Client Subscription & Account page
-
-Build:
-- Profile section: view details, edit what is permitted
-- Subscription section:
-  * Current status, clearly stated
-  * Next billing date, prominent
-  * PERSISTENT AUTO-RENEWAL NOTICE:
-    "Next payment: [date]. To stop it, cancel before this date."
-  * Sessions remaining this cycle
-  * Payment method management (via the payment platform's portal)
-  * Cancel subscription
-  * Billing history from paymentEvents
-- Password change → directs to the standard reset flow
-- Past-due banner when applicable
-
-This is the SECOND of the three required auto-renewal transparency points
-(checkout is first, pre-renewal email is third). It must be always visible
-here, not hidden in a submenu.
-
-Do NOT:
-- Hide or minimise the renewal notice
-
-Verify: every subscription state renders this page correctly —
-active, past_due, cancelled.
-
-Plan first and show me. Do not write code until I approve.
-When done, update @docs/ongoing.md.
-```
-
----
-
 ### Chunk 11.6 — Renewal reminders and end-of-subscription review
 
 ```

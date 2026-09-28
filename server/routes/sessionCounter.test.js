@@ -241,29 +241,13 @@ describe('completion takes one session, exactly once', () => {
   });
 });
 
-describe('renewal and ending (called by slice 11)', () => {
-  it('RENEWAL RESETS TO 4, and unused sessions are not added on', async () => {
-    const sub = await Subscription.findOne({ bookingId: bookings.mine._id });
-    await Subscription.updateOne({ _id: sub._id }, { $set: { sessionsRemaining: 1 } });
-    await counter.renewCycle(sub._id);
-    expect(await remaining()).toBe(4);
-
-    // Two unused at renewal still becomes 4, never 6.
-    await Subscription.updateOne({ _id: sub._id }, { $set: { sessionsRemaining: 2 } });
-    await counter.renewCycle(sub._id);
-    expect(await remaining()).toBe(4);
-  });
-
+// Renewal's reset to 4 and expiry's drop to 0 are tested through the real
+// webhook and sweep, in subscriptionRenewal.test.js and paymentFailure.test.js.
+describe('the ceiling', () => {
   it('the model itself refuses a count above 4', async () => {
     const sub = await Subscription.findOne({ bookingId: bookings.mine._id });
     sub.sessionsRemaining = 6;
     await expect(sub.save()).rejects.toThrow(/do not carry over/);
-  });
-
-  it('ending drops the count to 0', async () => {
-    const sub = await Subscription.findOne({ bookingId: bookings.mine._id });
-    await counter.endCycle(sub._id);
-    expect(await remaining()).toBe(0);
   });
 });
 
@@ -275,6 +259,18 @@ describe('the billing period', () => {
     expect(
       counter.periodStartOf({ startDate: new Date('2026-07-01T00:00:00Z'), currentPeriodEnd: new Date('2026-07-15T09:00:00Z') }).toISOString(),
     ).toBe('2026-07-01T00:00:00.000Z');
+  });
+
+  it("uses Stripe's stored period start once a renewal has saved one", () => {
+    const sub = {
+      startDate: new Date('2026-01-01T00:00:00Z'),
+      currentPeriodStart: new Date('2026-06-28T09:00:00Z'),
+      currentPeriodEnd: new Date('2026-07-28T09:00:00Z'),
+    };
+    expect(counter.periodStartOf(sub).toISOString()).toBe('2026-06-28T09:00:00.000Z');
+    // Last period's sessions never count against the new one.
+    expect(counter.countsAgainst(sub, '2026-06-27T10:00:00Z')).toBe(false);
+    expect(counter.countsAgainst(sub, '2026-06-29T10:00:00Z')).toBe(true);
   });
 
   it('counts a session inside the period, and not one at or after its end', () => {

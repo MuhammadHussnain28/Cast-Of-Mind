@@ -115,6 +115,26 @@ async function assertEmailIsFree(email) {
   }
 }
 
+/**
+ * The one subscription line item — INLINE PRICE, built from our own constant
+ * (developer's decision, 2026-09-07), so what Stripe charges and what we store
+ * come from one line of code. Shared with re-subscribe (11.4).
+ */
+export function subscriptionLineItem() {
+  return {
+    quantity: 1,
+    price_data: {
+      currency: BILLING_CURRENCY.toLowerCase(),
+      unit_amount: SUBSCRIPTION_AMOUNT_MINOR,
+      recurring: { interval: 'month' },
+      product_data: {
+        name: CHECKOUT_PRODUCT_NAME,
+        description: CHECKOUT_PRODUCT_DESCRIPTION,
+      },
+    },
+  };
+}
+
 export async function createCheckoutSession({ email, therapistProfileId, questionnaire }) {
   if (!isStripeConfigured) {
     // Development without payment credentials. A clear 503 rather than a
@@ -144,24 +164,7 @@ export async function createCheckoutSession({ email, therapistProfileId, questio
     session = await stripe.checkout.sessions.create({
       mode: 'subscription',
 
-      // INLINE PRICE, built from our own constant — developer's decision,
-      // 2026-09-07. The amount Stripe charges and the amount we store at 6.4
-      // therefore come from one line of code, so they cannot silently diverge
-      // the way a dashboard price and a code constant can.
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: BILLING_CURRENCY.toLowerCase(),
-            unit_amount: SUBSCRIPTION_AMOUNT_MINOR,
-            recurring: { interval: 'month' },
-            product_data: {
-              name: CHECKOUT_PRODUCT_NAME,
-              description: CHECKOUT_PRODUCT_DESCRIPTION,
-            },
-          },
-        },
-      ],
+      line_items: [subscriptionLineItem()],
 
       // Prefilled so the address they subscribe with is the address they gave
       // us, rather than whatever is saved in their browser.

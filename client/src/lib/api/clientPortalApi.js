@@ -18,6 +18,57 @@ export async function fetchClientMe() {
   }
 }
 
+// "Update your card" (11.2): a short-lived Stripe Customer Portal link. The
+// customer id stays on the server; only the URL comes back.
+export async function openBillingPortal() {
+  try {
+    const { data } = await apiClient.post('/client/billing/portal')
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+// Cancel and reactivate (11.3). No body: the server finds the subscription from
+// the token.
+export async function cancelMySubscription() {
+  try {
+    const { data } = await apiClient.post('/client/subscription/cancel')
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function reactivateMySubscription() {
+  try {
+    const { data } = await apiClient.post('/client/subscription/reactivate')
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+// Re-subscribe after expiry (11.4): a Stripe page for the same booking. No body.
+export async function startResubscription() {
+  try {
+    const { data } = await apiClient.post('/client/subscription/resubscribe')
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+// Billing history (11.5): the client's own payments, one row per invoice.
+export async function fetchBillingHistory(page = 1) {
+  try {
+    const { data } = await apiClient.get('/client/billing/history', { params: { page } })
+    return data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
 // The browser's own zone (9.2), so the therapist can see when a session lands.
 export async function saveClientTimezone(timezone) {
   try {
