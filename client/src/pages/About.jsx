@@ -1,4 +1,5 @@
-import AboutHero from '../components/about/AboutHero'
+import AboutHeroModern from '../components/about/AboutHeroModern'
+import BrandStoryModern from '../components/about/BrandStoryModern'
 import BrandStory from '../components/about/BrandStory'
 import Founder from '../components/about/Founder'
 import TeamGrid from '../components/about/TeamGrid'
@@ -31,9 +32,9 @@ import TeamGrid from '../components/about/TeamGrid'
 export default function About() {
   return (
     <>
-      <AboutHero />
+      <AboutHeroModern />
       <div aria-hidden="true" className="h-20 bg-linear-to-b from-ink-deep to-ink lg:h-28" />
-      <BrandStory />
+      <BrandStoryModern />
 
       {/* GRADIENT */}
       {/* <div aria-hidden="true" className="h-28 bg-linear-to-b from-ink to-mist lg:h-40" /> */}

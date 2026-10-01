@@ -2610,7 +2610,7 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 
 ## Pre-Launch Blockers
 
-**The list stands at 14.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
+**The list stands at 15.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
 10.5**, when admin 2FA was deferred rather than built. Every one of these must be resolved
 or consciously waived before the platform takes a real client.
 
@@ -2631,5 +2631,8 @@ or consciously waived before the platform takes a real client.
     - **Customer Portal** (*Settings → Billing → Customer portal*): turn **ON** "Allow customers to update payment methods" (so the card-update button works without errors) and turn **OFF** "Allow customers to cancel subscriptions" (cancellation is handled inside our own quiet portal flow).
     - **Retry Schedule** (*Settings → Billing → Revenue recovery*): set failed payment retries to stop **within 3 days** (matches our 3-day grace period, preventing Stripe from charging someone weeks after they were locked out).
     - **Customer Emails** (*Settings → Billing → Customer emails*): turn **OFF** "Send upcoming renewal emails" (our server sends the custom-branded reminder email from Chunk 11.6; leaving Stripe's on would send duplicate emails).
-    
+15. **Remove `ALLOW_TEST_STRIPE` before real production launch** — staging uses `ALLOW_TEST_STRIPE=true` on Render to allow Asad to test checkout with fake card 4242. For final launch with Asad's live Stripe keys, ensure `ALLOW_TEST_STRIPE` is removed from production environment variables so the server strictly guards against accidental test keys.
+
+                                                                             
+
 ---

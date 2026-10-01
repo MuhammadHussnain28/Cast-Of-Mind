@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui'
 import heroVideo from '../../assets/cast_of_mind Concept 1.mp4'
+import video from "../../assets/videoForHero.mp4"
 import doc1 from '../../assets/team-portrait-1.jpg'
 import doc2 from '../../assets/team-portrait-2.jpg'
 import doc3 from '../../assets/team-portrait-3.jpg'
@@ -43,7 +44,7 @@ function CheckTickIcon({ className = 'w-4 h-4' }) {
 const VALUE_POINTS = [
   {
     title: 'Matched to Your Exact Concern',
-    detail: 'Over 27 clinical specialties — matched with zero waitlists.',
+    detail: 'Over 27 clinical specialties matched with zero waitlists.',
   },
   {
     title: 'Accredited Master & PhD Specialists',
@@ -132,7 +133,7 @@ export default function HeroModern() {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-sage"></span>
                 </span>
                 <span className="text-xs text-paper/85 font-medium tracking-wide">
-                  Over 270+ certified clinicians worldwide
+                  Over 100+ certified clinicians worldwide
                 </span>
               </div>
             </div>
@@ -171,10 +172,10 @@ export default function HeroModern() {
                   <CheckTickIcon className="w-5 h-5" />
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-sm font-semibold text-paper/95 leading-snug">
+                  <p className="text-[16px] font-semibold text-paper/95 leading-snug">
                     {pt.title}
                   </p>
-                  <p className="text-xs text-paper/65 leading-relaxed">
+                  <p className="text-[14px] text-paper/65 leading-relaxed">
                     {pt.detail}
                   </p>
                 </div>
@@ -215,6 +216,7 @@ export default function HeroModern() {
           {...ambientDrift}
           className="lg:col-span-5 relative w-full max-w-[420px] lg:max-w-[460px] mx-auto select-none flex items-center justify-center"
         >
+
           {/* Subtle Ambient Sage/Gold Glow behind the human subject */}
           <div
             aria-hidden="true"
@@ -223,14 +225,14 @@ export default function HeroModern() {
 
           {/* Borderless Video Container with Elliptical Radial Feathering */}
           <div className="relative aspect-[4/5] w-full overflow-hidden">
-            <video
+            <video  
               src={heroVideo}
               autoPlay={!reduceMotion}
               loop
               muted
               playsInline
               aria-hidden="true"
-              className="h-full w-full object-cover [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_100%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_100%)]"
+              className="py-5 h-full w-full object-cover  [mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_100%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_55%,transparent_100%)]"
             />
           </div>
         </motion.div>

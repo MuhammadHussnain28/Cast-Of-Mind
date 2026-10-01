@@ -123,7 +123,7 @@ function loadEnv() {
   // A test key in production would take real subscriptions and never charge a
   // card — the business would be giving therapy away and would not find out
   // until the money did not arrive.
-  if (isProduction && process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+ if (isProduction && process.env.ALLOW_TEST_STRIPE !== 'true' &&    process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
     console.error('STRIPE_SECRET_KEY is a TEST key, but NODE_ENV is production.');
     console.error('Real payments would never be collected. Use the live key.');
     process.exit(1);

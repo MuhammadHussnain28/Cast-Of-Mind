@@ -7,11 +7,6 @@ import {
 
 // The refresh cookie is set in three places (login, refresh) and cleared in one
 // (logout). Those options live HERE, once.
-//
-// The reason this is not inlined at each call site: `res.clearCookie` only works
-// when `path`, `sameSite`, and `secure` match the cookie that was set exactly.
-// If one call site drifts from another, logout returns a cheerful 200 while the
-// cookie quietly stays in the browser — a bug that looks like nothing is wrong.
 
 function cookieOptions() {
   return {
@@ -27,12 +22,8 @@ function cookieOptions() {
     // (castofmind.com and api.castofmind.com), and on localhost where the port
     // does not matter.
     //
-    // TODO (chunk 12.5 — deployment): if the API ends up on a DIFFERENT domain,
-    // for example cast-of-mind.onrender.com serving castofmind.com, this must
-    // become sameSite: 'none' with secure: true. Otherwise the browser silently
-    // drops the cookie and every refresh fails, with nothing in the logs to
-    // explain why. This is the one line to change.
-    sameSite: 'lax',
+    
+    sameSite: env.isProduction ? 'none' : 'lax' ,
 
     // Scoped so the browser only ever sends this cookie to auth routes. It is
     // never attached to ordinary API calls, which shrinks where it can leak.

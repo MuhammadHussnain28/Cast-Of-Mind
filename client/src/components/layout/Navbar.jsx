@@ -84,7 +84,7 @@ export default function Navbar() {
             to="/questionnaire"
             className="inline-flex min-h-11 items-center rounded-full border border-ink/35
                        bg-gold px-6 font-body text-ui font-medium text-ink
-                       transition-colors duration-200 hover:bg-gold/90 active:bg-gold/80"
+                       transition-colors duration-200 hover:bg-gold/90 active:bg-gold/80  "
           >
             Get started
           </Link>

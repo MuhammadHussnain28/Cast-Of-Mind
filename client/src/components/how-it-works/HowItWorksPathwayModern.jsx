@@ -112,7 +112,7 @@ export default function HowItWorksPathwayModern() {
             rounded-full shadow-2xl border z-10 flex flex-col items-center justify-center
             p-2 text-center cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95
             ${MILESTONES[0].surface}
-            ${activeId === 1 ? 'ring-4 ring-gold/40' : ''}
+            
           `}
         >
           <span className="text-[8px] font-mono font-bold text-sage-deep bg-sage/15 px-2 py-0.5 rounded-full mb-1">
@@ -133,7 +133,7 @@ export default function HowItWorksPathwayModern() {
             rounded-full shadow-2xl border z-10 flex flex-col items-center justify-center
             p-2 text-center cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95
             ${MILESTONES[1].surface}
-            ${activeId === 2 ? 'ring-4 ring-gold/40' : ''}
+            
           `}
         >
           <span className="text-[8px] font-mono font-bold text-sage-deep bg-sage/15 px-2 py-0.5 rounded-full mb-1">
@@ -154,7 +154,7 @@ export default function HowItWorksPathwayModern() {
             rounded-full shadow-2xl border z-10 flex flex-col items-center justify-center
             p-2 text-center cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95
             ${MILESTONES[2].surface}
-            ${activeId === 3 ? 'ring-4 ring-gold/40' : ''}
+            
           `}
         >
           <span className="text-[8px] font-mono font-bold text-sage-deep bg-sage/15 px-2 py-0.5 rounded-full mb-1">
