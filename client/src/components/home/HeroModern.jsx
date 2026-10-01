@@ -3,7 +3,6 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui'
 import heroVideo from '../../assets/cast_of_mind Concept 1.mp4'
-import video from "../../assets/videoForHero.mp4"
 import doc1 from '../../assets/team-portrait-1.jpg'
 import doc2 from '../../assets/team-portrait-2.jpg'
 import doc3 from '../../assets/team-portrait-3.jpg'
