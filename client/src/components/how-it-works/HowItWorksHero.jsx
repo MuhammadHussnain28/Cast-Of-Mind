@@ -54,9 +54,17 @@ export default function HowItWorksHero() {
           </motion.div>
 
           <motion.div {...settle(0.1)}>
-            <p className="font-display text-section text-paper opacity-90 leading-snug">
+            {/* <p className="font-display text-section text-paper opacity-90 ">
               {intro.lede}
-            </p>
+            </p> */}
+
+             <p className="italic font-display
+              text-section text-paper opacity-90">
+                &ldquo;<span className=""> 7</span> steps , from your{' '}
+                <span className="">1</span> answer <span className="text-gold">{' '}&rarr;{' '}</span>
+                <span className="">1</span> session. &rdquo;
+              </p>
+
           </motion.div>
 
           <motion.div {...settle(0.2)}>

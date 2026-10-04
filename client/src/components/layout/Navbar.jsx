@@ -4,6 +4,7 @@ import MobileNav from './MobileNav'
 import { navItems } from '../../lib/siteConfig'
 import { cx } from '../../lib/cx'
 import logoInk from '../../assets/cast-of-mind-logo-singular-ink.png'
+import logoInks from "../../assets/cast-of-mind-logo-ink.png"
 
 /**
  * The active page is marked by weight AND an underline, not by colour alone -
@@ -52,11 +53,11 @@ export default function Navbar() {
           aria-label="Cast of Mind - home"
         >
           <img
-            src={logoInk}
+            src={logoInks}
             alt="Cast of Mind"
             width={54}
             height={44}
-            className="w-[74px] h-auto scale-x-[1.09] origin-left border-black"
+            className="w-[74px] h-auto scale-x-[1.1] origin-left border-black"
           />
         </Link>
 

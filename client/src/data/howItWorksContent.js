@@ -11,7 +11,7 @@
 
 export const intro = {
   heading: 'What actually happens?',
-  lede: '"Seven steps, from your first answer to your first session."',
+  lede: '" 7 steps , from your 1 answer ➡ 1 session. "',
   body: 'You can stop after any of them. Nothing below is a surprise, and nothing asks you to decide more than the one thing in front of you.',
 }
 
@@ -29,7 +29,7 @@ export const phases = [
         icon: 'questionnaire',
         title: 'Tell us what is going on',
         // §6 questionnaire fields, individual/couple branch, 3-4 concern tags.
-        body: 'A short questionnaire. First whether you are coming on your own or as a couple, then where you are and a little about you — and the part that matters most, three or four words for what you are dealing with, chosen from a fixed list.',
+        body: 'A short questionnaire. First whether you are coming on your own or as a couple, then where you are and a little about you and the part that matters most, three or four words for what you are dealing with, chosen from a fixed list.',
         note: 'No account, no card. You can close the tab at any point.',
       },
       {
@@ -37,7 +37,7 @@ export const phases = [
         icon: 'matching',
         title: 'We match on what you chose',
         // §15 tag overlap; gender preference sorts and never filters.
-        body: 'Therapists tag themselves from that same fixed list when they apply, and we show you the ones whose areas overlap with yours. If you said you would rather see a male or a female therapist, those come first — the preference orders the list, it never shortens it.',
+        body: 'Therapists tag themselves from that same fixed list when they apply, and we show you the ones whose areas overlap with yours. If you said you would rather see a male or a female therapist, those come first , the preference orders the list, it never shortens it.',
         note: 'Where you live and what time zone you are in never narrow the list.',
       },
       {
@@ -46,7 +46,7 @@ export const phases = [
         title: 'You choose your therapist',
         // §24.7: cards show photo, name, specialties, bio. §6: client selects.
         body: 'You see a photograph, a name, the areas they work in, and a few lines in their own words. Read as many as you like, take as long as you like, then pick one.',
-        note: 'You choose — nobody is assigned to you.',
+        note: 'You choose nobody is assigned to you.',
       },
     ],
   },
@@ -70,7 +70,7 @@ export const phases = [
         icon: 'credentials',
         title: 'Your login arrives',
         // §12: account created on webhook confirmation, never on redirect.
-        body: 'Your account is created once the payment clears, and your login details come by email. Nothing exists before that moment — there is no half-made account sitting somewhere waiting for you.',
+        body: 'Your account is created once the payment clears, and your login details come by email. Nothing exists before that moment there is no half-made account sitting somewhere waiting for you.',
         note: 'It goes to the address you gave in the questionnaire.',
       },
     ],

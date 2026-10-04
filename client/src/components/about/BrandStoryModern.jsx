@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { Heading, Text } from '../ui'
 import { brand } from '../../data/aboutContent'
-import logoWhite from '../../assets/cast-of-mind-logo-singular-white.png'
+import logoWhite from '../../assets/cast-of-mind-logo-white.png'
 
 /* --- BESPOKE ICONS FOR THE 3 COMMITMENTS --- */
 
@@ -89,7 +89,7 @@ export default function BrandStoryModern() {
           {/* LEFT: THE SCULPTURAL LOGO PEDESTAL */}
           <motion.div {...reveal(0)} className="lg:col-span-5 flex flex-col items-center">
             
-            <div className="relative w-full max-w-[380px] rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-7 sm:p-9 flex flex-col items-center justify-between shadow-2xl backdrop-blur-md group overflow-hidden transition-all duration-500 hover:border-gold/35">
+            <div className="relative w-full max-w-[380px] rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-4 sm:p-8 flex flex-col items-center justify-between shadow-2xl backdrop-blur-md group overflow-hidden transition-all duration-500 hover:border-gold/35">
               
               {/* Concentric Subtle Astronomical & Growth Rings */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 group-hover:opacity-35 transition-opacity duration-700">
@@ -100,7 +100,7 @@ export default function BrandStoryModern() {
 
               {/* Top Anatomy Callout: The Mind */}
               <div className="relative z-10 w-full flex items-center justify-between">
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-ink-deep/80 border border-white/15 text-[10px] uppercase tracking-wider font-semibold text-sage-deep backdrop-blur-md">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-ink-deep/80 border border-white/15 text-[10px] uppercase tracking-wider font-semibold text-sage-deep backdrop-blur-md ">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage-deep animate-pulse" />
                   <span>01 · UPPER CONTOUR</span>
                 </div>
@@ -163,7 +163,7 @@ export default function BrandStoryModern() {
               <div className="text-xs uppercase text-gold font-bold mb-2 tracking-wider flex items-center gap-2">
                 <span>✦</span> Why It Is Drawn This Way
               </div>
-              <p className="text-sm sm:text-base text-paper italic font-display leading-relaxed opacity-95">
+              <p className="text-sm sm:text-base text-paper italic font-section leading-relaxed opacity-95">
                 "{brand.body[1]}"
               </p>
             </motion.div>
@@ -206,7 +206,7 @@ export default function BrandStoryModern() {
                   className="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-7 flex flex-col justify-between shadow-2xl backdrop-blur-md transition-all duration-300 hover:border-gold/40 hover:-translate-y-1"
                 >
                   {/* Large Watermark Ghost Numeral in Fraunces display serif */}
-                  <span className="absolute -right-2 -bottom-6 text-7xl font-display font-semibold text-white/[0.05] pointer-events-none select-none group-hover:text-gold/[0.1] transition-colors">
+                  <span className="absolute -right-1 -bottom-5 text-7xl font-display font-semibold text-white/[0.05] pointer-events-none select-none group-hover:text-gold/[0.1] transition-colors">
                     0{index + 1}
                   </span>
 

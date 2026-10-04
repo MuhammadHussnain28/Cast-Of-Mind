@@ -6,11 +6,11 @@
  * the site goes live. Tracked as a pre-launch blocker in docs/ongoing.md.
  */
 export const siteConfig = {
-  name: 'Cast of Mind',
+  name: 'Cast of Minds',
   // TODO: PLACEHOLDER - REPLACE BEFORE LAUNCH
-  developerName: 'Muhammad Hussnain',
+  developerName: 'Hussnain',
   // TODO: PLACEHOLDER - REPLACE BEFORE LAUNCH
-  developerLinkedIn: 'https://www.linkedin.com/in/muhammad-hussnain-47633232a/',
+  developerEmail : 'https://mail.google.com/mail/?view=cm&fs=1&to=muhammadhussnainrauf@gmail.com',
 }
 
 /** The five navbar items, in the order the spec fixes them. */

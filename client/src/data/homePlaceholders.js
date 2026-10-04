@@ -125,12 +125,12 @@ export const audiences = [
  */
 export const figures = [
   {
-    value: '1,200',
+    value: '1000+',
     label: 'people supported since we opened',
     invented: true,
   },
   {
-    value: '40',
+    value: '100+',
     label: 'therapists practising across 18 countries',
     invented: true,
   },
@@ -138,7 +138,7 @@ export const figures = [
     // TRUE. The 27 concern tags are fixed and client-confirmed — master spec
     // §15, and server/constants/specialtyTags.js is the authority. Keep this
     // one when the other two are removed.
-    value: '27',
+    value: '27+',
     label: 'areas of concern our therapists specialise in',
     invented: false,
   },

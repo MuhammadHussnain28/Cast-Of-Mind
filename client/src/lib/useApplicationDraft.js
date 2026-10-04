@@ -20,6 +20,44 @@ const VERSION = 1
 // between releases, and a month-old half-form is more confusing than helpful.
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
+/**
+ * Detects whether an application has real user-entered progress.
+ * An untouched form on Step 1 (or default blank values) is NOT a draft.
+ */
+export function hasDraftContent(values, step = 1) {
+  if (!values) return false
+  if (Number(step) > 1) return true
+
+  // Check if any personal field in step 1 has been entered or selected
+  const hasStep1Text = Boolean(
+    values.firstName?.trim() ||
+    values.lastName?.trim() ||
+    values.email?.trim() ||
+    values.title ||
+    values.gender ||
+    values.dateOfBirth ||
+    values.photoUrl
+  )
+
+  if (hasStep1Text) return true
+
+  // Also check if any other field happens to contain content
+  return Boolean(
+    values.streetAddress?.trim() ||
+    values.city?.trim() ||
+    values.stateProvince?.trim() ||
+    values.zipPostal?.trim() ||
+    values.country?.trim() ||
+    (Array.isArray(values.languages) && values.languages.length > 0) ||
+    values.therapistType?.trim() ||
+    values.credentialType ||
+    values.credentialInitials?.trim() ||
+    values.bio?.trim() ||
+    (Array.isArray(values.specialtyTags) && values.specialtyTags.length > 0) ||
+    (Array.isArray(values.treatmentOrientations) && values.treatmentOrientations.length > 0)
+  )
+}
+
 export function readDraft() {
   try {
     const raw = window.localStorage.getItem(KEY)
@@ -28,6 +66,12 @@ export function readDraft() {
     const saved = JSON.parse(raw)
     if (saved?.version !== VERSION) return null
     if (!saved.savedAt || Date.now() - saved.savedAt > MAX_AGE_MS) return null
+
+    // If the saved draft has no real user-entered content, discard it
+    if (!hasDraftContent(saved.values, saved.step)) {
+      clearDraft()
+      return null
+    }
 
     // Belt and braces: even if an older build had written one, it never loads.
     if (saved.values) delete saved.values.password
@@ -60,9 +104,15 @@ export function useApplicationDraft(values, step, enabled = true) {
   useEffect(() => {
     if (!enabled) return undefined
 
+    clearTimeout(timer.current)
+
+    // Only save if the applicant has actually entered content
+    if (!hasDraftContent(values, step)) {
+      return undefined
+    }
+
     // Debounced: this fires on every keystroke, and serialising a 34-field
     // object that often is wasted work.
-    clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       try {
         const { password, ...safe } = values ?? {}

@@ -40,7 +40,7 @@ export default function ProcessPhase({ phase, startNumber }) {
           <Heading level={2} id={`phase-${phase.id}`} size="subsection" className="text-ink">
             {phase.title}
           </Heading>
-          <Text size="ui" className="mt-2 max-w-measure font-medium text-sage-deep">
+          <Text size="ui" className="underline mt-2 max-w-measure font-medium text-sage-deep">
             {phase.note}
           </Text>
         </motion.div>

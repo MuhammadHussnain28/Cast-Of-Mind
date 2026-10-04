@@ -192,8 +192,7 @@ export default function Services1() {
               What people bring us.
             </Heading>
             <Text tone="inverse" className="mt-7 max-w-measure opacity-80">
-              Cast of Mind is online therapy with one therapist you keep: an hour
-              together over Zoom each week, and unlimited chat in between.
+              Cast of Minds is online therapy with one therapist you keep: a weekly session over Zoom, and unlimited chat in between.
             </Text>
             <Text tone="inverse" className="mt-5 max-w-measure opacity-80">
               Therapists tag the areas they work in. You tag what you are going
@@ -311,7 +310,7 @@ export default function Services1() {
         </div>
 
         {/* Transition photograph */}
-        <div className="relative bg-paper">
+        {/* <div className="relative bg-paper">
           <img
             src={windowLight}
             alt=""
@@ -321,7 +320,7 @@ export default function Services1() {
             className="h-64 w-full object-cover object-center sm:h-80 lg:h-112"
           />
           <div aria-hidden="true" className="absolute inset-0 bg-ink-deep/14" />
-        </div>
+        </div> */}
       </section>
 
       {/* Plan & Pricing Section */}

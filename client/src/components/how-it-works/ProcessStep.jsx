@@ -67,7 +67,7 @@ export default function ProcessStep({ step, number }) {
           <Text tone="muted" className="mt-3 max-w-measure">
             {step.body}
           </Text>
-          <Text size="ui" className="mt-4 max-w-measure font-medium text-sage-deep">
+          <Text size="ui" className="italic mt-4 max-w-measure font-medium text-sage-deep">
             {step.note}
           </Text>
         </motion.div>

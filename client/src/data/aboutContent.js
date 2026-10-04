@@ -15,7 +15,7 @@
 
 /** Statement of purpose. No statistics, no outcome claims. */
 export const mission = {
-  heading: 'Why Cast of Mind exists?',
+  heading: 'Why Cast of Minds exists?',
   lede: '" The distance between deciding to get help and actually getting it is too long. "',
   body: [
     'Distance, wait lists, and the exhaustion of starting over with the wrong specialist. Traditional therapy demands too much resilience exactly when you have the least to give.',
@@ -36,7 +36,7 @@ export const brand = {
   heading: 'A mind that turns into a tree.',
   body: [
     'The upper contour is a brain. Follow the line down and it becomes a trunk, then roots.',
-    'It is drawn that way because therapy is not repair work. Nothing is being fixed, replaced, or returned to how it was. What changes is slower and far less visible than that — something grows, mostly below the surface, and the part anyone else can see arrives last.',
+    'It is drawn that way because therapy is not repair work. Nothing is being fixed, replaced, or returned to how it was. What changes is slower and far less visible than that something grows, mostly below the surface, and the part anyone else can see arrives last.',
   ],
   /** How the brand is held, expressed as commitments rather than adjectives. */
   principles: [

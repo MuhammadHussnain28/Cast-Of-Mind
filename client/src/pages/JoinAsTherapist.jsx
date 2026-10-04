@@ -68,25 +68,34 @@ export default function JoinAsTherapist() {
               </Heading>
             </motion.div>
 
-            <motion.p
+            {/* <motion.p
               {...settle(0.05)}
-              className="mt-6 max-w-[30ch] font-display text-section leading-snug text-paper/90"
+              className="mt-6 max-w-[30ch] font-display text-section text-paper/90"
             >
               {intro.lede}
-            </motion.p> 
+            </motion.p> */}
+
+            <motion.p
+              {...settle(0.05)}
+              className="mt-6 max-w-[30ch] font-display text-section italic text-paper/90"
+            >
+              &ldquo;No <span className="text-gold">caseload</span> targets. No{' '}
+              <span className="text-gold">dashboards</span> ranking you against other{' '}
+              <span className="text-gold">clinicians</span>.&rdquo;
+            </motion.p>
+
+            <div className="mt-8">
+              <EligibilityCard />
+            </div>
 
             <motion.div {...settle(0.1)}>
-              <Text tone="inverse" className="mt-5 max-w-measure opacity-75">
+              <Text tone="inverse" className="mt-8 max-w-measure opacity-75">
                 {intro.body}
               </Text>
             </motion.div>
 
             <div className="mt-10">
               <WhyPractiseHere />
-            </div>
-
-            <div className="mt-10">
-              <EligibilityCard />
             </div>
 
             {/* The one promise a therapist checks for, stated where they finish reading. */}

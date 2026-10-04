@@ -15,7 +15,7 @@ export const intro = {
   heading: 'Practise where the work is the whole job.',
   lede: '"No caseload targets. No dashboards ranking you against other clinicians."',
   body:
-    'Cast of Mind matches people to you by what they are actually dealing with, then gets out of the way. You set your hours, you schedule the sessions, and what happens between you and your client stays between you and your client.',
+    'Cast of Minds matches people to you by what they are actually dealing with, then gets out of the way. You set your hours, you schedule the sessions, and what happens between you and your client stays between you and your client.',
 }
 
 /** Why practise here — each traces to a spec section. */
@@ -82,7 +82,7 @@ export const eligibility = {
     {
       id: 'supervision',
       icon: 'Independent',
-      text: 'Fully qualified — we do not accept interns or anyone still requiring supervision',
+      text: 'Fully qualified , we do not accept interns or anyone still requiring supervision',
     },
   ],
   footnote:

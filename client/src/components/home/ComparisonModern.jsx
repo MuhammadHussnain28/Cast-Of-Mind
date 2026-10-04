@@ -77,9 +77,9 @@ export default function ComparisonModern() {
         
         {/* Section Heading */}
         <motion.div {...reveal(0)} className="text-center space-y-3 mb-10 sm:mb-14">
-          <span className="text-xs uppercase tracking-widest text-sage font-bold">
+          {/* <span className="text-xs uppercase tracking-widest text-sage font-bold">
             Care Comparison
-          </span>
+          </span> */}
           <Heading level={2} id="comparison-heading" className="max-w-[22ch] mx-auto">
             How this differs from a room with two chairs.
           </Heading>

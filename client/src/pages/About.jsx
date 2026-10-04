@@ -40,8 +40,8 @@ export default function About() {
       {/* <div aria-hidden="true" className="h-28 bg-linear-to-b from-ink to-mist lg:h-40" /> */}
       {/* <div aria-hidden="true" className="h-12 bg-linear-to-b from-ink to-mist " /> */}
       
-      <Founder />
-      <TeamGrid />
+      {/* <Founder /> */}
+      {/* <TeamGrid /> */}
     </>
   )
 }

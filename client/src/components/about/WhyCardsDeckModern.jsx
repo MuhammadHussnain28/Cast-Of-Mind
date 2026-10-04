@@ -55,7 +55,7 @@ const REASONS = [
     num: '01',
     category: 'TIME',
     title: 'No Waiting Lists.',
-    body: 'Start speaking to your therapist this week—not after 4 months on a clinic waiting list.',
+    body: 'Start speaking to your therapist this week not after 4 months on a clinic waiting list.',
     tag: 'Immediate Care',
     bg: 'bg-paper',
     border: 'border-white/40',
@@ -222,7 +222,7 @@ export default function WhyCardsDeckModern({ scrollTargetRef }) {
                 <div
                   className={`
                     absolute -right-7 -bottom-7 w-48 h-48 pointer-events-none select-none
-                    text-ink opacity-[0.085] transform transition-transform duration-500
+                    text-ink opacity-[0.12] transform transition-transform duration-500
                     group-hover:scale-105 ${card.watermarkRotate}
                   `}
                 >

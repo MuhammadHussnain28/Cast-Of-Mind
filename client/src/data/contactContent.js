@@ -42,8 +42,8 @@ export const channels = [
     href: escalationPhone ? `tel:${escalationPhone.replace(/\s/g, '')}` : null,
     // §11: there is deliberately no admin conversation-viewing feature, so this
     // route is the whole escalation path. Saying so plainly is the point.
-    body: 'If something has happened with your therapist that concerns you, tell us directly. Nobody at Cast of Mind can read your conversations, so this route is how we find out.',
-    fallback: 'A direct line is being set up. Until then, email us and mark it urgent — it is seen the same day it arrives.',
+    body: 'If something has happened with your therapist that concerns you, tell us directly. Nobody at Cast of Minds can read your conversations, so this route is how we find out.',
+    fallback: 'A direct line is being set up. Until then, email us and mark it urgent , it is seen the same day it arrives.',
   },
   {
     id: 'hours',
@@ -51,8 +51,8 @@ export const channels = [
     title: 'When we reply',
     value: supportHours,
     href: null,
-    body: 'We are a small team spread across time zones, so replies do not always land in your working day.',
-    fallback: 'We answer every message that arrives here. If it is an emergency, please contact your local emergency number instead — this is not a crisis service.',
+    body: "Our team reviews every inquiry personally across time zones to ensure thoughtful, dedicated responses.",
+    fallback: 'We answer every message that arrives here. If it is an emergency, please contact your local emergency number instead this is not a crisis service.',
   },
 ]
 

@@ -277,7 +277,7 @@ export const faqItems = [
     question: 'How much is it, and what am I paying for?',
     // §2 and §13.
     answer:
-      '€200 a month. There is one plan and no tiers. It covers four therapy sessions — one a week, over Zoom — and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
+      '€200 a month. There is one plan and no tiers. It covers four therapy sessions one a week, over Zoom and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
   },
   {
     id: 'faq-privacy',
@@ -285,7 +285,7 @@ export const faqItems = [
     // §7.3 requires a visible transparency note about journal access; §11
     // records that no admin conversation-viewing feature exists.
     answer:
-      'Your therapist can see your messages, your journal entries and any worksheet you send back. Nobody else can. There is no administrator view of conversations anywhere in this platform. Your journal is visible to your assigned therapist by design rather than by accident — it exists so they can read what you could not say out loud, and we would rather state that plainly than let you assume otherwise.',
+      'Your therapist can see your messages, your journal entries and any worksheet you send back. Nobody else can. There is no administrator view of conversations anywhere in this platform. Your journal is visible to your assigned therapist by design rather than by accident it exists so they can read what you could not say out loud, and we would rather state that plainly than let you assume otherwise.',
   },
   {
     id: 'faq-real',
@@ -302,7 +302,7 @@ export const faqItems = [
     // §2: the client cannot switch in-app; they contact the business, and Asad
     // handles it manually. Said outright rather than glossed.
     answer:
-      'You cannot switch from inside the site, and we would rather tell you that here than let you find out when you go looking for the button. Contact us by email or phone and we will arrange it. A poor fit is common and it is nobody’s fault — not yours and not your therapist’s. It is a reason to change who you are talking to, not a reason to stop.',
+      'You cannot switch from inside the site, and we would rather tell you that here than let you find out when you go looking for the button. Contact us by email or phone and we will arrange it. A poor fit is common and it is nobody’s fault not yours and not your therapist’s. It is a reason to change who you are talking to, not a reason to stop.',
   },
   {
     id: 'faq-cancel',

@@ -52,7 +52,7 @@ export default function HowItWorksPathwayModern() {
       ? {}
       : {
           animate: { y: [0, -5, 0] },
-          transition: { duration, delay, repeat: Infinity, ease: 'easeInOut' },
+          transition: { duration: duration * 0.83, delay, repeat: Infinity, ease: 'easeInOut' },
         }
 
   return (

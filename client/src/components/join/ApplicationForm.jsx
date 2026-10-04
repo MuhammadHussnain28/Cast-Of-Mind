@@ -162,6 +162,7 @@ export default function ApplicationForm() {
 
   function startFresh() {
     clearDraft()
+    reset({ ...emptyApplication, timezone: detectTimezone() })
     setStep(1)
     setDeciding(false)
     announce(1)

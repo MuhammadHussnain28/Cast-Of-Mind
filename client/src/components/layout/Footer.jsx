@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { siteConfig, navItems, legalItems } from '../../lib/siteConfig'
-import logoWhite from '../../assets/cast-of-mind-logo-singular-white.png'
+import logoWhite from '../../assets/cast-of-mind-logo-white.png'
 
 /**
  * data-surface="dark" flips the focus ring to yellow. On ink, an ink ring
@@ -23,7 +23,7 @@ function FooterLink({ to, children }) {
 }
 
 export default function Footer() {
-  const year = new Date().getFullYear()
+  const year = 2021
 
   return (
     <footer data-surface="dark" className="bg-ink text-paper">
@@ -32,10 +32,10 @@ export default function Footer() {
           <div>
             <img
               src={logoWhite}
-              alt="Cast of Mind"
+              alt="Cast of Minds"
               width={78}
               height={64}
-              className="h-16 w-auto"
+              className="h-16 w-auto scale-x-[1.1] origin-left"
             />
             <p className="mt-5 max-w-[38ch] font-body text-caption leading-relaxed text-paper/75">
               Therapy that fits around a life already in progress. Matched to what
@@ -73,8 +73,8 @@ export default function Footer() {
           <p className="font-body text-caption text-paper/75">
             Developed by{' '}
             <a
-              href={siteConfig.developerLinkedIn}
-              target="_blank"
+              href={siteConfig.developerEmail}
+              target='_blank'
               rel="noopener noreferrer"
               className="underline decoration-paper/40 underline-offset-4 transition-colors
                          duration-200 hover:text-paper hover:decoration-paper/60"

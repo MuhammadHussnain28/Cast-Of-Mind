@@ -1,6 +1,6 @@
 import Hero from '../components/home/Hero'
 import Services from '../components/home/Services'
-import Testimonials from '../components/home/Testimonials'
+import Testimonials from '../components/home/Testimonials1'
 import HowItWorks from '../components/home/HowItWorks'
 import WhoWeHelp from '../components/home/WhoWeHelp'
 import ComparisonModern from '../components/home/ComparisonModern'

@@ -48,9 +48,17 @@ export default function AboutHeroModern() {
 
           {/* The thesis of the page — section scale, not body scale. */}
           <motion.div {...settle(0.1)}>
-            <p className="mt-8 max-w-[22ch] font-display text-section text-paper opacity-90">
+
+            {/* <p className="mt-8 max-w-[22ch] font-display text-section text-paper opacity-90">
               {mission.lede}
-            </p>
+            </p> */}
+
+            <p className="mt-8 max-w-[22ch] italic font-display
+              text-section text-paper opacity-90">
+                &ldquo;The distance between<span className='text-gold'>{' '}deciding{' '}</span>to get help and actually
+                <span className='text-gold'>{' '}getting{' '}</span>it is too long.&rdquo;
+              </p>
+
           </motion.div>
 
           <motion.div {...settle(0.2)} className="mt-8 space-y-6">

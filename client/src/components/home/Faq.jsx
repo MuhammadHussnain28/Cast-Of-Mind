@@ -3,45 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Heading, Text } from '../ui'
 import { faqItems } from '../../data/homeContent'
 
-/**
- * Section 7 of the home page (master spec §24.7): the hesitations someone
- * actually has before paying €200 to talk to a stranger on the internet.
- *
- * THE PANEL OPENS IN 200ms, NOT 700ms, AND THAT IS THE POINT.
- * §24.4 slows ambient and reveal motion to a breathing rhythm and keeps
- * functional interactions at 150-250ms. Opening a panel is functional: the
- * reader asked a question and is waiting for the answer. A 700ms accordion is
- * the classic misreading of "calm" — it is not calm, it is slow, and the spec
- * says in as many words that a control which takes that long is broken rather
- * than serene. The section entrance around it still reveals at 700ms.
- *
- * KEYBOARD AND SCREEN READER
- *  - Each trigger is a real <button> inside its heading, so Enter and Space
- *    work with no key handling of our own and the focus ring is the one the
- *    rest of the site uses.
- *  - `aria-expanded` tracks open state; `aria-controls` points at the panel.
- *  - The panel is a labelled region, so a screen reader can jump to it and know
- *    which question it answers.
- *  - The panel UNMOUNTS when closed rather than being height-clamped to zero.
- *    Collapsed content left in the DOM stays in the accessibility tree, so a
- *    screen reader reads every answer whether or not it is open — which defeats
- *    the accordion. The cost is that `aria-controls` briefly references an
- *    absent id, which ARIA tolerates; `aria-expanded` is the attribute doing the
- *    real work.
- *  - Arrow-key movement between headers is deliberately NOT implemented. It is
- *    optional in the ARIA authoring practices, and a half-built roving
- *    tabindex is worse than none: it would trap Tab without providing the full
- *    Home/End behaviour people who rely on it expect.
- *
- * MORE THAN ONE PANEL CAN BE OPEN. Single-open accordions close the thing
- * someone was reading when they open the next one, which is hostile if they
- * were comparing two answers — cost against cancellation, say.
- *
- * MEASURED — computed, not estimated (all text pairs clear AA):
- *   ink        on mist ..... 16.2:1
- *   ink/70     on mist ......  6.4:1
- *   ink/20     on mist ......  1.5:1  (rule between items — decorative, exempt)
- */
 
 function FaqItem({ item, index, reduceMotion }) {
   const [open, setOpen] = useState(false)
