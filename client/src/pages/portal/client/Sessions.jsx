@@ -42,7 +42,13 @@ export default function Sessions() {
 
   return (
     <section className="flex flex-col gap-7 pb-6">
-      <ScreenHeader title={SCREENS.sessions.title} lead={SCREENS.sessions.lead} />
+      <ScreenHeader
+        title={SCREENS.sessions.title}
+        lead={SCREENS.sessions.lead}
+        icon={SessionsIcon}
+        category="Video Appointments"
+        badge={counter ? `${counter.left} of ${counter.total} left` : null}
+      />
 
       {sessions.status === 'loading' && <PageSkeleton />}
 

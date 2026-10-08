@@ -1,7 +1,9 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import ClientIdentityStrip from '../../../components/portal/therapist/workspace/ClientIdentityStrip'
 import WorkspaceTabs from '../../../components/portal/therapist/workspace/WorkspaceTabs'
+import TherapistTabBar from '../../../components/portal/therapist/workspace/TherapistTabBar'
 import ClientInfo from '../../../components/portal/therapist/workspace/ClientInfo'
+import ClientInfoDossier from '../../../components/portal/therapist/workspace/ClientInfoDossier'
 import TherapistChat from '../../../components/portal/therapist/workspace/TherapistChat'
 import WorksheetsTab from '../../../components/portal/therapist/workspace/WorksheetsTab'
 import JournalNotesTab from '../../../components/portal/therapist/workspace/JournalNotesTab'
@@ -68,48 +70,80 @@ export default function ClientWorkspace() {
   const isChat = tab === 'chat'
 
   return (
-    // The chat is BOUNDED to the pane (`min-h-0`) so its thread scrolls and the
-    // page does not. Every other tab grows with its content and lets the pane
-    // scroll — bounding those would end the sticky header's containing block at
-    // the bottom of the first screenful, and the strip would scroll away.
-    <div className={cx('flex flex-1 flex-col', isChat && 'min-h-0')}>
-      {/* ONE sticky block, so the strip can never scroll away from the tabs it
-          belongs to. Negative margins let it span the full content column while
-          its children keep the column's own padding. */}
-      <div className="sticky top-0 z-20 -mx-4 -mt-6 border-b border-ink/12 bg-paper sm:-mx-6 sm:-mt-8 lg:-mx-10 lg:-mt-10">
-        <ClientIdentityStrip client={client} ended={ended} />
-        <WorkspaceTabs bookingId={bookingId} />
+    <>
+      {/* ========================================================
+          PREVIOUS VERSION (SAVED FOR BACKUP)
+          ========================================================
+      <div className={cx('flex flex-1 flex-col', isChat && 'min-h-0')}>
+        <div className="sticky top-0 z-20 -mx-4 -mt-6 border-b border-ink/12 bg-paper sm:-mx-6 sm:-mt-8 lg:-mx-10 lg:-mt-10">
+          <ClientIdentityStrip client={client} ended={ended} />
+          <WorkspaceTabs bookingId={bookingId} />
+        </div>
+
+        {isChat ? (
+          <div className="-mx-4 -mb-6 flex min-h-0 flex-1 flex-col sm:-mx-6 sm:-mb-8 lg:-mx-10 lg:-mb-10">
+            <TherapistChat key={bookingId} bookingId={bookingId} clientName={client.client.name} />
+          </div>
+        ) : (
+          <div className={cx('w-full pt-6 sm:pt-8', tab === 'journal' ? 'max-w-7xl' : 'max-w-4xl')}>
+            {tab === 'info' && <ClientInfo data={client} />}
+            {tab === 'worksheets' && (
+              <WorksheetsTab key={bookingId} bookingId={bookingId} clientName={client.client.name} ended={ended} />
+            )}
+            {tab === 'journal' && (
+              <JournalNotesTab key={bookingId} bookingId={bookingId} clientName={client.client.name} />
+            )}
+            {tab === 'sessions' && (
+              <SessionsTab key={bookingId} bookingId={bookingId} client={client} ended={ended} />
+            )}
+          </div>
+        )}
       </div>
+      ======================================================== */}
 
-      {isChat ? (
-        /*
-          THE CHAT IS THE PANE, NOT A BOX IN IT. Header on paper, thread on
-          mist, composer on paper — the negative margins cancel the pane's own
-          padding at the sides and the foot so the three meet its edges.
+      {/* ========================================================
+          NEW VERSION (ACTIVE: RESPONSIVE WORKSPACE WITH MOBILE BOTTOM TAB BAR)
+          ======================================================== */}
+      <div className={cx('flex flex-1 flex-col', isChat && 'min-h-0')}>
+        {/* Sticky top header containing the Ink Band Identity Strip and Desktop Tabs.
+            Horizontal negative margins span edge-to-edge; top is flush with pt-0 main. */}
+        <div className="sticky top-0 z-20 -mx-4 mt-0 border-b border-ink/12 bg-paper sm:-mx-6 lg:-mx-10">
+          <ClientIdentityStrip client={client} ended={ended} />
+          <WorkspaceTabs bookingId={bookingId} />
+        </div>
 
-          `key={bookingId}` is the first layer of the leak defence: switching
-          clients discards this whole chat instance rather than reusing it.
-        */
-        <div className="-mx-4 -mb-6 flex min-h-0 flex-1 flex-col sm:-mx-6 sm:-mb-8 lg:-mx-10 lg:-mb-10">
-          <TherapistChat key={bookingId} bookingId={bookingId} clientName={client.client.name} />
-        </div>
-      ) : (
-        /* Journal and Notes runs wider: it is two columns side by side on a
-           large screen, which `max-w-4xl` would squeeze into one. */
-        <div className={cx('w-full pt-6 sm:pt-8', tab === 'journal' ? 'max-w-7xl' : 'max-w-4xl')}>
-          {tab === 'info' && <ClientInfo data={client} />}
-          {tab === 'worksheets' && (
-            <WorksheetsTab key={bookingId} bookingId={bookingId} clientName={client.client.name} ended={ended} />
-          )}
-          {tab === 'journal' && (
-            <JournalNotesTab key={bookingId} bookingId={bookingId} clientName={client.client.name} />
-          )}
-          {tab === 'sessions' && (
-            <SessionsTab key={bookingId} bookingId={bookingId} client={client} ended={ended} />
-          )}
-        </div>
-      )}
-    </div>
+        {isChat ? (
+          /* The chat pane fills available vertical space, with pb-16 on mobile for the fixed bottom tab bar */
+          <div className="-mx-4 flex min-h-0 flex-1 flex-col pb-16 sm:-mx-6 lg:-mx-10 lg:pb-0 lg:-mb-10">
+            <TherapistChat key={bookingId} bookingId={bookingId} clientName={client.client.name} />
+          </div>
+        ) : (
+          /* PREVIOUS VERSION (SAVED FOR BACKUP):
+          <div className={cx('w-full pt-6 sm:pt-8 pb-24 lg:pb-0', tab === 'journal' ? 'max-w-7xl' : 'max-w-5xl')}>
+          */
+          <div className={cx('w-full pt-6 sm:pt-8 pb-24 lg:pb-0', tab === 'journal' || tab === 'sessions' ? 'max-w-7xl' : 'max-w-5xl')}>
+            {tab === 'info' && (
+              <>
+                {/* PREVIOUS VERSION (SAVED FOR BACKUP): <ClientInfo data={client} /> */}
+                <ClientInfoDossier data={client} />
+              </>
+            )}
+            {tab === 'worksheets' && (
+              <WorksheetsTab key={bookingId} bookingId={bookingId} clientName={client.client.name} ended={ended} />
+            )}
+            {tab === 'journal' && (
+              <JournalNotesTab key={bookingId} bookingId={bookingId} clientName={client.client.name} />
+            )}
+            {tab === 'sessions' && (
+              <SessionsTab key={bookingId} bookingId={bookingId} client={client} ended={ended} />
+            )}
+          </div>
+        )}
+
+        {/* Mobile bottom tab bar (< 1024px) - fixed to viewport bottom */}
+        <TherapistTabBar bookingId={bookingId} />
+      </div>
+    </>
   )
 }
 

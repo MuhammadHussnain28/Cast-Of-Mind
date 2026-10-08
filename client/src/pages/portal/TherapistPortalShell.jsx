@@ -12,8 +12,8 @@ import { DraftContext } from '../../lib/chat/draftContext'
 import { createDraftStore } from '../../lib/chat/draftStore'
 import { CLIENTS_LIST } from '../../data/therapistPortalContent'
 import { cx } from '../../lib/cx'
-import logoInk from '../../assets/cast-of-mind-logo-singular-ink.png'
-import logoWhite from '../../assets/cast-of-mind-logo-singular-white.png'
+import logoInk from '../../assets/cast-of-mind-logo-ink.png'
+import logoWhite from '../../assets/cast-of-mind-logo-white.png'
 
 /**
  * The therapist portal — master spec §8, portal notes §24.8.
@@ -109,8 +109,12 @@ function TherapistPortalFrame() {
         {/* The rail carries no logo on desktop — the list is the subject there.
             On a phone this is the whole screen, so it needs the mark and a way
             out. White on ink; the ink logo would be invisible here. */}
-        <div className="flex shrink-0 items-center gap-4 bg-ink px-4 pb-1 pt-3 lg:hidden">
-          <img src={logoWhite} alt="Cast of Mind" className="h-7 w-auto shrink-0" />
+        <div className="flex shrink-0 items-center gap-4 bg-ink px-4 py-3 lg:hidden">
+          <img
+            src={logoWhite}
+            alt="Cast of Minds"
+            className="w-[74px] h-auto scale-x-[1.1] origin-left shrink-0"
+          />
         </div>
 
         <div className="min-h-0 flex-1">
@@ -132,7 +136,11 @@ function TherapistPortalFrame() {
             {CLIENTS_LIST.backToList}
           </Link>
 
-          <img src={logoInk} alt="Cast of Mind" className="ml-auto h-6 w-auto shrink-0" />
+          <img
+            src={logoInk}
+            alt="Cast of Minds"
+            className="ml-auto w-[74px] h-auto scale-x-[1.1] origin-right shrink-0"
+          />
         </header>
 
         <main

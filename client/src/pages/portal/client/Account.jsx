@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { ScreenHeader } from '../../../components/portal/client/ScreenScaffold'
+import { AccountIcon } from '../../../components/portal/client/ClientPortalIcons'
 import RatingForm from '../../../components/portal/client/review/RatingForm'
 import SubscriptionControls from '../../../components/portal/client/account/SubscriptionControls'
 import PlanHero from '../../../components/portal/client/account/PlanHero'
@@ -92,7 +93,13 @@ export default function Account() {
 
   return (
     <section>
-      <ScreenHeader title={ACCOUNT.title} lead={ACCOUNT.lead} />
+      <ScreenHeader
+        title={ACCOUNT.title}
+        lead={ACCOUNT.lead}
+        icon={AccountIcon}
+        category="Membership & Plan"
+        badge={access === 'granted' ? 'Active Plan' : access === 'ending' ? 'Ending' : null}
+      />
 
       <div className="mt-7 flex flex-col gap-6">
         <motion.div {...rise(0)}>

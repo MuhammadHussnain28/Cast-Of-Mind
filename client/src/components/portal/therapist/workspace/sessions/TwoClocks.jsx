@@ -64,7 +64,10 @@ export default function TwoClocks({ preview, therapistZone, clientZone, clientNa
   const night = preview.status === 'ok' && them?.night
 
   return (
+    /* PREVIOUS VERSION (SAVED FOR BACKUP):
     <section aria-label={copy.label} className="relative overflow-hidden rounded-2xl bg-mist px-3 py-5 sm:px-5">
+    */
+    <section aria-label={copy.label} className="relative overflow-hidden rounded-2xl bg-mist p-5 sm:p-6">
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-sage/10 blur-[130px]" />
 
       <div className="relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 sm:gap-3">

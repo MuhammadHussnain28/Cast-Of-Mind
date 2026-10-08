@@ -50,7 +50,7 @@ export default function AdminTopBar({ title, parent, email, onOpenNav }) {
               {email}
             </Text>
           )}
-          <SignOutButton />
+          <SignOutButton variant="ghost" />
         </div>
       </div>
     </header>

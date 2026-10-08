@@ -208,7 +208,10 @@ export default function SessionForm({
         {editing ? copy.editHeading : copy.heading(clientName)}
       </h3>
 
+      {/* PREVIOUS VERSION (SAVED FOR BACKUP):
       <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-6">
+      */}
+      <div className="mt-4 grid gap-6 md:grid-cols-[1.15fr_0.85fr] md:gap-6 lg:gap-8 xl:gap-10">
         <div className="grid gap-4 sm:grid-cols-2 md:col-start-1">
           <WhenInput
             inputRef={dateRef}

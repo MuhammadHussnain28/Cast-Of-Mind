@@ -83,15 +83,9 @@ export default function ClientRail({ therapist, subscription, bookingId, onNavig
         </ul>
       </nav>
 
-      {/* §13 wants the next payment date visible in the portal, not only in the
-          account section. Quiet, because nothing about it needs acting on. */}
-      {subscription?.nextBillingDate && (
-        <p className="relative border-t border-paper/12 px-5 py-4 font-body text-caption text-paper/70">
-          Next payment {formatDate(subscription.nextBillingDate)}
-        </p>
-      )}
 
-      {footer && <div className="relative px-3 pb-4">{footer}</div>}
+      {footer && <div className="relative px-3 pb-4 pt-2">{footer}</div>}
+
     </div>
   )
 }

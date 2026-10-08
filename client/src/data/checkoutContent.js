@@ -24,7 +24,7 @@ export const checkout = {
   includedHeading: "What's included",
 
   // §13: unused sessions are forfeited. A term to read BEFORE paying.
-  noCarryOver: 'Sessions do not roll over — each month starts again at four.',
+  noCarryOver: 'Sessions do not roll over , each month starts again at four.',
 
   submit: 'Continue to payment',
   submitting: 'Taking you to payment…',

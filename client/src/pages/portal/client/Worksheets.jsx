@@ -54,7 +54,13 @@ export default function Worksheets() {
 
   return (
     <section className="flex flex-col gap-7 pb-6">
-      <ScreenHeader title={SCREENS.worksheets.title} lead={MY_WORKSHEETS.lead(name)} />
+      <ScreenHeader
+        title={SCREENS.worksheets.title}
+        lead={MY_WORKSHEETS.lead(name)}
+        icon={WorksheetsIcon}
+        category="Care Resources & Exercises"
+        badge={toComplete.length > 0 ? `${toComplete.length} active` : null}
+      />
 
       <p role="status" className="sr-only">
         {announcement}

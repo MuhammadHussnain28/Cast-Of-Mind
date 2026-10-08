@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Outlet, useSearchParams } from 'react-router-dom'
+import { Outlet, useSearchParams, useLocation } from 'react-router-dom'
 import SkipLink from '../../components/layout/SkipLink'
 import SignOutButton from '../../components/auth/SignOutButton'
 import ErrorState from '../../components/states/ErrorState'
@@ -18,7 +18,7 @@ import { ClientPortalContext } from '../../lib/clientPortalContext'
 import { useKeyboardViewportHeight } from '../../lib/useVisualViewport'
 import { fetchClientMe } from '../../lib/api/clientPortalApi'
 import { useSaveBrowserTimezone } from '../../lib/client/useSaveBrowserTimezone'
-import logoInk from '../../assets/cast-of-mind-logo-singular-ink.png'
+import logoInks from '../../assets/cast-of-mind-logo-ink.png'
 
 /**
  * The client portal — master spec §7, portal notes §24.8.
@@ -43,6 +43,8 @@ export default function ClientPortalShell() {
   // Bumped to re-run the fetch. A counter rather than a boolean, so a retry
   // after a retry still triggers.
   const [attempt, setAttempt] = useState(0)
+  const location = useLocation()
+  const isChatTab = location.pathname === '/portal' || location.pathname === '/portal/chat'
 
   // Called before the early returns below — hooks cannot sit behind a branch.
   const keyboardHeight = useKeyboardViewportHeight()
@@ -143,9 +145,13 @@ export default function ClientPortalShell() {
             need somewhere to live. */}
         <header className="shrink-0 border-b border-ink/12 bg-paper/90 backdrop-blur-md lg:hidden">
           <div className="flex items-center gap-4 px-4 py-3">
-            <img src={logoInk} alt="Cast of Mind" className="h-7 w-auto shrink-0" />
+            <img
+              src={logoInks}
+              alt="Cast of Minds"
+              className="w-[74px] h-auto scale-x-[1.1] origin-left shrink-0"
+            />
             <div className="ml-auto shrink-0">
-              <SignOutButton />
+              <SignOutButton variant="ghost" />
             </div>
           </div>
         </header>
@@ -157,11 +163,12 @@ export default function ClientPortalShell() {
             className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 focus-visible:outline-none sm:px-6 sm:py-8 lg:px-10 lg:py-10"
           >
             <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
-              {/* The therapist leads the content on a phone, where there is no
-                  rail to carry them. */}
-              <div className="mb-6 shrink-0 rounded-2xl bg-paper px-4 py-4 lg:hidden">
-                <TherapistPresence therapist={state.therapist} tone="light" />
-              </div>
+              {/* The therapist leads the content on a phone ONLY in the chat tab */}
+              {isChatTab && (
+                <div className="mb-6 shrink-0 rounded-2xl bg-paper px-4 py-4 lg:hidden">
+                  <TherapistPresence therapist={state.therapist} tone="light" />
+                </div>
+              )}
 
               <AccessNotice
                 access={state.access}

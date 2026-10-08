@@ -28,12 +28,12 @@ export default function Field({
     .join(' ') || undefined
 
   return (
-    <div className={cx('flex flex-col gap-2', className)}>
+    <div className={cx("flex flex-col gap-2", className)}>
       <label
         htmlFor={id}
         className={cx(
-          'font-body text-caption font-medium text-ink',
-          hideLabel && 'sr-only',
+          "font-body text-caption font-medium text-ink",
+          hideLabel && "sr-only",
         )}
       >
         {label}
@@ -48,14 +48,34 @@ export default function Field({
       {children({ id, describedBy, invalid: Boolean(error) })}
 
       {error ? (
-        <p id={errId} className="font-body text-caption text-clay" role="alert">
-          {error}
+
+        <p
+          id={errId}
+          className="font-body text-caption font-semibold text-clay flex items-center gap-1.5"
+          role="alert"
+        >
+          <svg
+            className="size-3.5 shrink-0 stroke-[2.5]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{error}</span>
         </p>
+
+
       ) : helper ? (
         <p id={helpId} className="font-body text-caption text-ink/70">
           {helper}
         </p>
       ) : null}
     </div>
-  )
+  );
 }

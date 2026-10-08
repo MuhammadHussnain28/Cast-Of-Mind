@@ -36,12 +36,17 @@ export default function TherapistRail({ state, activeTab, onNavigate, footer }) 
       />
 
       <div className="relative flex items-center justify-between gap-2 px-5 pb-4 pr-3 pt-5">
-        <div className="flex items-baseline gap-2">
-          <h2 className="font-body text-ui font-medium text-paper">{CLIENTS_LIST.heading}</h2>
+
+        <div className="flex items-center gap-2.5">
+          <h2 className="font-body text-base font-bold tracking-tight text-paper">
+            {CLIENTS_LIST.heading}
+          </h2>
           {!loading && !error && total > 0 && (
             <>
-              {/* Decorative: the real count is announced on the list below. */}
-              <span aria-hidden="true" className="font-body text-caption tabular-nums text-paper/70">
+              <span
+                aria-hidden="true"
+                className="inline-flex size-5 items-center justify-center rounded-full bg-paper/15 font-body text-xs font-semibold text-paper"
+              >
                 {total}
               </span>
               <span className="sr-only">{CLIENTS_LIST.countLabel(total)}</span>

@@ -24,13 +24,22 @@ export default function WorkingHoursTable({ rows, theirZone, yourZone }) {
           </caption>
           <thead>
             <tr className="border-b border-ink/12">
-              <th scope="col" className="py-2 pr-4 font-body text-caption font-medium text-ink/70">
+              <th
+                scope="col"
+                className="py-2 pr-4 font-body text-caption font-medium text-ink/70"
+              >
                 <span className="sr-only">Day</span>
               </th>
-              <th scope="col" className="py-2 pr-4 font-body text-caption font-medium text-ink/70">
+              <th
+                scope="col"
+                className="py-2 pr-4 font-body text-caption font-medium text-ink/70"
+              >
                 {detail.hoursTheirs}
               </th>
-              <th scope="col" className="py-2 font-body text-caption font-medium text-ink">
+              <th
+                scope="col"
+                className="py-2 font-body text-caption font-medium text-ink"
+              >
                 {detail.hoursYours}
               </th>
             </tr>
@@ -48,8 +57,8 @@ export default function WorkingHoursTable({ rows, theirZone, yourZone }) {
                 <td
                   data-numeric
                   className={cx(
-                    'whitespace-nowrap py-3 pr-4 font-body text-ui',
-                    row.enabled ? 'text-ink/70' : 'text-ink/60',
+                    "whitespace-nowrap py-3 pr-4 font-body text-ui",
+                    row.enabled ? "text-ink/70" : "text-ink/60",
                   )}
                 >
                   {row.enabled ? row.theirs : detail.hoursClosed}
@@ -58,20 +67,25 @@ export default function WorkingHoursTable({ rows, theirZone, yourZone }) {
                 <td
                   data-numeric
                   className={cx(
-                    'whitespace-nowrap py-3 font-body text-ui',
-                    row.enabled ? 'text-ink' : 'text-ink/60',
+                    "whitespace-nowrap py-3 font-body text-ui",
+                    row.enabled ? "text-ink" : "text-ink/60",
                   )}
                 >
                   {row.enabled ? (
                     <>
                       {row.crossesDay && (
-                        <span className="text-ink/70">{row.yours.startDay} </span>
+                        <span className="text-ink/70">
+                          {row.yours.startDay}{" "}
+                        </span>
                       )}
                       {row.yours.startTime}
                       <span className="text-ink/70"> – </span>
-                      {row.crossesDay && row.yours.endDay !== row.yours.startDay && (
-                        <span className="text-ink/70">{row.yours.endDay} </span>
-                      )}
+                      {row.crossesDay &&
+                        row.yours.endDay !== row.yours.startDay && (
+                          <span className="text-ink/70">
+                            {row.yours.endDay}{" "}
+                          </span>
+                        )}
                       {row.yours.endTime}
                     </>
                   ) : (
@@ -84,15 +98,49 @@ export default function WorkingHoursTable({ rows, theirZone, yourZone }) {
         </table>
       </div>
 
-      <div className="mt-4 space-y-1">
-        <p className="font-body text-caption text-ink/70">
-          {detail.hoursTheirs}: {theirZone} · {detail.hoursYours}: {yourZone}
-        </p>
-        {anyCrossing && (
-          <p className="font-body text-caption text-ink/70">{detail.crossesDay}</p>
-        )}
-        <p className="font-body text-caption text-ink/70">{detail.hoursNote}</p>
+     
+
+      <div className="mt-5 rounded-xl border border-ink/10 bg-mist/70 p-4">
+        {/* Timezone Badges */}
+        <div className="flex flex-wrap items-center gap-2 font-body text-caption">
+          <div className="flex items-center gap-1.5 text-ink/70">
+            <svg
+              className="h-4 w-4 text-sage-deep"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span>{detail.hoursTheirs}:</span>
+          </div>
+          <span className="rounded-md border border-ink/10 bg-paper px-2 py-0.5 font-mono text-[12px] font-medium text-ink">
+            {theirZone}
+          </span>
+          <span className="text-ink/40 font-mono">→</span>
+          <span className="text-ink/70">{detail.hoursYours}:</span>
+          <span className="rounded-md border border-sage/40 bg-sage/15 px-2 py-0.5 font-mono text-[12px] font-medium text-ink">
+            {yourZone}
+          </span>
+        </div>
+
+        {/* Helpful Footnote */}
+        <div className="mt-3 space-y-1.5 border-t border-ink/8 pt-3 font-body text-caption leading-relaxed text-ink/75">
+          {anyCrossing && (
+            <p className="flex items-center gap-2 font-medium text-amber-900">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
+              {detail.crossesDay}
+            </p>
+          )}
+          <p className="text-ink/65">{detail.hoursNote}</p>
+        </div>
       </div>
+
     </div>
-  )
+  );
 }

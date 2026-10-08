@@ -8,6 +8,7 @@ import JournalComposer from '../../../components/portal/client/journal/JournalCo
 import EntryRow from '../../../components/portal/client/journal/EntryRow'
 import { EntrySpine } from '../../../components/portal/journal/EntrySpine'
 import { SharedPageIcon, QuillIcon } from '../../../components/portal/journal/JournalIcons'
+import { JournalIcon } from '../../../components/portal/client/ClientPortalIcons'
 
 /**
  * §7.3. The transparency note LEADS this screen.
@@ -24,7 +25,13 @@ export default function Journal() {
 
   return (
     <section className="flex flex-col gap-7 pb-6">
-      <ScreenHeader title={screen.title} lead={screen.lead} />
+      <ScreenHeader
+        title={screen.title}
+        lead={screen.lead}
+        icon={JournalIcon}
+        category="Personal Reflections"
+        badge={journal.total > 0 ? `${journal.total} ${journal.total === 1 ? 'entry' : 'entries'}` : 'Shared'}
+      />
 
       <p role="status" className="sr-only">
         {announcement}

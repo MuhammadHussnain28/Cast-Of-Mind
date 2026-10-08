@@ -97,83 +97,161 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="dialog"
-          aria-label={BELL.panelLabel}
-          tabIndex={-1}
-          data-surface="dark"
-
-          // ----------------------------
-
-          className={cx(
-            'fixed z-50 rounded-2xl bg-ink-deep p-2 shadow-2xl ring-1 ring-paper/15 focus-visible:outline-none',
-            // On mobile phones: centered at the top
-            'inset-x-3 top-16',
-            // On desktop: floats on the right side of the 320px sidebar
-            'sm:left-[328px] sm:top-5 sm:w-80 sm:inset-x-auto',
-          )}
-
-
-
-        > 
-          <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-            <h2 className="font-body text-caption font-medium text-paper">{BELL.panelLabel}</h2>
-            {unread > 0 && (
-              <button
-                type="button"
-                onClick={readAll}
-                className="min-h-11 rounded-lg px-2 font-body text-caption text-paper/70 underline decoration-paper/40 underline-offset-4 transition-colors duration-200 ease-out hover:text-paper"
-              >
-                {BELL.markAll}
-              </button>
+        <>
+          {/* ========================================================
+              PREVIOUS VERSION (SAVED FOR BACKUP)
+              ========================================================
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="dialog"
+            aria-label={BELL.panelLabel}
+            tabIndex={-1}
+            data-surface="dark"
+            className={cx(
+              'fixed z-50 rounded-2xl bg-ink-deep p-2 shadow-2xl ring-1 ring-paper/15 focus-visible:outline-none',
+              // On mobile phones: centered at the top
+              'inset-x-3 top-16',
+              // On desktop: floats on the right side of the 320px sidebar
+              'sm:left-[328px] sm:top-5 sm:w-80 sm:inset-x-auto',
             )}
-          </div>
+          > 
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+              <h2 className="font-body text-caption font-medium text-paper">{BELL.panelLabel}</h2>
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={readAll}
+                  className="min-h-11 rounded-lg px-2 font-body text-caption text-paper/70 underline decoration-paper/40 underline-offset-4 transition-colors duration-200 ease-out hover:text-paper"
+                >
+                  {BELL.markAll}
+                </button>
+              )}
+            </div>
 
-          {failed ? (
-            <div className="px-2 pb-3 pt-1">
-              <p className="font-body text-caption text-paper/70">{BELL.failed}</p>
-              <button
-                type="button"
-                onClick={reload}
-                className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-paper/40 px-4 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
+            {failed ? (
+              <div className="px-2 pb-3 pt-1">
+                <p className="font-body text-caption text-paper/70">{BELL.failed}</p>
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-paper/40 px-4 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
+                >
+                  {BELL.retry}
+                </button>
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="px-2 pb-4 pt-2">
+                <p className="font-body text-ui font-medium text-paper">{BELL.empty}</p>
+                <p className="mt-1 font-body text-caption text-paper/70">{BELL.emptyBody}</p>
+              </div>
+            ) : (
+              <ul className="flex flex-col">
+                {rows.map((notification) => (
+                  <li key={notification.id}>
+                    <NotificationRow
+                      notification={notification}
+                      tone="dark"
+                      onOpen={() => {
+                        if (!notification.read) readOne(notification.id)
+                        close({ restoreFocus: false })
+                      }}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="border-t border-paper/12 px-2 pt-2">
+              <Link
+                to="/portal/notifications"
+                onClick={() => close({ restoreFocus: false })}
+                className="flex min-h-11 items-center rounded-xl px-3 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
               >
-                {BELL.retry}
-              </button>
+                {BELL.seeAll}
+              </Link>
             </div>
-          ) : rows.length === 0 ? (
-            <div className="px-2 pb-4 pt-2">
-              <p className="font-body text-ui font-medium text-paper">{BELL.empty}</p>
-              <p className="mt-1 font-body text-caption text-paper/70">{BELL.emptyBody}</p>
-            </div>
-          ) : (
-            <ul className="flex flex-col">
-              {rows.map((notification) => (
-                <li key={notification.id}>
-                  <NotificationRow
-                    notification={notification}
-                    tone="dark"
-                    onOpen={() => {
-                      if (!notification.read) readOne(notification.id)
-                      close({ restoreFocus: false })
-                    }}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="border-t border-paper/12 px-2 pt-2">
-            <Link
-              to="/portal/notifications"
-              onClick={() => close({ restoreFocus: false })}
-              className="flex min-h-11 items-center rounded-xl px-3 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
-            >
-              {BELL.seeAll}
-            </Link>
           </div>
-        </div>
+          ======================================================== */}
+
+          {/* ========================================================
+              NEW VERSION (ACTIVE: VIEWPORT-CONSTRAINED SCROLLABLE NOTIFICATION PANEL)
+              ======================================================== */}
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="dialog"
+            aria-label={BELL.panelLabel}
+            tabIndex={-1}
+            data-surface="dark"
+            className={cx(
+              'fixed z-50 flex flex-col rounded-2xl bg-ink-deep p-2 shadow-2xl ring-1 ring-paper/15 focus-visible:outline-none',
+              // On mobile phones: centered at the top with bottom clearance
+              'inset-x-3 top-16 max-h-[calc(100dvh-5rem)]',
+              // On desktop: floats on the right side of the 320px sidebar with top/bottom margin
+              'sm:left-[328px] sm:top-5 sm:w-80 sm:inset-x-auto sm:max-h-[calc(100dvh-2.5rem)]',
+            )}
+          > 
+            {/* Pinned Header */}
+            <div className="flex shrink-0 items-center justify-between gap-2 px-2 py-1.5 border-b border-paper/8">
+              <h2 className="font-body text-caption font-medium text-paper">{BELL.panelLabel}</h2>
+              {unread > 0 && (
+                <button
+                  type="button"
+                  onClick={readAll}
+                  className="min-h-11 rounded-lg px-2 font-body text-caption text-paper/70 underline decoration-paper/40 underline-offset-4 transition-colors duration-200 ease-out hover:text-paper"
+                >
+                  {BELL.markAll}
+                </button>
+              )}
+            </div>
+
+            {failed ? (
+              <div className="px-2 pb-3 pt-2">
+                <p className="font-body text-caption text-paper/70">{BELL.failed}</p>
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-paper/40 px-4 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
+                >
+                  {BELL.retry}
+                </button>
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="px-2 pb-4 pt-3">
+                <p className="font-body text-ui font-medium text-paper">{BELL.empty}</p>
+                <p className="mt-1 font-body text-caption text-paper/70">{BELL.emptyBody}</p>
+              </div>
+            ) : (
+              /* Smoothly scrollable notifications list */
+              <ul className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain divide-y divide-paper/6 scrollbar-thin scrollbar-thumb-paper/20 pt-1">
+                {rows.map((notification) => (
+                  <li key={notification.id} className="min-w-0">
+                    <NotificationRow
+                      notification={notification}
+                      tone="dark"
+                      onOpen={() => {
+                        if (!notification.read) readOne(notification.id)
+                        close({ restoreFocus: false })
+                      }}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Pinned Footer with guaranteed visible "See all" link */}
+            <div className="shrink-0 border-t border-paper/12 px-2 pt-2">
+              <Link
+                to="/portal/notifications"
+                onClick={() => close({ restoreFocus: false })}
+                className="flex min-h-11 items-center rounded-xl px-3 font-body text-caption font-medium text-paper transition-colors duration-200 ease-out hover:bg-paper/10"
+              >
+                {BELL.seeAll}
+              </Link>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

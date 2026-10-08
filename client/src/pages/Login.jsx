@@ -97,7 +97,7 @@ export default function Login() {
       intro={INTRO}
       footer={
         <Text size="caption" tone="muted">
-          New to Cast of Mind?{' '}
+          New to Cast of Minds?{' '}
           <Link to="/questionnaire" className="text-ink underline underline-offset-4">
             Start with a few questions
           </Link>

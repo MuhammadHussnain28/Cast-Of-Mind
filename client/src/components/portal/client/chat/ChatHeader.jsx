@@ -48,7 +48,7 @@ export default function ChatHeader({ therapist }) {
   const week = hasAnyHours(rows) ? rows : null
 
   return (
-    <header className="shrink-0 border-b border-ink/12 bg-paper">
+    <header className="hidden shrink-0 border-b border-ink/12 bg-paper lg:block">
       <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-5">
         <div className="flex items-start gap-3">
           {therapist.photoUrl ? (
@@ -103,7 +103,7 @@ export default function ChatHeader({ therapist }) {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="overflow-hidden"
             >
-              <div className="pt-3">
+              <div className="mt-3 max-h-[240px] overflow-y-auto rounded-xl border border-ink/8 bg-mist/60 p-3.5 pr-2">
                 <WorkingHoursTable rows={week} theirZone={therapist.timezone} yourZone={zone} />
               </div>
             </motion.div>

@@ -29,17 +29,25 @@
      360px screen, and 360px is the responsive floor the same spec sets in
      §24.6 — the two rules only reconcile if the type is fluid.
      Measured: hero 44px at 360px, 72px from 1024px up. */
-  --text-hero: clamp(2.75rem, 1.6rem + 5.1vw, 4.5rem); /* 44px → 72px */
+
+  /* --text-hero: clamp(2.75rem, 1.6rem + 5.1vw, 4.5rem); */   /* 44px → 72px */  
+  --text-hero: clamp(2.5625rem, 1.6rem + 4.6vw, 4.5rem);   /* 40px → 72px */
+  
   --text-hero--line-height: 1.06;
   --text-hero--letter-spacing: -0.03em;
   --text-hero--font-weight: 500;
 
-  --text-section: clamp(2rem, 1.5rem + 2.2vw, 2.75rem); /* 32px → 44px */
+   /* --text-section: clamp(2rem, 1.5rem + 2.2vw, 2.75rem);*/     /* 32px → 44px */
+  --text-section: clamp(1.75rem, 1.4rem + 1.8vw, 2.75rem);       /* 28px → 44px */
+
   --text-section--line-height: 1.14;
   --text-section--letter-spacing: -0.02em;
   --text-section--font-weight: 400;
 
-  --text-subsection: clamp(1.375rem, 1.2rem + 0.8vw, 1.625rem); /* 22px → 26px */
+  /* --text-subsection: clamp(1.375rem, 1.2rem + 0.8vw, 1.625rem); */   /* 22px → 26px */
+  --text-subsection: clamp(1.125rem, 1.05rem + 0.6vw, 1.625rem); /* 18px → 26px */
+
+
   --text-subsection--line-height: 1.3;
   --text-subsection--letter-spacing: -0.01em;
   --text-subsection--font-weight: 500;

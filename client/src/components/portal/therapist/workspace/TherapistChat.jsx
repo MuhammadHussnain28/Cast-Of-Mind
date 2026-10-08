@@ -159,9 +159,11 @@ export default function TherapistChat({ bookingId, clientName }) {
       )}
 
       {showZone && (
-        <p className="shrink-0 px-4 pt-3 text-center font-body text-caption text-ink/70 sm:px-6">
-          {THERAPIST_CHAT.zoneNote(zoneName(timeZone))}
-        </p>
+        <div className="shrink-0 border-b border-ink/8 bg-paper/60 px-4 py-2 text-center">
+          <p className="font-body text-caption text-ink/70">
+            {THERAPIST_CHAT.zoneNote(zoneName(timeZone))}
+          </p>
+        </div>
       )}
 
       <MessageThread

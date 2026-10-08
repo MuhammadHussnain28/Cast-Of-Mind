@@ -100,7 +100,10 @@ export default function SessionsTab({ bookingId, client, ended }) {
 
           {canSchedule ? (
             <Surface glow="right">
+              {/* PREVIOUS VERSION (SAVED FOR BACKUP):
               <div className="px-5 py-5 sm:px-6 sm:py-6">
+              */}
+              <div className="p-6 sm:p-7 lg:p-8">
                 <SessionForm
                   therapistZone={zone}
                   clientZone={clientZone}

@@ -69,10 +69,6 @@ export default function Checkout() {
         />
 
         <div className="relative flex h-full flex-col gap-8 px-6 py-8 sm:px-8 lg:sticky lg:top-[72px] lg:gap-12 lg:px-10 lg:py-14">
-          <Link to="/" className="hidden w-fit rounded-sm lg:inline-flex">
-            <img src={logoWhite} alt="Cast of Mind" className="h-10 w-auto" />
-          </Link>
-
           <TherapistSummary therapist={therapist} />
 
           {/* Below lg this sits under the fold on purpose — the disclosure has
@@ -82,12 +78,27 @@ export default function Checkout() {
             <IncludedGrid />
           </div>
 
+
           <Link
             to={`/therapist/${therapist.id}`}
-            className="mt-auto hidden w-fit rounded-sm font-body text-caption text-paper/70 underline decoration-paper/40 underline-offset-4 transition-colors duration-200 hover:text-paper lg:inline-flex"
+            className="group mt-0 hidden w-fit items-center gap-2.5 rounded-full border border-paper/15 bg-paper/5 px-4 py-2 font-body text-caption font-medium text-paper/80 shadow-xs backdrop-blur-sm transition-all duration-200 hover:border-paper/30 hover:bg-paper/10 hover:text-paper lg:inline-flex"
           >
-            {checkout.backToTherapist}
+            <svg
+              className="h-3.5 w-3.5 text-sage transition-transform duration-200 group-hover:-translate-x-1"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span>{checkout.backToTherapist}</span>
           </Link>
+
+
         </div>
       </aside>
 
@@ -177,12 +188,30 @@ export default function Checkout() {
           {/* The mobile home for what's included, and for the way back. */}
           <div className="mt-12 rounded-2xl bg-ink-deep px-6 py-7 lg:hidden">
             <IncludedGrid />
+
+
             <Link
               to={`/therapist/${therapist.id}`}
-              className="mt-6 inline-flex min-h-11 items-center rounded-sm font-body text-caption text-paper/70 underline decoration-paper/40 underline-offset-4"
+              className="group mt-5 inline-flex w-fit items-center gap-2 rounded-full border border-paper/15 bg-paper/5 px-3.5 py-1.5 font-body text-[12px] font-medium text-paper/80 shadow-xs backdrop-blur-sm transition-all duration-200 hover:border-paper/30 hover:bg-paper/10 hover:text-paper"
             >
-              {checkout.backToTherapist}
+              <svg
+                className="h-3 w-3 text-sage transition-transform duration-200 group-hover:-translate-x-0.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              <span>{checkout.backToTherapist}</span>
             </Link>
+
+
+
+
           </div>
         </motion.div>
       </section>

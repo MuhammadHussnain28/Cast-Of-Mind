@@ -1,28 +1,56 @@
 import { Heading, Text } from '../../ui'
+import { cx } from '../../../lib/cx'
 
-/**
- * The shared parts of a client portal screen.
- *
- * Consistency is the virtue here rather than variety: §24.8 puts the portals in
- * Operate territory, where the same vocabulary screen to screen is what lets
- * someone stop reading the furniture and get on with the task. The screens
- * differ in the SHAPE of their content — a sequence, a panel, a list — not in
- * how their heading and lead are set.
- */
-
-export function ScreenHeader({ title, lead }) {
+export function ScreenHeader({ title, lead, icon: Icon, category, badge, className }) {
   return (
-    <header>
-      {/* No eyebrow above this heading, ever. The rail and the tab bar already
-          name the section; a label here would be a second copy of it. */}
-      <Heading level={1} size="subsection">
-        {title}
-      </Heading>
-      {lead && (
-        <Text tone="muted" className="mt-3 max-w-measure">
-          {lead}
-        </Text>
+    <header
+      className={cx(
+        'rounded-2xl sm:rounded-3xl bg-paper border border-ink/8 p-6 sm:p-7 shadow-[0_10px_30px_-12px_rgba(25,18,43,0.08),0_2px_8px_-2px_rgba(25,18,43,0.03)]  border-l-4 border-l-ink',
+        className,
       )}
+    >
+
+      {(Icon || category || badge) && (
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {Icon && (
+              <div
+                aria-hidden="true"
+                className="flex size-9 items-center justify-center rounded-xl bg-sage/15 text-sage-deep ring-1 ring-sage/20 shrink-0"
+              >
+                <Icon size={18} className="stroke-[1.75]" />
+              </div>
+            )}
+            {category && (
+              <span className="font-body text-caption font-semibold uppercase tracking-wider text-sage-deep truncate">
+                {category}
+              </span>
+            )}
+          </div>
+
+          {badge && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full font-body text-caption font-semibold bg-mist text-ink border border-ink/8 shadow-2xs shrink-0">
+              {badge}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div>
+        <Heading
+          level={1}
+          size="section"
+          className="font-display text-2xl sm:text-3xl font-normal text-ink-deep tracking-tight"
+        >
+          {title}
+        </Heading>
+
+        {lead && (
+          <Text tone="muted" className="mt-2 max-w-2xl leading-relaxed text-sm sm:text-base">
+            {lead}
+          </Text>
+        )}
+      </div>
     </header>
   )
 }

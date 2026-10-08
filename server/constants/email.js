@@ -6,7 +6,7 @@
 // too. Values confirmed by the developer, 2026-08-24.
 
 export const BRAND = Object.freeze({
-  name: 'Cast of Mind',
+  name: 'Cast of Minds',
 
   ink: '#19122B',       // headings, body text, dark surfaces
   gold: '#F5C518',      // the accent — buttons only, NEVER text
@@ -30,14 +30,14 @@ export const BRAND = Object.freeze({
 export const SUPPORT_EMAIL = 'support@castofmind.com';
 
 export const EMAIL_SUBJECTS = Object.freeze({
-  passwordReset: 'Reset your Cast of Mind password',
-  therapistWelcome: 'Your Cast of Mind therapist account is ready',
-  clientWelcome: 'Welcome to Cast of Mind — your account is ready',
-  emailChanged: 'Your Cast of Mind sign-in email has changed',
-  paymentReceipt: 'Your Cast of Mind payment was received',
-  paymentFailed: 'Your Cast of Mind payment did not go through',
-  subscriptionCancelled: 'Your Cast of Mind subscription is cancelled',
-  subscriptionReactivated: 'Your Cast of Mind subscription will continue',
-  welcomeBack: 'Welcome back to Cast of Mind',
-  renewalReminder: 'Your Cast of Mind subscription renews soon',
+  passwordReset: 'Reset your Cast of Minds password',
+  therapistWelcome: 'Your Cast of Minds therapist account is ready',
+  clientWelcome: 'Welcome to Cast of Minds — your account is ready',
+  emailChanged: 'Your Cast of Minds sign-in email has changed',
+  paymentReceipt: 'Your Cast of Minds payment was received',
+  paymentFailed: 'Your Cast of Minds payment did not go through',
+  subscriptionCancelled: 'Your Cast of Minds subscription is cancelled',
+  subscriptionReactivated: 'Your Cast of Minds subscription will continue',
+  welcomeBack: 'Welcome back to Cast of Minds',
+  renewalReminder: 'Your Cast of Minds subscription renews soon',
 });

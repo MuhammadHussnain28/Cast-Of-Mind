@@ -27,7 +27,7 @@ export const RENEWAL_DISCLOSURE =
 
 // Shown as the product name on Stripe's hosted page and on the card statement
 // descriptor Stripe derives from it.
-export const CHECKOUT_PRODUCT_NAME = 'Cast of Mind — monthly therapy';
+export const CHECKOUT_PRODUCT_NAME = 'Cast of Minds — monthly therapy';
 
 export const CHECKOUT_PRODUCT_DESCRIPTION =
   'Four therapy sessions a month with your chosen therapist, plus unlimited chat in between.';

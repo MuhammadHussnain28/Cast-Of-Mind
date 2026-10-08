@@ -44,74 +44,115 @@ export default function WorkspaceTabs({ bookingId }) {
   }, [bookingId])
 
   return (
-    <div className="relative">
-      {/* The fades say "there is more this way" without a scrollbar doing it —
-          a browser default this design does not otherwise use.
+    <>
+      {/* ========================================================
+          PREVIOUS VERSION (SAVED FOR BACKUP)
+          ========================================================
+      <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-linear-to-r from-paper to-transparent sm:hidden" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-linear-to-l from-paper to-transparent sm:hidden" />
 
-          BOTH hide rules are needed. Tailwind's `scrollbar-none` emits only
-          `scrollbar-width: none`, which Safari did not support until 18.2, so
-          on an iPhone the bar would still sit across the tabs. Checked in the
-          generated CSS rather than assumed. */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-linear-to-r from-paper to-transparent sm:hidden" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-linear-to-l from-paper to-transparent sm:hidden" />
+        <nav aria-label="This client">
+          <ul
+            ref={listRef}
+            className="flex gap-1 overflow-x-auto px-4 scrollbar-none [&::-webkit-scrollbar]:hidden sm:px-6 lg:px-10"
+          >
+            {WORKSPACE_TABS.map((tab) => {
+              const Icon = WORKSPACE_TAB_ICONS[tab.slug]
+              const count = tab.slug === 'chat' ? unread : 0
 
-      <nav aria-label="This client">
-        <ul
-          ref={listRef}
-          className="flex gap-1 overflow-x-auto px-4 scrollbar-none [&::-webkit-scrollbar]:hidden sm:px-6 lg:px-10"
-        >
-          {WORKSPACE_TABS.map((tab) => {
-            const Icon = WORKSPACE_TAB_ICONS[tab.slug]
-            const count = tab.slug === 'chat' ? unread : 0
+              return (
+                <li key={tab.slug} className="shrink-0">
+                  <NavLink
+                    to={`/portal/clients/${bookingId}/${tab.slug}`}
+                    aria-label={unreadLabel(tab.label, count)}
+                    className={({ isActive }) =>
+                      cx(
+                        'relative flex min-h-11 items-center gap-2 whitespace-nowrap px-3 pb-3 pt-2.5',
+                        'font-body text-ui transition-colors duration-200 ease-out',
+                        isActive
+                          ? 'font-medium text-ink'
+                          : 'font-normal text-ink/70 hover:text-ink',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={18} className={isActive ? 'text-ink' : 'text-ink/70'} />
+                        <span>{tab.label}</span>
 
-            return (
-              <li key={tab.slug} className="shrink-0">
-                <NavLink
-                  to={`/portal/clients/${bookingId}/${tab.slug}`}
-                  // The count goes in the accessible NAME, never left to a
-                  // numeral read on its own (7.6's rule).
-                  aria-label={unreadLabel(tab.label, count)}
-                  className={({ isActive }) =>
-                    cx(
-                      'relative flex min-h-11 items-center gap-2 whitespace-nowrap px-3 pb-3 pt-2.5',
-                      'font-body text-ui transition-colors duration-200 ease-out',
-                      isActive
-                        ? 'font-medium text-ink'
-                        : 'font-normal text-ink/70 hover:text-ink',
-                    )
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon size={18} className={isActive ? 'text-ink' : 'text-ink/70'} />
-                      <span>{tab.label}</span>
+                        {count > 0 && (
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 shrink-0 rounded-full bg-ink"
+                          />
+                        )}
 
-                      {count > 0 && (
-                        // Not the gold pill from the rail — gold cannot carry a
-                        // numeral on paper. A small ink dot says "something is
-                        // here" without claiming to be readable as a count, and
-                        // the number is already in the accessible name.
                         <span
                           aria-hidden="true"
-                          className="size-1.5 shrink-0 rounded-full bg-ink"
+                          className={cx(
+                            'absolute inset-x-3 bottom-0 h-0.5 rounded-full transition-colors duration-200',
+                            isActive ? 'bg-ink' : 'bg-transparent',
+                          )}
                         />
-                      )}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      </div>
+      ======================================================== */}
 
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          'absolute inset-x-3 bottom-0 h-0.5 rounded-full transition-colors duration-200',
-                          isActive ? 'bg-ink' : 'bg-transparent',
+      {/* ========================================================
+          NEW VERSION (ACTIVE: EXPANDED FULL-WIDTH SEGMENTED CAPSULE TABS FOR DESKTOP)
+          ======================================================== */}
+      <div className="hidden lg:block border-b border-ink/10 bg-paper px-6 py-3 sm:px-8 lg:px-10">
+        <nav aria-label="This client">
+          <ul
+            ref={listRef}
+            className="grid w-full grid-cols-5 gap-1 rounded-2xl bg-mist p-1 border border-ink/8"
+          >
+            {WORKSPACE_TABS.map((tab) => {
+              const Icon = WORKSPACE_TAB_ICONS[tab.slug]
+              const count = tab.slug === 'chat' ? unread : 0
+
+              return (
+                <li key={tab.slug} className="flex items-stretch min-w-0">
+                  <NavLink
+                    to={`/portal/clients/${bookingId}/${tab.slug}`}
+                    aria-label={unreadLabel(tab.label, count)}
+                    className={({ isActive }) =>
+                      cx(
+                        'flex w-full items-center justify-center gap-2 whitespace-nowrap px-3 py-2 rounded-xl text-sm font-body transition-all duration-200 ease-out min-w-0',
+                        isActive
+                          ? 'bg-paper text-ink font-semibold shadow-xs'
+                          : 'text-ink/70 font-normal hover:text-ink',
+                      )
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={16} className={cx('shrink-0', isActive ? 'text-ink' : 'text-ink/70')} />
+                        <span className="truncate">{tab.label}</span>
+
+                        {count > 0 && (
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 shrink-0 rounded-full bg-ink"
+                          />
                         )}
-                      />
-                    </>
-                  )}
-                </NavLink>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-    </div>
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      </div>
+    </>
   )
 }
