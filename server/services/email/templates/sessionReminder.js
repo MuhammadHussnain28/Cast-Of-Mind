@@ -1,4 +1,5 @@
 import { baseTemplate, baseTextTemplate } from './base.js';
+import { escapeHtml } from './escapeHtml.js';
 import { BRAND } from '../../../constants/email.js';
 
 // The session reminder — master spec §16, chunk 9.6.
@@ -41,13 +42,14 @@ export function sessionReminderEmail({ recipient, kind, when, otherName, meeting
     ? 'The Join button appears on your sessions page shortly before you start.'
     : 'The same link is on the client’s page in your portal.';
 
+  const link = meetingLink ? escapeHtml(meetingLink) : '';
   const linkHtml = meetingLink
-    ? `<p style="${p}">Meeting link: <a href="${meetingLink}" style="color:${BRAND.ink};">${meetingLink}</a></p>`
+    ? `<p style="${p}">Meeting link: <a href="${link}" style="color:${BRAND.ink};">${link}</a></p>`
     : '';
 
   const bodyHtml = `
-    <p style="${p}">${opening}</p>
-    <p style="${strong}">${when}</p>
+    <p style="${p}">${escapeHtml(opening)}</p>
+    <p style="${strong}">${escapeHtml(when)}</p>
     ${linkHtml}
     <p style="${p}">${closing}</p>`;
 

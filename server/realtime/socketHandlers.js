@@ -139,10 +139,37 @@ function clearAllTyping(socket, { notify = true } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Expiry — close a socket the moment its token expires (12.3)
+// ---------------------------------------------------------------------------
+
+// setTimeout's ceiling; past it Node fires after 1ms instead.
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+/**
+ * `guarded` only checks expiry when the user SENDS. A socket that only listened
+ * stayed open, so a deactivated user's tab kept receiving messages. The client
+ * refreshes on `auth:expired` and reconnects; a deactivated account cannot.
+ */
+function armExpiry(socket) {
+  const remaining = (socket.data.user?.exp ?? 0) * 1000 - Date.now();
+  const timer = setTimeout(() => {
+    if (!tokenHasExpired(socket)) {
+      armExpiry(socket);
+      return;
+    }
+    socket.emit(SOCKET_EVENTS.AUTH_EXPIRED, { code: SOCKET_ERRORS.TOKEN_EXPIRED });
+    socket.disconnect(true);
+  }, Math.min(Math.max(remaining, 0), MAX_TIMER_MS));
+  timer.unref?.();
+  socket.data.expiryTimer = timer;
+}
+
+// ---------------------------------------------------------------------------
 
 export function registerHandlers(socket) {
   socket.data.typingTimers = new Map();
   socket.data.sendTimes = [];
+  armExpiry(socket);
 
   const user = socket.data.user;
 
@@ -218,6 +245,7 @@ export function registerHandlers(socket) {
   );
 
   socket.on('disconnect', () => {
+    clearTimeout(socket.data.expiryTimer);
     // The other side must not be left watching "typing…" for ever because a
     // connection dropped mid-sentence.
     clearAllTyping(socket);

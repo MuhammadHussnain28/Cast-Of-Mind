@@ -14,6 +14,8 @@
 // Never the request body, and never the query string either: an admin searching
 // a client list would otherwise write that person's name into the log. Only the
 // path is recorded. Same privacy rule as requestLogger.js.
+import { logger } from '../utils/logger.js';
+
 function safePath(req) {
   return `${req.baseUrl}${req.path}`;
 }
@@ -26,8 +28,17 @@ export function adminActionLog(req, res, next) {
     // query string is left out.
     const detail = res.locals.adminActionDetail ? ` ${res.locals.adminActionDetail}` : '';
 
-    console.log(
+    logger.info(
       `[admin] ${new Date().toISOString()} user=${who} ${req.method} ${safePath(req)} ${res.statusCode} ip=${req.ip}${detail}`,
+      {
+        tag: 'admin',
+        user: who,
+        method: req.method,
+        path: safePath(req),
+        status: res.statusCode,
+        ip: req.ip,
+        ...(res.locals.adminActionDetail ? { detail: res.locals.adminActionDetail } : {}),
+      },
     );
   });
 

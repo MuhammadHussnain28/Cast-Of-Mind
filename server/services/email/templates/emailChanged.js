@@ -1,4 +1,5 @@
 import { baseTemplate, baseTextTemplate } from './base.js';
+import { escapeHtml } from './escapeHtml.js';
 import { BRAND, EMAIL_SUBJECTS, SUPPORT_EMAIL } from '../../../constants/email.js';
 
 // Sent to BOTH addresses when an admin changes a therapist's sign-in email.
@@ -33,10 +34,10 @@ export function emailChangedOldAddress({ firstName, newEmail, loginUrl }) {
   const greeting = firstName ? `Hello ${firstName},` : 'Hello,';
 
   const bodyHtml = `
-    <p style="${p}">${greeting}</p>
+    <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
       The email address you use to sign in to Cast of Mind has been changed by our
-      team to <strong>${newEmail}</strong>. This address will no longer work for
+      team to <strong>${escapeHtml(newEmail)}</strong>. This address will no longer work for
       signing in or for resetting your password.
     </p>
     <p style="${p}">
@@ -61,9 +62,9 @@ export function emailChangedNewAddress({ firstName, newEmail, loginUrl }) {
   const greeting = firstName ? `Hello ${firstName},` : 'Hello,';
 
   const bodyHtml = `
-    <p style="${p}">${greeting}</p>
+    <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
-      This address, <strong>${newEmail}</strong>, is now the one you use to sign
+      This address, <strong>${escapeHtml(newEmail)}</strong>, is now the one you use to sign
       in to Cast of Mind. Your previous address will no longer work.
     </p>
     <p style="${p}">

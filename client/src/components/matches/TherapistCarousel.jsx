@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from '../join/JoinIcons'
 import { matches } from '../../data/matchesContent'
+import { optimisedPhoto } from '../../lib/cloudinaryImage'
 
 export default function TherapistCarousel({ therapists = [] }) {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -145,8 +146,10 @@ export default function TherapistCarousel({ therapists = [] }) {
                 {/* LEFT: Crisp Full-Height HD Portrait */}
                 <div className="relative h-44 sm:h-[370px] sm:w-[280px] shrink-0 overflow-hidden bg-mist border-b sm:border-b-0 sm:border-r border-ink/10">
                   <img
-                    src={therapist.photoUrl}
+                    src={optimisedPhoto(therapist.photoUrl)}
                     alt={`${therapist.firstName} ${therapist.lastName}`}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover object-top"
                     draggable="false"
                   />

@@ -1,4 +1,5 @@
 import { baseTemplate, baseTextTemplate } from './base.js';
+import { escapeHtml } from './escapeHtml.js';
 import { BRAND, EMAIL_SUBJECTS } from '../../../constants/email.js';
 
 // Sent the moment a client's payment is confirmed — master spec §16.
@@ -16,6 +17,11 @@ const TITLE = 'Your account is ready';
 export function clientWelcomeEmail({ name, email, temporaryPassword, loginUrl, therapistName }) {
   const p = `margin:0 0 16px;font-size:16px;line-height:1.6;color:${BRAND.ink};`;
   const greeting = name ? `Hello ${name},` : 'Hello,';
+  const safe = {
+    email: escapeHtml(email),
+    password: escapeHtml(temporaryPassword),
+    therapist: therapistName ? escapeHtml(therapistName) : '',
+  };
 
   // A bordered plate rather than a coloured one: this has to stay readable in
   // Outlook, which renders email through Word and ignores most styling.
@@ -25,20 +31,20 @@ export function clientWelcomeEmail({ name, email, temporaryPassword, loginUrl, t
       <tr>
         <td style="padding:16px 20px;font-size:15px;line-height:1.7;color:${BRAND.ink};">
           <strong style="display:block;margin:0 0 8px;">Your sign-in details</strong>
-          Email: ${email}<br>
-          Temporary password: <strong>${temporaryPassword}</strong>
+          Email: ${safe.email}<br>
+          Temporary password: <strong>${safe.password}</strong>
         </td>
       </tr>
     </table>`;
 
   const matched = therapistName
-    ? `<p style="${p}">You are matched with ${therapistName}. Once you sign in, send them a first
+    ? `<p style="${p}">You are matched with ${safe.therapist}. Once you sign in, send them a first
        message about what brought you here — it gives them the context to start properly.</p>`
     : `<p style="${p}">Once you sign in, send your therapist a first message about what brought you
        here — it gives them the context to start properly.</p>`;
 
   const bodyHtml = `
-    <p style="${p}">${greeting}</p>
+    <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
       Your payment went through and your Cast of Mind account is open. Your
       subscription includes four sessions a month and unlimited messaging with

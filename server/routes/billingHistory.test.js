@@ -185,12 +185,14 @@ describe('billing history — one row per invoice', () => {
   it('two failed tries then a payment read as ONE paid month, marked as retried', async () => {
     await ledger({ type: STRIPE_EVENT.INVOICE_FAILED, invoice: 'in_r', sub: 'sub_a_now', at: ago(6) });
     await ledger({ type: STRIPE_EVENT.INVOICE_FAILED, invoice: 'in_r', sub: 'sub_a_now', at: ago(5) });
-    await ledger({ invoice: 'in_r', sub: 'sub_a_now', at: ago(4) });
+    // Taken once: calling ago(4) again below could land in the next second.
+    const paidAt = ago(4);
+    await ledger({ invoice: 'in_r', sub: 'sub_a_now', at: paidAt });
     const { body } = await history();
 
     expect(body.data).toHaveLength(1);
     expect(body.data[0]).toMatchObject({ status: 'paid', retried: true, amount: 20000 });
-    expect(new Date(body.data[0].date).getTime()).toBe(Math.floor(ago(4).getTime() / 1000) * 1000);
+    expect(new Date(body.data[0].date).getTime()).toBe(Math.floor(paidAt.getTime() / 1000) * 1000);
   });
 
   it('a payment still outstanding reads as one row that did not go through', async () => {

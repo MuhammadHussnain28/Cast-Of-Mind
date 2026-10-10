@@ -130,19 +130,22 @@ function Empty() {
 
 function ListSkeleton() {
   return (
-    <div aria-hidden="true" className="overflow-hidden rounded-2xl bg-paper">
-      {[0, 1, 2].map((row) => (
-        <div key={row} className="flex items-center gap-4 border-b border-ink/12 px-5 py-4 last:border-b-0">
-          <div className="size-11 rounded-xl bg-ink/10 motion-safe:animate-pulse" />
-          <div className="flex-1 space-y-2">
-            <div className="h-3.5 w-48 rounded bg-ink/10 motion-safe:animate-pulse" />
-            <div className="h-2.5 w-32 rounded bg-ink/10 motion-safe:animate-pulse" />
+    <>
+      <div aria-hidden="true" className="overflow-hidden rounded-2xl bg-paper">
+        {[0, 1, 2].map((row) => (
+          <div key={row} className="flex items-center gap-4 border-b border-ink/12 px-5 py-4 last:border-b-0">
+            <div className="size-11 rounded-xl bg-ink/10 motion-safe:animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3.5 w-48 rounded bg-ink/10 motion-safe:animate-pulse" />
+              <div className="h-2.5 w-32 rounded bg-ink/10 motion-safe:animate-pulse" />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      {/* Outside the aria-hidden block, or screen readers never hear it. */}
       <p className="sr-only" role="status">
         Loading worksheets
       </p>
-    </div>
+    </>
   )
 }

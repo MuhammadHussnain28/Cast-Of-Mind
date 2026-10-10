@@ -3053,7 +3053,8 @@ Do NOT:
 Verify: trigger a test error and confirm it reaches Sentry with no
 sensitive content. Check bundle size and page load performance.
 
-MANUAL STEP EXPECTED: Sentry DSN in .env. Tell me what to set.
+MANUAL STEP EXPECTED: Sent
+ry DSN in .env. Tell me what to set.
 
 Plan first and show me. Do not write code until I approve.
 When done, update @docs/ongoing.md.

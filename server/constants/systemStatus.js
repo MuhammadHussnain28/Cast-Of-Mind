@@ -33,3 +33,20 @@ export const SERVICE_DETAIL = Object.freeze({
 export const PROBE_TIMEOUT_MS = 4000;
 
 export const RESEND_TEST_DOMAIN = 'resend.dev';
+
+// Public GET /api/v1/health (12.4). States only — the admin card keeps details.
+export const HEALTH_STATUS = Object.freeze({
+  HEALTHY: 'healthy',
+  DEGRADED: 'degraded',
+  DOWN: 'down',
+});
+
+// One probe run is shared for this long: the endpoint is public, and each run
+// calls Resend's and Cloudinary's admin APIs, which have quotas.
+export const HEALTH_CACHE_MS = 60 * 1000;
+
+export const HEALTH_RATE_LIMIT = Object.freeze({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Too many health checks. Please try again in a minute.',
+});

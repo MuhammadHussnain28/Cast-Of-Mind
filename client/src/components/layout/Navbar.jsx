@@ -60,6 +60,7 @@ export default function Navbar() {
             className="w-[74px] h-auto scale-x-[1.1] origin-left border-black"
           />
         </Link>
+        
 
         <nav aria-label="Main" className="ml-2 hidden flex-1 lg:block">
           <ul className="flex items-center gap-8">

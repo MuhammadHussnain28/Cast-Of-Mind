@@ -2608,6 +2608,158 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 
 ---
 
+# SLICE 12 — Polish, Hardening & Launch
+
+## Chunk 12.1 — Root error boundary and worksheet loading fix (reduced scope)
+
+**Status:** Complete **for the reduced scope the developer set (2026-10-08)**: two changes only, chosen to avoid regressions this close to launch. Everything else in the brief was **deliberately not built, on instruction** (listed under Carried forward). Not seen rendered; see Manual steps. Frontend only — server, database and vendors untouched.
+
+**Built**
+- client new: `components/states/RootErrorBoundary.jsx` — class boundary plus its fallback screen (sage glow, drawn reload mark, Fraunces heading, two actions). The logo was later removed by the developer, by preference.
+- client edits: `main.jsx` (boundary wraps `<Provider><App/></Provider>`; `onCaughtError` on `createRoot`) · `WorksheetsTab.jsx` (`ListSkeleton` only).
+- Packages / env vars: none.
+
+**Key decisions**
+- **One boundary, at the root, outside Redux and the router** — so its fallback still renders if either is what crashed. No layout, route or portal file was touched.
+- **Recovery is a reload, plus a plain `<a href="/">`** — not `<Link>`, because the router may be broken. A reload restores the signed-in session from the refresh cookie.
+- **Neutral copy, no assurances** (developer's call): *"The page stopped working unexpectedly. Reloading usually fixes it…"* Nothing claims data is safe — an unsent draft in memory is lost on reload.
+- **Production logs the error NAME only.** React 19 logs a caught error's full message by default, in production too (`defaultOnCaughtError` → `console.error(error)`). A message can carry on-screen text, so `onCaughtError` on `createRoot` overrides it: full error and component stack in development, `[render] <name>` in production.
+- **Scope of protection, stated plainly:** catches render errors only. Failed requests and event-handler errors are not caught — those are handled screen by screen as before.
+- **Worksheets:** the `role="status"` line moved out of the `aria-hidden` block (the 9.2 carry-over), matching `SessionsTab`'s skeleton. `sr-only` is absolutely positioned, so the parent's `gap-6` is unaffected — no visual change.
+
+**Verification**
+- Client build passes (the >500 kB chunk warning is pre-existing). `oxlint`: **0 warnings, 0 errors** on all 3 files.
+- **Server suite not run, on instruction** — no server file changed; it stands at 1779.
+- **16 logic and markup checks on the real component** (bundled with rolldown, rendered with React's server renderer; the client has no test runner and none was added): static `getDerivedStateFromError` returns `{ failed: true }`; healthy render returns children unchanged; failed render shows no children, exactly one `<main>` and one `<h1>`, a real `<button type="button">`, a plain `<a href="/">`, logo alt text (logo since removed), both glows and the icon `aria-hidden`, and no "safe"/"lost" assurance in the copy.
+- **Not executable here:** an actual in-browser crash being caught. No DOM library is installed and React's server renderer does not run boundaries. That is the developer's step 2 below.
+- Generated CSS confirmed to carry every new utility (`size-96`, `size-80`, `blur(130px)`, `bg-sage/15`, `w-[74px]`, `min-h-dvh`).
+- Contrast: **6 pairs computed, 0 failures**, worst case over the sage glow — heading 16.24:1, body 6.40:1, gold button edge 3.35:1, reload mark 4.70:1 (graphic, 3:1 floor). Detector `[]` — degraded, as always.
+
+**Manual steps for the developer**
+1. Hard-refresh the client. No restart of the API, no packages, no env vars.
+2. **Boundary check (dev only, then undo):** add `throw new Error('test')` as the first line of any page component (e.g. `pages/Contact.jsx`), open it. Expect the "Something went wrong on this page" screen, not white. **Reload the page** reloads; **Go to the homepage** goes to `/`. The browser console shows the full error. **Remove the line.**
+3. Check that screen at 360px and with the keyboard: two visible focus rings, both targets at least 44px.
+4. **Worksheets, with NVDA or Narrator:** as a therapist, open a client → Worksheets on a throttled connection (DevTools → Network → Slow 3G). The reader should say "Loading worksheets". The skeleton should look exactly as before.
+
+**Carried forward**
+- **Deliberately not built in 12.1 (developer's decision):** session-expiry explanation on `/login` · server-down handling in `AuthBootstrap` (a reload while the API is down sends a signed-in user to `/login`) · offline banner · 404/500 redesigns, including the **nested `<main>`** in `NotFound.jsx` on public and `/portal/*` 404s · visual upgrade of the plain error/empty boxes · retry on the public therapist profile and the three admin detail pages · chat's reload-based "Try again".
+- **Found during the audit, not fixed:** `login()` does not set `skipAuthRefresh`, so a wrong password also triggers a refresh attempt and a `sessionEnded` dispatch. Harmless today (the right message still shows), but it contradicts the interceptor's own comment. A one-line fix whenever wanted.
+- Journal copy *"the hour you spend together"* (9.4) is still open.
+- **Pre-launch blockers — unchanged at 15.** No placeholder content.
+
+**Not done (by design):** region boundaries inside the layouts · any new test runner or package · any server change.
+
+---
+
+## Chunk 12.2 — Accessibility and responsive audit (SKIPPED)
+
+**Status:** Chunk 12.2 skipped by developer decision — existing manual checks considered sufficient. No additional audit performed. (2026-10-08)
+
+No code, tests or packages changed. The per-chunk accessibility work recorded in earlier entries (computed contrast, keyboard focus, 360px, reduced motion) stands as it was.
+
+---
+
+## Chunk 12.3 — Security hardening (approved scope)
+
+**Status:** Complete **for the five fixes the developer approved (2026-10-08)**: C1, C3, C4, P1, P5. A full independent audit was done first; everything else it found was **deferred by developer decision**, listed under Carried forward. Not seen in a browser or on staging; see Manual steps. **Atlas, Stripe, Resend and Cloudinary untouched** — every test ran in memory.
+
+**Built**
+- **C1** `realtime/socketHandlers.js` — `armExpiry` closes a socket at its token's `exp` (emits `auth:expired`, then disconnects); timer cleared on disconnect. Tests in `realtime/socket.test.js` (+3).
+- **C3** `client/src/lib/api/ApiError.js` — production logs one line (`[api] status METHOD path`, query stripped); `cause` kept in development only.
+- **C4** new `services/email/templates/escapeHtml.js`, applied to `sessionReminder.js`, `clientWelcome.js`, `therapistWelcome.js`, `emailChanged.js` (HTML only; plain-text parts and subjects unchanged). New `test/emailEscaping.test.js` (9).
+- **P1** `client/vercel.json` — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
+- **P5** `client/src/lib/useApplicationDraft.js` — `NEVER_STORED = ['password', 'taxpayerIdNumber']`, stripped on write and on read.
+- Packages / env vars: none.
+
+**Key decisions**
+- **C1 was a real hole, not a theory.** Expiry was only checked when a socket SENT an event, so a deactivated therapist's open tab kept receiving client messages until it happened to make a REST call. The socket now closes at expiry; a real user refreshes and reconnects (every reconnect already refetches chat, unread counts, notifications and the client list). **Cost:** one refresh and a brief reconnect per open tab every ~15 minutes. **Still true:** the up-to-15-minute window after deactivation (the accepted REST design) applies to sockets too.
+- **C3: the leak was bigger than the console line.** The axios error carries `config.headers.Authorization` and `config.data` (a password on a failed login, a journal entry on a failed save). `ApiError.cause` held the same object, so an uncaught error would have printed it too — dropped in production; nothing read it.
+- **C4: one shared helper for the four templates only.** The six templates that already escape keep their local copies (no refactor). A raw quote in a meeting link can no longer break out of `href` either.
+- **P1: no `Content-Security-Policy: frame-ancestors`.** The admin's PDF preview is an iframe on a `blob:` URL, which inherits the page's CSP; browser behaviour there could not be confirmed, and the brief said avoid anything that might break the app. `X-Frame-Options: DENY` alone stops clickjacking in every current browser and cannot touch a blob. HSTS left to Vercel, which sets it by default.
+- **P2 (cross-site sign-out) SKIPPED by developer decision** — low risk (a forced sign-out, no data exposed).
+
+**Verification**
+- Tests: **1791 passing across 63 suites** (1779 before, 12 new). Server `eslint` clean on every changed file; client `oxlint` 0 warnings; client build passes.
+- **Mutation-checked three times:** removing `armExpiry` broke **2**; making `escapeHtml` return its input broke **7**; restoring `console.error(error)` in production failed **8** of 27 console checks.
+- **Client, run against the real modules** (no test runner exists): C3 — 27 checks (network, timeout, 500, 502, 401) prove no token, password, journal text or query email reaches the console or an uncaught `ApiError`, and development still logs in full. P5 — 7 checks: an older draft holding a taxpayer ID and password loads without either and keeps every other field.
+- **Security checklist — verified independently, not taken from earlier entries:**
+  - **Role checks:** guards on the admin, therapist, client, chat, sessions and notifications routers; fail closed; admin refused on chat and sockets. ✅
+  - **Other users' data:** booking membership proved in services, identical 404s, client booking from the token never the URL. ✅
+  - **Validation / NoSQL injection:** every body through Zod or a type check, every query through `validateQuery`, params are strings checked as ObjectIds, search regexes escaped. ✅
+  - **XSS:** no raw HTML in the client, link allowlist in chat, meeting links https on approved hosts, photo URLs our own Cloudinary; emails fixed by C4. ✅
+  - **Rate limits:** on every sensitive endpoint. ✅ · **CORS:** locked to `CLIENT_ORIGIN` on REST and sockets. ✅ · **Headers:** helmet on the API; P1 on the frontend. ✅
+  - **Secrets:** env only; no `.env` ever committed; git history and the built bundle scanned clean; no source maps. ✅
+  - **Errors:** production returns fixed messages, no stacks. ✅ · **Uploads:** magic bytes, per-kind size caps, private streaming, macro DOCX refused. ✅
+  - **Tokens:** access token in memory only; refresh token hashed, rotated, `httpOnly` + `Secure`, path-scoped. ✅
+  - **privateNotes:** one import chain only (`PrivateNote` → service → controller → `therapist.routes` behind `requireTherapist`); no raw collection access or `$lookup` on it anywhere; the existing sweep of 10 client responses passes with a real note seeded. ✅ *(Its import walk still starts from four routers only — widening it was not in the approved scope.)*
+  - **DevTools:** responses carry no hashes, refresh token, Stripe ids or other users' data; storage holds only the admin idle timestamp, the application draft (P5) and the questionnaire draft (sessionStorage, cleared on `/welcome`); console fixed by C3; bundle clean. ✅
+
+**Manual steps for the developer**
+1. Restart the API; redeploy the client so Vercel picks up `vercel.json` (`npm run dev` ignores it).
+2. **Headers:** `curl -I <vercel-url>` shows the four headers. Load the site in an `<iframe>` from a local HTML file — it must refuse. **Then open an application as the admin and confirm the PDF preview still shows.**
+3. **C1 live:** open a therapist portal, deactivate them from admin, wait ~15 minutes, send a message as their client — it must not arrive. A normal therapist left open 20+ minutes must still receive messages.
+4. **C3 live:** stop the API, try to sign in, open the console — no password, no token.
+5. **P5:** fill the application to step 3 with a taxpayer ID, reload, resume — the field is empty, everything else is back.
+6. Render logs: `[admin] … ip=` should show your real IP, not a proxy's (rate limiting depends on it).
+
+**Carried forward — deferred by developer decision (2026-10-08)**
+- **C2:** `requestLogger` logs `req.originalUrl` with the query string — admin search terms (client names/emails) and Stripe checkout session ids reach the server logs.
+- **P2:** origin check on `/auth/refresh` and `/auth/logout` (skipped). **P3:** dependency advisories — server `qs`, `multer`, `express`/`body-parser`, `ip-address`, `proxy-addr` (not exploitable here: hop-count trust); client `axios`, `source-map-js` (build only); all non-major. **P4:** `auth.service.js:341` logs a user's email on reset-email failure; five places log raw vendor error messages.
+- Widen the privateNotes import walk to every router plus the socket layer. Refresh-token reuse detection (still not built: two tabs would sign an honest user out). Server-side admin idle enforcement. Emailed temporary password vs a set-password link (kept, 6.4). `paymentevents` DB-user rights (12.5). Admin 2FA (blocker 12).
+- **Pre-launch blockers — unchanged at 15.** No placeholder content.
+
+**Not done (by instruction):** C2 · P2 · P3 · P4 · any refactor or dependency upgrade.
+
+---
+
+## Chunk 12.4 — Monitoring, logging and performance (approved scope)
+
+**Status:** Complete for the scope agreed with the developer and their mentor (2026-10-10). **Not done by decision:** route code splitting, an image pipeline, re-exporting the logos, the admin therapist-list N+1, and uptime-monitor setup (an external account — see Manual steps). Not seen in a browser or on staging. **Atlas, Stripe, Resend and Cloudinary untouched by the code** — but see Verification for two read-only vendor calls a test made before it was fixed.
+
+**Built**
+- server new: `config/sentry.js` · `utils/sentryScrub.js` · `utils/logger.js` · `scripts/sentryTest.js` (`npm run sentry:test`) · tests `test/sentryScrub.test.js` (12), `test/observability.test.js` (6), `test/logger.test.js` (3), `routes/health.test.js` (8).
+- server edits: `server.js`, `middleware/{errorHandler,requestLogger,adminActionLog}.js`, `controllers/health.controller.js`, `routes/health.routes.js`, `services/systemStatus.service.js` (`getHealthStatus`, cached), `constants/systemStatus.js`, `config/env.js`, `models/Session.js` (+ index, +1 test), `app.test.js`, `.env.example`, `package.json` (`sentry:test`, `engines: node >=22.12`).
+- client new: `lib/sentry.js` · `lib/sentryScrub.js` · `lib/cloudinaryImage.js`. Edits: `main.jsx`, `vite.config.js`, `.env.example`, `Footer.jsx`, `TherapistCarousel.jsx`, `TherapistCard.jsx`, `pages/TherapistDetail.jsx`.
+- Packages: `@sentry/node@11.6.0` (server) · `@sentry/react@11.6.0` · `@sentry/vite-plugin@5.4.1` (client, dev). Env: see Manual steps.
+
+**Key decisions**
+- **Sentry 11 collects bodies, headers, cookies, query strings, user info and stack-frame variables BY DEFAULT** (`dataCollection`, which replaced `sendDefaultPii`). Every category is switched off explicitly, on both sides. `scrubEvent` then removes it all again regardless: request body/cookies/query/headers (allowlist only), quoted text in messages (where Mongoose echoes user input), JWTs and emails anywhere, frame `vars`, sensitive keys in `extra`/`contexts`/`tags`. **User: the pseudonymous MongoDB `_id` only** (developer's decision) — anything that is not a 24-hex id is dropped.
+- **Off unless production AND a DSN** — dev and the test suite send nothing. No tracing, no profiling, **no Session Replay ever** (it records the screen). Server breadcrumbs: none (they would carry our own log lines). Client: navigation and API-call breadcrumbs only, URLs without query strings.
+- **Reported: genuine faults only** — unknown errors and any 5xx. Never a wrong password, 404 or validation error.
+- **Unhandled promise rejections set to `strict`.** Sentry's default (`warn`) would have stopped the server crashing on one — a silent behaviour change. `strict` reports, then exits as Node does today; Render restarts it.
+- **Source maps:** client maps are built `hidden`, uploaded, then deleted — **only when `SENTRY_AUTH_TOKEN` is present at build**. Local builds have none. The server needs none: Node runs the source as written.
+- **Health:** `{ status: healthy|degraded|down, checkedAt, services: { database, email, storage } }` — states only. **503 only when the database is down**; email `attention` (blocker 7) reads `degraded` with a 200, so it never pages anyone. **Cached 60s and limited to 30/min**, because each probe calls Resend's and Cloudinary's quota'd admin APIs from a public endpoint.
+- **Logging:** production writes one JSON line per entry (`time, level, msg, …fields`); dev and tests keep the old text. Applied to the four core places only (~40 other `console` calls unchanged, by decision). **C2 folded in:** `requestLogger` logs the path only — no admin search terms, no Stripe session ids. Production error logs carry the stack **without its first line**, which repeats the message.
+- **Images:** `optimisedPhoto()` adds `f_auto,q_auto,c_limit,w_800` to Cloudinary therapist photos (`c_limit` never upscales); seeded `placehold.co` photos, private `authenticated` files and lookalike hosts are untouched. Applied on the matching path (carousel, card, public profile). `loading="lazy"` added to the footer logo and the carousel photos; most other below-the-fold images already had it. Above-the-fold images deliberately stay eager.
+- **Index:** `Session { status, scheduledAt }` — the 5-minute reminder sweep was scanning every session (flagged in 9.6, never added). Mongoose builds it on Atlas at the next server start; that adds an index and changes no data.
+
+**Verification**
+- Tests: **1821 passing across 67 suites** (1791 before, 30 new). Server `eslint` clean on every changed file; client `oxlint` 0 warnings; client build passes; **no `.map` files in `dist`**.
+- **Mutation-checked seven times, every one caught:** request not scrubbed (2) · frame vars kept (2) · full user kept (3) · every error reported (1) · query string logged (1) · health cache disabled (2) · client page URL keeps its query (2 of 23 client checks).
+- `explain()` on the reminder query: **IXSCAN on `status_1_scheduledAt_1`, no COLLSCAN**. Client, run against the real modules: 23 checks (scrubber + photo helper).
+- **Two existing tests changed, both test-only:** `roleGuards` used `/health` as its "server is up" check — now 503 without a database — switched to `/auth/me` (401). `billingHistory` called `ago(4)` twice and failed whenever a second boundary fell between them (11.5, a timing flaw, unrelated to 12.4); now taken once.
+- **Disclosed: before the vendors were faked, test runs made read-only calls to the real Resend (domain list) and Cloudinary (ping)** from `server/.env` — the first `health.test.js` run and the `roleGuards` child process. Nothing was written. Both are now faked or avoided; no test can reach them.
+- Bundle: **354 KB gzip** (343 before; Sentry adds 11 KB even when off).
+
+**Manual steps for the developer**
+1. **Sentry:** create the organisation with **EU data storage** (it can only be chosen at creation), then a **Node/Express** and a **React** project. In each: *Settings → Security & Privacy* — Data Scrubber, Default Scrubbers and IP scrubbing ON.
+2. **Render:** `SENTRY_DSN`, `SENTRY_ENVIRONMENT=staging` (then `production`), `NODE_VERSION=22.12` or later. Optional `LOG_LEVEL`. Restart: the log shows `Sentry error reporting enabled.`
+3. **Vercel:** `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`; build-only `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — **never prefix the token with `VITE_`**.
+4. **Prove the server pipeline:** in Render's shell, `npm run sentry:test`. Open the event: no `FAKE_` value, no email, user `{ id }` only.
+5. **Prove the client and source maps:** on a preview deploy, temporarily `throw new Error('test')` in one page (as in 12.1). The event must show real file names and lines. Remove the line.
+6. `curl <render-url>/api/v1/health` → `healthy` or `degraded`, 200. Then point **UptimeRobot** at it every 5 minutes, alerting on non-200.
+7. Open `/matches` with a real (Cloudinary) therapist: DevTools → Network shows `f_auto,q_auto,c_limit,w_800` in the photo URL and a small download.
+
+**Carried forward**
+- **Deferred by decision:** the admin therapist-list N+1 (2 queries per row; admin-only, harmless at today's scale) · route splitting (`/admin` alone is the safe first split) · logo re-exports (1764×1446 PNGs shown ~74px wide) · the ~40 remaining `console` calls · P4's email-in-log line.
+- Small therapist photos in the portals, admin and checkout still load originals — `optimisedPhoto()` can be applied there in one line each.
+- The 6 production dependency advisories from 12.3 (P3) are unchanged; Sentry added none.
+- **Pre-launch blockers — unchanged at 15.** No placeholder content.
+
+**Not done (by instruction):** code splitting · image pipeline or plugins · logo re-export · admin N+1 · uptime-monitor configuration in code.
+
+---
+
 ## Pre-Launch Blockers
 
 **The list stands at 15.** The count is unchanged since chunk 5.5; **item 12 was rewritten in

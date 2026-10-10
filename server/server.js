@@ -1,10 +1,16 @@
 import http from 'node:http';
 import env from './config/env.js';
+import { initSentry, flushSentry } from './config/sentry.js';
+import { logger } from './utils/logger.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import app from './app.js';
 import { createSocketServer } from './realtime/socketServer.js';
 import { startSessionReminders, stopSessionReminders } from './services/sessionReminders.service.js';
 import { startLifecycleSweep, stopLifecycleSweep } from './services/subscriptionLifecycle.service.js';
+
+// Before anything runs, so a startup crash is reported too. Off outside
+// production or without SENTRY_DSN.
+if (initSentry()) logger.info('Sentry error reporting enabled.', { tag: 'startup' });
 
 async function start() {
   await connectDB();
@@ -16,26 +22,26 @@ async function start() {
   const io = createSocketServer(server);
 
   server.listen(env.port, () => {
-    console.log(`Server listening on port ${env.port} [${env.nodeEnv}]`);
-    console.log('Socket.io attached.');
+    logger.info(`Server listening on port ${env.port} [${env.nodeEnv}]`, { tag: 'startup', port: env.port });
+    logger.info('Socket.io attached.', { tag: 'startup' });
   });
 
   // Session reminders (9.6): a sweep every few minutes inside this process.
   // Two instances are safe — each reminder is claimed atomically before sending.
   if (env.sessionReminders) {
     startSessionReminders();
-    console.log('Session reminders scheduled.');
+    logger.info('Session reminders scheduled.', { tag: 'startup' });
   }
 
   // The lifecycle sweep (11.2): expires past-due subscriptions whose grace has
   // ended. Two instances are safe — every expiry is a conditional update.
   if (env.lifecycleSweep) {
     startLifecycleSweep();
-    console.log('Subscription lifecycle sweep scheduled.');
+    logger.info('Subscription lifecycle sweep scheduled.', { tag: 'startup' });
   }
 
   const shutdown = (signal) => {
-    console.log(`${signal} received. Shutting down gracefully...`);
+    logger.info(`${signal} received. Shutting down gracefully...`, { tag: 'shutdown' });
 
     // Sockets first: open connections would otherwise hold the HTTP server open
     // and server.close() would never call back.
@@ -45,6 +51,7 @@ async function start() {
     io.close(() => {
       server.close(async () => {
         await disconnectDB();
+        await flushSentry();
         process.exit(0);
       });
     });

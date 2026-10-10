@@ -4,6 +4,8 @@ import env from '../config/env.js';
 import { stripe, isStripeConfigured, isTestKey } from '../config/stripe.js';
 import { cloudinary, isCloudinaryConfigured } from '../config/cloudinary.js';
 import {
+  HEALTH_CACHE_MS,
+  HEALTH_STATUS,
   PROBE_TIMEOUT_MS,
   RESEND_TEST_DOMAIN,
   SERVICE_DETAIL,
@@ -113,4 +115,39 @@ export async function getSystemStatus() {
   ]);
 
   return { checkedAt: new Date().toISOString(), services };
+}
+
+// ---------------------------------------------------------------------------
+// Public health check (12.4) — database, email and storage, states only.
+// ---------------------------------------------------------------------------
+
+let healthCache = null; // { at, promise }
+
+function overall({ database, email, storage }) {
+  if (database !== SERVICE_STATE.OPERATIONAL) return HEALTH_STATUS.DOWN;
+  const fine = [SERVICE_STATE.OPERATIONAL, SERVICE_STATE.NOT_CONFIGURED];
+  return fine.includes(email) && fine.includes(storage) ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED;
+}
+
+async function runHealthProbes() {
+  const [database, email, storage] = await Promise.all([
+    probe(SERVICE_KEY.DATABASE, checkDatabase),
+    probe(SERVICE_KEY.EMAIL, checkEmail),
+    probe(SERVICE_KEY.STORAGE, checkStorage),
+  ]);
+  const services = { database: database.state, email: email.state, storage: storage.state };
+  return { status: overall(services), checkedAt: new Date().toISOString(), services };
+}
+
+/** Cached for HEALTH_CACHE_MS; callers arriving together share one probe run. */
+export function getHealthStatus(now = Date.now()) {
+  if (!healthCache || now - healthCache.at >= HEALTH_CACHE_MS) {
+    healthCache = { at: now, promise: runHealthProbes() };
+  }
+  return healthCache.promise;
+}
+
+/** Tests only. */
+export function resetHealthCache() {
+  healthCache = null;
 }

@@ -180,6 +180,16 @@ function loadEnv() {
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || null,
     cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || null,
     cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || null,
+
+    // Sentry (12.4). Optional: unset means nothing is ever reported. It also
+    // stays off outside production — see config/sentry.js.
+    sentryDsn: process.env.SENTRY_DSN || null,
+    sentryEnvironment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV,
+    // Render sets this to the deployed commit.
+    sentryRelease: process.env.RENDER_GIT_COMMIT || null,
+
+    // debug | info | warn | error. Defaults to info.
+    logLevel: process.env.LOG_LEVEL || 'info',
   };
 }
 

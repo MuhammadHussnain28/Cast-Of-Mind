@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import TherapistIdentity from '../therapist/TherapistIdentity'
 import { ArrowRight } from '../join/JoinIcons'
 import { matches } from '../../data/matchesContent'
+import { optimisedPhoto } from '../../lib/cloudinaryImage'
 
 /**
  * One therapist, portrait-led.
@@ -41,7 +42,7 @@ export default function TherapistCard({ therapist, index = 0 }) {
       >
         <div className="aspect-[4/5] w-full overflow-hidden bg-mist">
           <img
-            src={therapist.photoUrl}
+            src={optimisedPhoto(therapist.photoUrl)}
             alt={`${therapist.firstName} ${therapist.lastName}`}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"

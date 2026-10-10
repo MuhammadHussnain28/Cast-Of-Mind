@@ -1246,3 +1246,70 @@ describe('session notices', () => {
     await silent;
   });
 });
+
+// ---------------------------------------------------------------------------
+// Expiry of a LISTENING socket (12.3)
+// ---------------------------------------------------------------------------
+
+describe('a socket that only listens is closed when its token expires (12.3)', () => {
+  const OPENING = 'Something I have been carrying for a long time.';
+
+  async function shortToken(userId, role, seconds) {
+    const jwt = (await import('jsonwebtoken')).default;
+    return jwt.sign({ role }, process.env.JWT_ACCESS_SECRET, {
+      subject: String(userId),
+      expiresIn: seconds,
+    });
+  }
+
+  it('CLOSES IT AT EXPIRY — a deactivated therapist hears nothing more', async () => {
+    const therapist = await connect(await shortToken(ids.therapistA, ROLES.THERAPIST, 2));
+    const client = await connect(tokens.clientA);
+
+    // It never sends anything, so the per-event check in `guarded` never runs.
+    const told = waitFor(therapist, SOCKET_EVENTS.AUTH_EXPIRED, 4000);
+    const closed = waitFor(therapist, 'disconnect', 4000);
+    expect((await told).code).toBe('TOKEN_EXPIRED');
+    expect(await closed).toBe('io server disconnect');
+
+    const silent = expectNoEvent(therapist, SOCKET_EVENTS.MESSAGE_NEW, 600);
+    const sent = await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: OPENING,
+    });
+    expect(sent.data).toBeDefined();
+    await silent;
+
+    // The server holds no socket for them in the booking room any more.
+    expect(io.sockets.adapter.rooms.get(bookingRoom(bookingA._id))?.size).toBe(1);
+  }, 10000);
+
+  it('leaves a socket with a valid token connected', async () => {
+    const socket = await connect(await shortToken(ids.therapistA, ROLES.THERAPIST, 60));
+    await expectNoEvent(socket, 'disconnect', 1500);
+    expect(socket.connected).toBe(true);
+  });
+
+  it('A REAL USER RECONNECTS WITH A FRESH TOKEN and keeps receiving messages', async () => {
+    const therapist = await connect(await shortToken(ids.therapistA, ROLES.THERAPIST, 2));
+    const client = await connect(tokens.clientA);
+
+    // Both listeners first: the disconnect follows the event within milliseconds.
+    const told = waitFor(therapist, SOCKET_EVENTS.AUTH_EXPIRED, 4000);
+    const closed = waitFor(therapist, 'disconnect', 4000);
+    await Promise.all([told, closed]);
+
+    // What the browser does on auth:expired: refresh, then reconnect.
+    therapist.auth = { token: tokens.therapistA };
+    const back = waitFor(therapist, 'connect', 4000);
+    therapist.connect();
+    await back;
+
+    const arrives = waitFor(therapist, SOCKET_EVENTS.MESSAGE_NEW, 3000);
+    await emit(client, SOCKET_EVENTS.MESSAGE_SEND, {
+      bookingId: String(bookingA._id),
+      text: OPENING,
+    });
+    expect((await arrives).bookingId).toBe(String(bookingA._id));
+  }, 12000);
+});

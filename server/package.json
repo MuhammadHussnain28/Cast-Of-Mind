@@ -14,9 +14,14 @@
     "seed:therapists": "node scripts/seedTherapists.js",
     "seed:therapists:remove": "node scripts/seedTherapists.js --remove",
     "reminders:run": "node scripts/runSessionReminders.js",
-    "lifecycle:run": "node scripts/runLifecycleSweep.js"
+    "lifecycle:run": "node scripts/runLifecycleSweep.js",
+    "sentry:test": "node scripts/sentryTest.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   },
   "dependencies": {
+    "@sentry/node": "^11.6.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",

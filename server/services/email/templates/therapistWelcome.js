@@ -1,4 +1,5 @@
 import { baseTemplate, baseTextTemplate } from './base.js';
+import { escapeHtml } from './escapeHtml.js';
 import { BRAND, EMAIL_SUBJECTS } from '../../../constants/email.js';
 
 // Sent when the admin approves a therapist application — master spec §16.
@@ -19,7 +20,7 @@ export function therapistWelcomeEmail({ firstName, loginUrl }) {
   const greeting = firstName ? `Hello ${firstName},` : 'Hello,';
 
   const bodyHtml = `
-    <p style="${p}">${greeting}</p>
+    <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
       Your application to practise with Cast of Mind has been approved, and your
       therapist account is now open.

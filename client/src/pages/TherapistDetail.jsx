@@ -13,6 +13,7 @@ import {
 } from '../store/questionnaireSlice'
 import { convertWorkingHours, detectViewerZone, hasAnyHours } from '../lib/workingHours'
 import { detail } from '../data/matchesContent'
+import { optimisedPhoto } from '../lib/cloudinaryImage'
 
 /**
  * One therapist, in full (§24.7).
@@ -123,7 +124,7 @@ export default function TherapistDetail() {
             className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-end"
           >
             <img
-              src={therapist.photoUrl}
+              src={optimisedPhoto(therapist.photoUrl)}
               alt={`${therapist.firstName} ${therapist.lastName}`}
               className="h-48 w-40 shrink-0 rounded-2xl object-cover sm:h-56 sm:w-48"
             />

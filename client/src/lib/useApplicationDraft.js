@@ -16,6 +16,16 @@ import { useEffect, useRef } from 'react'
 const KEY = 'com.castofmind.therapistApplication.draft'
 const VERSION = 1
 
+// Never written to localStorage, and dropped from any draft an older build saved.
+// The taxpayer ID is flagged sensitive in §23 (12.3).
+const NEVER_STORED = ['password', 'taxpayerIdNumber']
+
+function withoutSensitive(values) {
+  const safe = { ...(values ?? {}) }
+  for (const field of NEVER_STORED) delete safe[field]
+  return safe
+}
+
 // A draft older than this is dropped rather than restored. Fields change
 // between releases, and a month-old half-form is more confusing than helpful.
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
@@ -74,7 +84,7 @@ export function readDraft() {
     }
 
     // Belt and braces: even if an older build had written one, it never loads.
-    if (saved.values) delete saved.values.password
+    if (saved.values) saved.values = withoutSensitive(saved.values)
 
     return saved
   } catch {
@@ -115,12 +125,9 @@ export function useApplicationDraft(values, step, enabled = true) {
     // object that often is wasted work.
     timer.current = setTimeout(() => {
       try {
-        const { password, ...safe } = values ?? {}
-        void password // named only to drop it
-
         window.localStorage.setItem(
           KEY,
-          JSON.stringify({ version: VERSION, savedAt: Date.now(), step, values: safe }),
+          JSON.stringify({ version: VERSION, savedAt: Date.now(), step, values: withoutSensitive(values) }),
         )
       } catch {
         // Quota exceeded or storage blocked. Silent by design.

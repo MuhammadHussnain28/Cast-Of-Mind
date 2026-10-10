@@ -23,7 +23,9 @@ export class ApiError extends Error {
     // long form put each message back on the field it belongs to instead of
     // showing one generic failure. Null for every other status.
     this.details = Array.isArray(details) ? details : null
-    this.cause = cause
+    // Dev only: the axios error holds the token and request body, and an
+    // uncaught ApiError would print it to the console (12.3).
+    this.cause = import.meta.env.DEV ? cause : undefined
   }
 }
 
@@ -49,11 +51,17 @@ export function toApiError(error) {
   // Genuine faults — no network, a 500, something unrecognised — still get the
   // full object, because there the stack is the entire point. Same reasoning as
   // the server-side error handler (server/middleware/errorHandler.js).
+  const method = error?.config?.method?.toUpperCase() || ''
+  const path = (error?.config?.url || '').split('?')[0]
   if (HANDLED_STATUSES.has(status)) {
     const code = error?.response?.data?.error?.code || 'SERVER_ERROR'
-    console.info(`[api] ${status} ${code} ${error?.config?.method?.toUpperCase() || ''} ${error?.config?.url || ''}`)
-  } else {
+    console.info(`[api] ${status} ${code} ${method} ${path}`)
+  } else if (import.meta.env.DEV) {
     console.error(error)
+  } else {
+    // Never the error object in production: its config holds the bearer token
+    // and the request body — a password, a message, a journal entry (12.3).
+    console.error(`[api] ${status ?? error?.code ?? 'NETWORK_ERROR'} ${method} ${path}`)
   }
 
   if (error?.code === 'ECONNABORTED') {

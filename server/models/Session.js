@@ -113,6 +113,8 @@ sessionSchema.pre('validate', function checkCancellation() {
 
 // A booking's sessions in time order, both directions — upcoming and history.
 sessionSchema.index({ bookingId: 1, scheduledAt: 1, _id: 1 });
+// The reminder sweep (9.6) runs every 5 minutes across ALL bookings (12.4).
+sessionSchema.index({ status: 1, scheduledAt: 1 });
 
 export const Session = mongoose.model('Session', sessionSchema);
 

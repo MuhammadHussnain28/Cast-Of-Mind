@@ -232,7 +232,10 @@ describe('the dev routes are not mounted in production', () => {
       await new Promise((resolve, reject) => {
         const started = Date.now();
         const poll = () => {
-          const req = http.get({ host: '127.0.0.1', port, path: '/api/v1/health' }, (res) => {
+          // Not /health: with no database it answers 503, and it would call the
+          // real Resend and Cloudinary from the .env (12.4). /auth/me answers
+          // 401 with neither.
+          const req = http.get({ host: '127.0.0.1', port, path: '/api/v1/auth/me' }, (res) => {
             res.resume();
             resolve();
           });
@@ -256,7 +259,7 @@ describe('the dev routes are not mounted in production', () => {
       });
 
       // Sanity check: the server really is up and serving normal routes.
-      expect(await status('/api/v1/health')).toBe(200);
+      expect(await status('/api/v1/auth/me')).toBe(401);
 
       // But every dev route is simply absent.
       expect(await status(ANY_ROUTE)).toBe(404);

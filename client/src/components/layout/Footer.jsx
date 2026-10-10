@@ -35,6 +35,8 @@ export default function Footer() {
               alt="Cast of Minds"
               width={78}
               height={64}
+              loading="lazy"
+              decoding="async"
               className="h-16 w-auto scale-x-[1.1] origin-left"
             />
             <p className="mt-5 max-w-[38ch] font-body text-caption leading-relaxed text-paper/75">

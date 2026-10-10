@@ -90,4 +90,18 @@ describe('the sessions schema', () => {
       true,
     );
   });
+
+  it('the reminder sweep\'s query uses an index, not a collection scan (12.4)', async () => {
+    await Session.create(base());
+    const now = new Date();
+    const plan = await Session.find({
+      status: SESSION_STATUS.SCHEDULED,
+      scheduledAt: { $gt: now, $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+    }).explain('queryPlanner');
+
+    const winning = JSON.stringify(plan.queryPlanner.winningPlan);
+    expect(winning).toContain('IXSCAN');
+    expect(winning).not.toContain('COLLSCAN');
+    expect(winning).toContain('status_1_scheduledAt_1');
+  });
 });

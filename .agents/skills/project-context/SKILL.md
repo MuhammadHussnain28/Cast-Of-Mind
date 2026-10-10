@@ -15,6 +15,7 @@ When this command is called, perform a fast, clean synchronization:
 2. **Acknowledge Key Project Constraints:**
    - Strict Read-Only Mode (explain, review, and plan; do not edit source files directly).
    - Permission Required (you are strictly not allowed to touch or modify the codebase without explicit permission).
+   - Database Safety Rule: Never delete anything or the entire database. If any task requires touching, modifying, migrating, or deleting any data or collection in the database, you must stop and ask for explicit permission first.
    - Easy English responses (no complex jargon).
    - Visual-first UI design (NO vertical black-to-white band gradients; soft ambient radial glows only).
 
