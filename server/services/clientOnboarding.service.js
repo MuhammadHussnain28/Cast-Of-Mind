@@ -8,7 +8,7 @@ import { Subscription } from '../models/Subscription.js';
 import { PendingCheckout } from '../models/PendingCheckout.js';
 import { hashPassword, generateTemporaryPassword } from '../utils/password.js';
 import { ROLES, USER_STATUS } from '../constants/roles.js';
-import { sendClientWelcomeEmail } from './email/email.service.js';
+import { sendClientWelcomeEmail, sendTherapistNewClientEmail } from './email/email.service.js';
 import { notifyQuietly } from './notification.service.js';
 import { NOTIFICATION_TYPE } from '../constants/notifications.js';
 import { addOneMonth } from './subscriptionRenewal.service.js';
@@ -266,6 +266,22 @@ export async function createClientAccount(session) {
     type: NOTIFICATION_TYPE.NEW_CLIENT,
     bookingId: createdBookingId,
   });
+
+  // Notify the therapist via email that a new client has been matched with them.
+  // After the commit for the same safety reason: email failure must never undo the paid account.
+  if (therapist?.userId) {
+    try {
+      const therapistUser = await User.findById(therapist.userId).select('email').lean();
+      if (therapistUser?.email) {
+        await sendTherapistNewClientEmail(therapistUser.email, {
+          firstName: therapist.firstName,
+          clientName: greetingName(draft.questionnaire),
+        });
+      }
+    } catch (error) {
+      console.error('[onboarding] therapist new client email failed to send:', error.name);
+    }
+  }
 
   return { created: true, userId: String(createdUserId), emailSent };
 }

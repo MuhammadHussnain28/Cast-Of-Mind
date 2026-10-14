@@ -2,6 +2,7 @@ import { escapeHtml } from '../services/email/templates/escapeHtml.js';
 import { sessionReminderEmail } from '../services/email/templates/sessionReminder.js';
 import { clientWelcomeEmail } from '../services/email/templates/clientWelcome.js';
 import { therapistWelcomeEmail } from '../services/email/templates/therapistWelcome.js';
+import { therapistNewClientEmail } from '../services/email/templates/therapistNewClient.js';
 import {
   emailChangedOldAddress,
   emailChangedNewAddress,
@@ -101,6 +102,18 @@ describe('templates escape user text in their HTML (12.3)', () => {
       expectNeutralised(html);
       expect(html).toContain('new@example.com');
     }
+  });
+
+  it('therapist new client: escapes therapist and client names, carries login link', () => {
+    const { html, text } = therapistNewClientEmail({
+      firstName: INJECTED,
+      clientName: INJECTED,
+      loginUrl: 'https://castofmind.com/login',
+    });
+    expectNeutralised(html);
+    expect(html).toContain('https://castofmind.com/login');
+    expect(html).toContain('Sign in to Cast of Minds');
+    expect(text).toContain('https://castofmind.com/login');
   });
 
   it('an ordinary name renders exactly as before', () => {

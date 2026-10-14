@@ -25,6 +25,7 @@ export function createEmailServiceMock(overrides = {}) {
     sendEmail: jest.fn(async () => ({ delivered: true })),
     sendPasswordResetEmail: jest.fn(async () => ({ delivered: true })),
     sendTherapistWelcomeEmail: jest.fn(async () => ({ delivered: true })),
+    sendTherapistNewClientEmail: jest.fn(async () => ({ delivered: true })),
     sendClientWelcomeEmail: jest.fn(async () => ({ delivered: true })),
     sendSessionReminderEmail: jest.fn(async () => ({ delivered: true })),
     sendPaymentReceiptEmail: jest.fn(async () => ({ delivered: true })),

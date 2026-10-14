@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import env from '../../config/env.js';
 import { passwordResetEmail } from './templates/passwordReset.js';
 import { therapistWelcomeEmail } from './templates/therapistWelcome.js';
+import { therapistNewClientEmail } from './templates/therapistNewClient.js';
 import { clientWelcomeEmail } from './templates/clientWelcome.js';
 import {
   emailChangedOldAddress,
@@ -89,6 +90,16 @@ export async function sendPasswordResetEmail(to, resetUrl) {
 export async function sendTherapistWelcomeEmail(to, { firstName }) {
   const loginUrl = `${env.clientOrigin}/login`;
   const { subject, html, text } = therapistWelcomeEmail({ firstName, loginUrl });
+
+  return sendEmail({ to, subject, html, text });
+}
+
+/**
+ * Notify a therapist that a new client has been matched with them.
+ */
+export async function sendTherapistNewClientEmail(to, { firstName, clientName }) {
+  const loginUrl = `${env.clientOrigin}/login`;
+  const { subject, html, text } = therapistNewClientEmail({ firstName, clientName, loginUrl });
 
   return sendEmail({ to, subject, html, text });
 }

@@ -40,4 +40,5 @@ export const EMAIL_SUBJECTS = Object.freeze({
   subscriptionReactivated: 'Your Cast of Minds subscription will continue',
   welcomeBack: 'Welcome back to Cast of Minds',
   renewalReminder: 'Your Cast of Minds subscription renews soon',
+  therapistNewClient: 'You have a new client on Cast of Minds',
 });
