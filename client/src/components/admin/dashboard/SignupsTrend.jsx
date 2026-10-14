@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { formatCount } from '../../../lib/dashboardFormat'
+import { cx } from '../../../lib/cx'
 
 /**
  * New client signups, twelve months, one series.
@@ -20,13 +21,14 @@ import { formatCount } from '../../../lib/dashboardFormat'
  */
 
 const W = 640
-const H = 200
+const DEFAULT_HEIGHT = 200
 const PAD = { top: 16, right: 20, bottom: 28, left: 20 }
 
-export default function SignupsTrend({ points }) {
+export default function SignupsTrend({ points, height = DEFAULT_HEIGHT, className }) {
   const id = useId()
   const [active, setActive] = useState(null)
 
+  const H = height
   const plotWidth = W - PAD.left - PAD.right
   const plotHeight = H - PAD.top - PAD.bottom
 
@@ -45,7 +47,7 @@ export default function SignupsTrend({ points }) {
   const shown = active ?? last
 
   return (
-    <figure className="m-0">
+    <figure className={cx('m-0', className)}>
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="font-body text-caption text-paper/70">
           New client signups, last 12 months

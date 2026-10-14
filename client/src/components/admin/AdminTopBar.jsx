@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Heading, Text } from '../ui'
+import { Heading } from '../ui'
 import SignOutButton from '../auth/SignOutButton'
 import { MenuIcon } from './AdminIcons'
 
@@ -39,16 +39,25 @@ export default function AdminTopBar({ title, parent, email, onOpenNav }) {
               </Link>
             </nav>
           )}
-          <Heading level={1} size="subsection" className="truncate">
+          <Heading
+            level={1}
+            size="subsection"
+            className="truncate font-medium italic  tracking-wide text-ink text-xl sm:text-2xl"
+          >
             {title}
           </Heading>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 sm:gap-4 md:gap-5">
           {email && (
-            <Text size="caption" tone="muted" className="hidden truncate sm:block">
-              {email}
-            </Text>
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-ink/8 bg-mist/80 px-3 py-1.5 shadow-2xs">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink text-gold text-[10px] font-bold shadow-2xs">
+                AD
+              </span>
+              <span className="font-body text-caption font-medium tracking-tight text-ink/85 truncate max-w-[200px] md:max-w-none">
+                {email}
+              </span>
+            </div>
           )}
           <SignOutButton variant="ghost" />
         </div>

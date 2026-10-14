@@ -92,7 +92,7 @@ export default function Account() {
   })
 
   return (
-    <section>
+    <section className="pb-12 sm:pb-16">
       <ScreenHeader
         title={ACCOUNT.title}
         lead={ACCOUNT.lead}

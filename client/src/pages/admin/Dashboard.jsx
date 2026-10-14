@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button, Text } from '../../components/ui'
-import MoneyBand from '../../components/admin/dashboard/MoneyBand'
+import ModernMoneyBand from '../../components/admin/dashboard/ModernMoneyBand'
+// import MoneyBand from '../../components/admin/dashboard/MoneyBand'
 import StatFigure from '../../components/admin/dashboard/StatFigure'
 import PendingApplicationsCard from '../../components/admin/dashboard/PendingApplicationsCard'
-import QualityPanel from '../../components/admin/dashboard/QualityPanel'
+import ModernQualityPanel from '../../components/admin/dashboard/ModernQualityPanel'
+// import QualityPanel from '../../components/admin/dashboard/QualityPanel'
 import SystemStatusCard from '../../components/admin/dashboard/SystemStatusCard'
 import { fetchAdminStats } from '../../lib/api/adminApi'
 import { toApiError } from '../../lib/api/ApiError'
@@ -101,7 +103,8 @@ export default function Dashboard() {
       )}
       aria-busy={loading || undefined}
     >
-      <MoneyBand money={money} signups={activity.signups} />
+      <ModernMoneyBand money={money} signups={activity.signups} />
+      {/* Backup original: <MoneyBand money={money} signups={activity.signups} /> */}
 
       <section aria-labelledby="dashboard-people" className="flex flex-col gap-4">
         <GroupHeading id="dashboard-people">People</GroupHeading>
@@ -135,22 +138,57 @@ export default function Dashboard() {
       <section aria-labelledby="dashboard-activity" className="flex flex-col gap-4">
         <GroupHeading id="dashboard-activity">Activity and quality</GroupHeading>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div className="rounded-2xl border border-ink/12 bg-mist px-5 py-5 sm:px-6">
-            <dl>
-              <StatFigure
-                label="Sessions scheduled this month"
-                value={formatCount(activity.sessionsThisMonth)}
-                note={
-                  activity.sessionsThisMonth === 0
-                    ? 'Therapists schedule sessions from their portal.'
-                    : 'Across every active booking'
-                }
-              />
-            </dl>
+        <div className="flex flex-col gap-4">
+          {/* SESSIONS SCHEDULED STRIP (Zero empty space) */}
+          <div className="rounded-2xl border border-ink/12 bg-paper p-5 sm:p-6 shadow-xs relative overflow-hidden transition-all hover:border-ink/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-sage/30 bg-sage/15 text-sage-deep">
+                  <svg
+                    className="size-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="font-body text-caption font-medium text-ink/70 block">
+                    Sessions scheduled this month
+                  </span>
+                  <div className="flex flex-wrap items-baseline gap-2.5 mt-0.5">
+                    <span className="font-body text-3xl font-extrabold tracking-tight text-ink tabular-nums">
+                      {formatCount(activity.sessionsThisMonth)}
+                    </span>
+                    <span className="font-body text-caption text-ink/60 font-medium">
+                      {activity.sessionsThisMonth === 0
+                        ? 'Therapists schedule sessions from their portal.'
+                        : 'Across every active client booking'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:border-l sm:border-ink/10 sm:pl-6">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-body text-caption font-medium bg-sage/15 text-sage-deep border border-sage/25">
+                  <span className="size-1.5 rounded-full bg-sage-deep" aria-hidden="true" />
+                  Live Platform Cadence
+                </span>
+              </div>
+            </div>
           </div>
 
-          <QualityPanel quality={quality} />
+          {/* THERAPIST QUALITY & FEEDBACK SHOWCASE */}
+          <ModernQualityPanel quality={quality} />
+          {/* Backup original: <QualityPanel quality={quality} /> */}
         </div>
       </section>
 

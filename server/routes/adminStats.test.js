@@ -79,6 +79,7 @@ describe('the empty database — the chunk\'s verify step', () => {
     expect(res.status).toBe(200);
     expect(res.body.money).toEqual({
       monthlyRecurringRevenue: 0,
+      totalRevenueEarned: 0,
       currency: 'EUR',
       activeSubscriptions: 0,
       newThisMonth: 0,

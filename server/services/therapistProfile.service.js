@@ -11,6 +11,9 @@ import {
   THERAPIST_EDITABLE_FIELDS,
 } from '../constants/therapistProfile.js';
 
+import { Booking } from '../models/Booking.js';
+
+
 /**
  * A therapist's own profile — master spec §8.7.
  *
@@ -34,9 +37,18 @@ const raw = (name) => mongoose.connection.db.collection(name);
  * these switch on by themselves when slice 6 and slice 9 ship.
  */
 async function practiceStats(userId) {
-  const bookings = await raw(FUTURE_COLLECTIONS.bookings)
-    .find({ therapistId: userId }, { projection: { _id: 1, clientId: 1, status: 1 } })
-    .toArray();
+
+  // const bookings = await raw(FUTURE_COLLECTIONS.bookings)
+  //   .find({ therapistId: userId }, { projection: { _id: 1, clientId: 1, status: 1 } })
+  //   .toArray();
+
+
+  const bookings = await Booking.find(
+    { therapistId: userId },
+    { _id: 1, clientId: 1, status: 1 }
+  ).lean();
+
+
 
   const activeClients = bookings.filter((booking) => booking.status === 'active').length;
 

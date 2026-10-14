@@ -51,6 +51,18 @@ export default function ClientPortalShell() {
   useSaveBrowserTimezone(state?.profile?.timezone ?? null, Boolean(state) && state.access !== 'ended')
 
   useEffect(() => {
+    document.documentElement.classList.add('overflow-hidden', 'h-full')
+    document.body.classList.add('overflow-hidden', 'h-full')
+    window.scrollTo(0, 0)
+    return () => {
+      document.documentElement.classList.remove('overflow-hidden', 'h-full')
+      document.body.classList.remove('overflow-hidden', 'h-full')
+    }
+  }, [])
+
+
+
+  useEffect(() => {
     let cancelled = false
 
     // No synchronous setState before the first await — the React Compiler rule

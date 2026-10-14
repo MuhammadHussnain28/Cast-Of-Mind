@@ -20,7 +20,7 @@ export default function SignOutButton({ className, variant }) {
     navigate('/login', { replace: true })
   }
 
-  // Small screens & headers: compact button with ink background and white text
+  // Small screens & headers: compact button with ink background, inverting to paper on hover
   if (variant === 'ghost') {
     return (
       <button
@@ -28,7 +28,7 @@ export default function SignOutButton({ className, variant }) {
         disabled={busy}
         onClick={handleSignOut}
         className={cx(
-          'group inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-ink bg-ink px-3.5 py-1.5 font-body text-caption font-medium text-paper shadow-xs transition-all duration-200 ease-out hover:bg-ink-deep hover:shadow-sm active:scale-95 disabled:opacity-50',
+          'group inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-ink bg-ink px-3.5 py-1.5 font-body text-caption font-medium text-paper shadow-xs transition-all duration-200 ease-out hover:border-ink/40 hover:bg-paper hover:text-ink hover:shadow-xs active:scale-95 disabled:opacity-50',
           className,
         )}
       >
@@ -36,7 +36,7 @@ export default function SignOutButton({ className, variant }) {
           <Spinner size="sm" />
         ) : (
           <svg
-            className="h-3.5 w-3.5 shrink-0 text-paper transition-transform duration-200 ease-out group-hover:translate-x-0.5"
+            className="h-3.5 w-3.5 shrink-0 text-paper transition-all duration-200 ease-out group-hover:translate-x-0.5 group-hover:text-ink"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -50,7 +50,7 @@ export default function SignOutButton({ className, variant }) {
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
         )}
-        <span>{busy ? 'Signing out…' : 'Sign out'}</span>
+        <span className="transition-colors duration-200">{busy ? 'Signing out…' : 'Sign out'}</span>
       </button>
     )
   }

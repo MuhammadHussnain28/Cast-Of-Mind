@@ -87,10 +87,10 @@ export default function Notifications() {
   })
 
   return (
-    <div className="flex w-full max-w-4xl flex-1 flex-col">
+    <div className="flex w-full max-w-4xl flex-1 flex-col pt-6 sm:pt-8 lg:pt-10 ">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-body text-subsection font-medium text-ink">{FEED.title}</h1>
+          <h1 className="font-body text-subsection  text-ink italic tracking-wide">{FEED.title}</h1>
           <p className="mt-3 max-w-measure font-body text-ui leading-relaxed text-ink/70">
             {FEED.lead}
           </p>

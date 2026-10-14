@@ -96,7 +96,7 @@ async function money(now) {
 
   const subscriptions = raw(FUTURE_COLLECTIONS.subscriptions);
 
-  const [revenue, activeSubscriptions, newThisMonth, newLastMonth, endedThisMonth] =
+  const [revenue, activeSubscriptions, newThisMonth, newLastMonth, endedThisMonth, paidEvents] =
     await Promise.all([
       subscriptions
         .aggregate([
@@ -114,10 +114,21 @@ async function money(now) {
         status: { $in: [SUBSCRIPTION_STATUS.CANCELLED, SUBSCRIPTION_STATUS.EXPIRED] },
         updatedAt: { $gte: thisMonth },
       }),
+      raw('paymentevents')
+        .aggregate([
+          { $match: { eventType: 'invoice.payment_succeeded', amount: { $gt: 0 } } },
+          { $group: { _id: null, totalCents: { $sum: '$amount' } } },
+        ])
+        .toArray(),
     ]);
 
+  const totalFromEvents = paidEvents[0]?.totalCents ?? 0;
+  const currentMrr = revenue[0]?.total ?? 0;
+  const totalRevenueEarned = totalFromEvents > 0 ? totalFromEvents : currentMrr;
+
   return {
-    monthlyRecurringRevenue: revenue[0]?.total ?? 0,
+    monthlyRecurringRevenue: currentMrr,
+    totalRevenueEarned,
     currency: BILLING_CURRENCY,
     activeSubscriptions,
     newThisMonth,
