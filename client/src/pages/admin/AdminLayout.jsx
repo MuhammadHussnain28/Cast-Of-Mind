@@ -62,7 +62,7 @@ export default function AdminLayout() {
   // Restored on the way out, or a public page keeps the admin's tab title.
   useEffect(() => {
     const previous = document.title
-    document.title = `${title} · Cast of Mind admin`
+    document.title = `${title} · Cast of Minds admin`
     return () => {
       document.title = previous
     }

@@ -19,7 +19,7 @@ export const mission = {
   lede: '" The distance between deciding to get help and actually getting it is too long. "',
   body: [
     'Distance, wait lists, and the exhaustion of starting over with the wrong specialist. Traditional therapy demands too much resilience exactly when you have the least to give.',
-    'Cast of Mind dismantles these barriers. Tell us what you are navigating, review exact-fit specialists, and choose your therapist. Geography never dictates your care.',
+    'Cast of Minds dismantles these barriers. Tell us what you are navigating, review exact-fit specialists, and choose your therapist. Geography never dictates your care.',
   ],
   // body: [
   //   'Too far to travel. Too long to wait. And at the end of it, too easy to be matched with someone who does not work with the thing you actually came about — which means starting over, and explaining yourself again, at the point where most people have the least left to give.',

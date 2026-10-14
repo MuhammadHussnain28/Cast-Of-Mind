@@ -28,7 +28,7 @@ export function applicationReceivedEmail({ firstName, applicationId }) {
       Hello ${safeName},
     </p>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:${BRAND.ink};">
-      Thank you for applying to join Cast of Mind. We have your application and everything you uploaded.
+      Thank you for applying to join Cast of Minds. We have your application and everything you uploaded.
     </p>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:${BRAND.ink};">
       What happens next: a member of our team reads your application in full, including your
@@ -42,22 +42,22 @@ export function applicationReceivedEmail({ firstName, applicationId }) {
       ${escapeHtml(applicationId)}
     </p>
     <p style="margin:0;font-size:15px;line-height:1.7;color:${BRAND.ink};">
-      If you did not apply to Cast of Mind, please let us know using the address below.
+      If you did not apply to Cast of Minds, please let us know using the address below.
     </p>
   `;
 
   const text = `Hello ${firstName},
 
-Thank you for applying to join Cast of Mind. We have your application and everything you uploaded.
+Thank you for applying to join Cast of Minds. We have your application and everything you uploaded.
 
 What happens next: a member of our team reads your application in full, including your qualifications and the documents you sent. We will email you at this address once a decision is made. There is nothing for you to do in the meantime.
 
 Your reference: ${applicationId}
 
-If you did not apply to Cast of Mind, please let us know using the address below.`;
+If you did not apply to Cast of Minds, please let us know using the address below.`;
 
   return {
-    subject: 'We have received your Cast of Mind application',
+    subject: 'We have received your Cast of Minds application',
     html: baseTemplate({ title: 'Your application has been received', bodyHtml }),
     text: baseTextTemplate({ title: 'Your application has been received', bodyText: text }),
   };

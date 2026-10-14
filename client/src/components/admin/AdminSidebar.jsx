@@ -42,7 +42,7 @@ export default function AdminSidebar({ onNavigate }) {
       <div className="flex items-center justify-between border-b border-paper/10 px-5 py-4 bg-paper/2">
         <img
           src={logoWhite}
-          alt="Cast of Mind"
+          alt="Cast of Minds"
           className="w-[74px] h-auto scale-x-[1.1] origin-left shrink-0"
         />
         <span className="inline-flex items-center gap-1 rounded-md border border-gold/30 bg-gold/10 px-2 py-0.5 font-body text-[9px] font-semibold tracking-wider text-gold uppercase shadow-2xs">

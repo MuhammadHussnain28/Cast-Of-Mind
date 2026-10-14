@@ -150,7 +150,7 @@ function loadEnv() {
     // enough for development, useless for real users. Production is checked
     // above and will not start without a real value.
     resendApiKey: process.env.RESEND_API_KEY || null,
-    emailFrom: process.env.EMAIL_FROM || 'Cast of Mind <onboarding@resend.dev>',
+    emailFrom: process.env.EMAIL_FROM || 'Cast of Minds <onboarding@resend.dev>',
 
     // Public URL of the logo shown in email headers. Optional — the template
     // falls back to a text wordmark, which is better than a broken-image icon.

@@ -22,7 +22,7 @@ export function therapistWelcomeEmail({ firstName, loginUrl }) {
   const bodyHtml = `
     <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
-      Your application to practise with Cast of Mind has been approved, and your
+      Your application to practise with Cast of Minds has been approved, and your
       therapist account is now open.
     </p>
     <p style="${p}">
@@ -39,7 +39,7 @@ export function therapistWelcomeEmail({ firstName, loginUrl }) {
   const bodyText = [
     greeting,
     '',
-    'Your application to practise with Cast of Mind has been approved, and your therapist account is now open.',
+    'Your application to practise with Cast of Minds has been approved, and your therapist account is now open.',
     '',
     'Sign in with the email address you applied with and the password you chose on the application form. We do not have a copy of it, so if you cannot remember it, use the "Forgot password" link on the sign-in page.',
     '',

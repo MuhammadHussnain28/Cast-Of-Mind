@@ -30,7 +30,7 @@ export const stripe = isStripeConfigured
       // worse than not pinning at all, because the request and the types disagree.
       
       apiVersion: '2026-08-26.dahlia',
-      appInfo: { name: 'Cast of Mind', version: '1.0.0' },
+      appInfo: { name: 'Cast of Minds', version: '1.0.0' },
       // Stripe retries idempotently on network errors; two is enough to ride
       // out a blip without leaving a checkout hanging for a person watching it.
       maxNetworkRetries: 2,

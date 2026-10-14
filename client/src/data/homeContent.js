@@ -316,6 +316,6 @@ export const faqItems = [
     id: 'faq-crisis',
     question: 'What if I am in crisis right now?',
     answer:
-      'Cast of Mind is not an emergency service, and your therapist will not see a message immediately if they are offline. If you are in immediate danger, or you are thinking about harming yourself, please contact your local emergency number or a crisis line in your country now. Those services are staffed around the clock and this is exactly what they are there for. Therapy alongside that is still worth having, and this will still be here afterwards.',
+      'Cast of Minds is not an emergency service, and your therapist will not see a message immediately if they are offline. If you are in immediate danger, or you are thinking about harming yourself, please contact your local emergency number or a crisis line in your country now. Those services are staffed around the clock and this is exactly what they are there for. Therapy alongside that is still worth having, and this will still be here afterwards.',
   },
 ]

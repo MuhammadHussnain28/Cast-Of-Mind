@@ -103,7 +103,7 @@ export default function ComparisonModern() {
             <div className="col-span-3 sm:col-span-3 text-center">
               <div className="bg-ink text-white py-3 px-2 sm:px-4 rounded-2xl shadow-md border border-ink">
                 <span className="block text-xs sm:text-sm font-bold text-white tracking-wide">
-                  Cast of Mind
+                  Cast of Minds
                 </span>
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function ComparisonModern() {
                 <div className="col-span-3 sm:col-span-3 flex justify-center">
                   <div
                     className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-ink text-gold flex items-center justify-center shadow-xs"
-                    aria-label="Included with Cast of Mind"
+                    aria-label="Included with Cast of Minds"
                   >
                     <CheckIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   </div>

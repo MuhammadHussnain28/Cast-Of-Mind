@@ -9,7 +9,7 @@
 
 export const RATE = Object.freeze({
   heading: (name) => (name ? `How was your time with ${name}?` : 'How was your time with your therapist?'),
-  lead: 'If you would like to, you can rate it. It is entirely up to you, and it helps Cast of Mind look after the service.',
+  lead: 'If you would like to, you can rate it. It is entirely up to you, and it helps Cast of Minds look after the service.',
   legend: 'Your rating',
   starLabel: (n) => `${n} of 5`,
   chosen: (n) => `${n} of 5`,
@@ -17,7 +17,7 @@ export const RATE = Object.freeze({
   wordsLabel: 'Anything you would like to tell us?',
   wordsHelper: 'Optional. A rating on its own is welcome.',
   // The approved disclosure: the team reads it with your name; your therapist never does.
-  privacy: 'Only the Cast of Mind team reads this, with your name. Your therapist never sees your rating or your words.',
+  privacy: 'Only the Cast of Minds team reads this, with your name. Your therapist never sees your rating or your words.',
   send: 'Send my rating',
   sending: 'Sending',
   // 11.6: an invitation, never a wall. Declining asks for no reason.
@@ -26,7 +26,7 @@ export const RATE = Object.freeze({
   declineFailed: 'That did not go through. You can simply leave this be.',
   failed: 'That did not send. Everything you wrote is still here — please try again.',
   thanksTitle: 'Thank you.',
-  thanksBody: 'Your rating went to the Cast of Mind team only. Your therapist never sees it.',
+  thanksBody: 'Your rating went to the Cast of Minds team only. Your therapist never sees it.',
 })
 
 export const ADMIN_RATINGS = Object.freeze({

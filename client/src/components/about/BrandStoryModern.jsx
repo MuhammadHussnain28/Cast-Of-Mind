@@ -112,7 +112,7 @@ export default function BrandStoryModern() {
                 <div className="absolute w-44 h-44 rounded-full bg-gradient-to-b from-sage/20 to-gold/15 blur-[35px] pointer-events-none group-hover:scale-125 transition-transform duration-700" />
                 <img
                   src={logoWhite}
-                  alt="The Cast of Mind mark: a brain whose lower contour becomes a trunk and roots"
+                  alt="The Cast of Minds mark: a brain whose lower contour becomes a trunk and roots"
                   width={1764}
                   height={1446}
                   loading="lazy"

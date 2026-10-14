@@ -162,7 +162,7 @@ export const CANCELLATION = {
     `Your plan carries on as before. Your card is charged ${amount} on ${date}, then monthly until you cancel.`,
   reactivate: 'Reactivate subscription',
   reactivating: 'Reactivating…',
-  adminCancelled: 'This subscription was stopped by the Cast of Mind team. If you would like to carry on, write to us at',
+  adminCancelled: 'This subscription was stopped by the Cast of Minds team. If you would like to carry on, write to us at',
   noUndo: 'This subscription has already stopped with our payment provider. If you would like to carry on, write to us at',
 }
 

@@ -36,7 +36,7 @@ export function emailChangedOldAddress({ firstName, newEmail, loginUrl }) {
   const bodyHtml = `
     <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
-      The email address you use to sign in to Cast of Mind has been changed by our
+      The email address you use to sign in to Cast of Minds has been changed by our
       team to <strong>${escapeHtml(newEmail)}</strong>. This address will no longer work for
       signing in or for resetting your password.
     </p>
@@ -48,7 +48,7 @@ export function emailChangedOldAddress({ firstName, newEmail, loginUrl }) {
   const bodyText = [
     greeting,
     '',
-    `The email address you use to sign in to Cast of Mind has been changed by our team to ${newEmail}. This address will no longer work for signing in or for resetting your password.`,
+    `The email address you use to sign in to Cast of Minds has been changed by our team to ${newEmail}. This address will no longer work for signing in or for resetting your password.`,
     '',
     'Your password has not changed, and nothing else about your account or your clients has been affected.',
   ].join('\n');
@@ -65,7 +65,7 @@ export function emailChangedNewAddress({ firstName, newEmail, loginUrl }) {
     <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
       This address, <strong>${escapeHtml(newEmail)}</strong>, is now the one you use to sign
-      in to Cast of Mind. Your previous address will no longer work.
+      in to Cast of Minds. Your previous address will no longer work.
     </p>
     <p style="${p}">
       Your password is unchanged. If you do not remember it, use
@@ -76,7 +76,7 @@ export function emailChangedNewAddress({ firstName, newEmail, loginUrl }) {
   const bodyText = [
     greeting,
     '',
-    `This address, ${newEmail}, is now the one you use to sign in to Cast of Mind. Your previous address will no longer work.`,
+    `This address, ${newEmail}, is now the one you use to sign in to Cast of Minds. Your previous address will no longer work.`,
     '',
     'Your password is unchanged. If you do not remember it, use "Forgot password" on the sign-in page — we do not hold a copy of it and cannot read it.',
   ].join('\n');

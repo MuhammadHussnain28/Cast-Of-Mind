@@ -18,7 +18,7 @@ export function passwordResetEmail({ resetUrl }) {
 
   const bodyHtml = `
     <p style="${p}">
-      We received a request to reset the password for your Cast of Mind account.
+      We received a request to reset the password for your Cast of Minds account.
       Choose a new one using the button below.
     </p>
     <p style="${p}">
@@ -28,7 +28,7 @@ export function passwordResetEmail({ resetUrl }) {
   const footerNote =
     'If you did not ask for this, you can ignore this email — your password will not change.';
 
-  const bodyText = `We received a request to reset the password for your Cast of Mind account.
+  const bodyText = `We received a request to reset the password for your Cast of Minds account.
 
 Open this link to choose a new one. It works once, and expires in ${RESET_TOKEN_TTL_MINUTES} minutes.`;
 

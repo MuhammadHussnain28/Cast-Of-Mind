@@ -50,11 +50,11 @@ export default function Navbar() {
         <Link
           to="/"
           className="inline-flex shrink-0 items-center rounded-lg py-2"
-          aria-label="Cast of Mind - home"
+          aria-label="Cast of Minds - home"
         >
           <img
             src={logoInks}
-            alt="Cast of Mind"
+            alt="Cast of Minds"
             width={54}
             height={44}
             className="w-[74px] h-auto scale-x-[1.1] origin-left border-black"

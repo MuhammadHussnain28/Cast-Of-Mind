@@ -46,7 +46,7 @@ export function clientWelcomeEmail({ name, email, temporaryPassword, loginUrl, t
   const bodyHtml = `
     <p style="${p}">${escapeHtml(greeting)}</p>
     <p style="${p}">
-      Your payment went through and your Cast of Mind account is open. Your
+      Your payment went through and your Cast of Minds account is open. Your
       subscription includes four sessions a month and unlimited messaging with
       your therapist in between.
     </p>
@@ -61,7 +61,7 @@ export function clientWelcomeEmail({ name, email, temporaryPassword, loginUrl, t
   const bodyText = [
     greeting,
     '',
-    'Your payment went through and your Cast of Mind account is open. Your subscription includes four sessions a month and unlimited messaging with your therapist in between.',
+    'Your payment went through and your Cast of Minds account is open. Your subscription includes four sessions a month and unlimited messaging with your therapist in between.',
     '',
     'Your sign-in details',
     `Email: ${email}`,

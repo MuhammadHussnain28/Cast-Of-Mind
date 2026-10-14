@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Brand Ink Rounded Badge (#19122B) -->
+  <rect width="32" height="32" rx="7" fill="#19122B"/>
+  
+  <!-- Subtle Border Outline -->
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.1"/>
+
+  <!-- High-End Serif Monogram in Warm Gold (#F5C518) -->
+  <text x="16" y="21.5" 
+        font-family="Georgia, 'Times New Roman', 'Fraunces', serif" 
+        font-size="14.5" 
+        font-weight="700" 
+        letter-spacing="-0.04em"
+        text-anchor="middle" 
+        fill="#F5C518">CM</text>
+</svg>

@@ -60,12 +60,12 @@ export const founder = {
   name: 'Asad',
   role: 'Founder',
   portrait: portrait1,
-  portraitAlt: 'Asad, founder of Cast of Mind',
-  lede: 'Cast of Mind began with a wait.',
+  portraitAlt: 'Asad, founder of Cast of Minds',
+  lede: 'Cast of Minds began with a wait.',
   body: [
-    'Asad founded Cast of Mind after watching someone close to him spend four months on a waiting list, then travel two hours for a fifty-minute appointment with a therapist who did not work with what he was actually dealing with. Nothing about that had gone wrong administratively. It was simply how the system worked.',
+    'Asad founded Cast of Minds after watching someone close to him spend four months on a waiting list, then travel two hours for a fifty-minute appointment with a therapist who did not work with what he was actually dealing with. Nothing about that had gone wrong administratively. It was simply how the system worked.',
     'The company exists to remove the three obstacles in that story: the wait, the journey, and the mismatch. A person describes what they are carrying, sees therapists who specialise in exactly that, and chooses one. Where either of them happens to live never enters into it.',
-    'He is deliberately not a clinician, and Cast of Mind is built so that he does not need to be. Clinical judgement belongs to the therapists; his job is to make sure the platform never gets in their way, and never asks a client to explain themselves twice.',
+    'He is deliberately not a clinician, and Cast of Minds is built so that he does not need to be. Clinical judgement belongs to the therapists; his job is to make sure the platform never gets in their way, and never asks a client to explain themselves twice.',
   ],
 }
 
