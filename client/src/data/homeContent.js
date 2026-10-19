@@ -102,7 +102,7 @@ export const concernThemes = [
 
 /** What a subscription actually includes. Master spec §2 and §13. */
 export const subscriptionIncludes = [
-  'Four therapy sessions a month, one a week, over Zoom.',
+  'Four therapy sessions a month , weekly video sessions.',
   'Unlimited chat with your therapist in between.',
   'Worksheets and a private journal your therapist can read.',
   'Cancel whenever you like. You keep access until the month you paid for ends.',
@@ -277,7 +277,7 @@ export const faqItems = [
     question: 'How much is it, and what am I paying for?',
     // §2 and §13.
     answer:
-      '€200 a month. There is one plan and no tiers. It covers four therapy sessions one a week, over Zoom and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
+      '€200 a month. There is one plan and no tiers. It covers four therapy sessions one a week, over video and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
   },
   {
     id: 'faq-privacy',

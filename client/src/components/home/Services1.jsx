@@ -192,7 +192,7 @@ export default function Services1() {
               What people bring us.
             </Heading>
             <Text tone="inverse" className="mt-7 max-w-measure opacity-80">
-              Cast of Minds is online therapy with one therapist you keep: a weekly session over Zoom, and unlimited chat in between.
+              Cast of Minds is online therapy with one therapist you keep: a weekly session over Video meeting, and unlimited chat in between.
             </Text>
             <Text tone="inverse" className="mt-5 max-w-measure opacity-80">
               Therapists tag the areas they work in. You tag what you are going

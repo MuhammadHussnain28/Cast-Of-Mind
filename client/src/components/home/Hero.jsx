@@ -183,7 +183,7 @@ const TRUST_PILLARS = [
   {
     icon: '🔒',
     label: '100% Confidential',
-    sub: 'Private weekly Zoom',
+    sub: 'Private weekly video session',
   },
 ]
 

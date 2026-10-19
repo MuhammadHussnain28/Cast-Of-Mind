@@ -23,7 +23,7 @@ export const intro = {
 export const escalationPhone = null
 export const supportHours = null
 
-export const SUPPORT_EMAIL = 'support@castofmind.com'
+export const SUPPORT_EMAIL = 'contact@castofminds.com'
 
 export const channels = [
   {

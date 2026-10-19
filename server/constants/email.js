@@ -27,7 +27,7 @@ export const BRAND = Object.freeze({
 // NOTE FOR LAUNCH: support@castofmind.com does not exist yet. The developer's
 // plan is to forward it to atcastofmind@gmail.com once the domain is set up.
 // Until then, mail sent to it will bounce. On the pre-launch checklist.
-export const SUPPORT_EMAIL = 'support@castofmind.com';
+export const SUPPORT_EMAIL = 'contact@castofminds.com';
 
 export const EMAIL_SUBJECTS = Object.freeze({
   passwordReset: 'Reset your Cast of Minds password',

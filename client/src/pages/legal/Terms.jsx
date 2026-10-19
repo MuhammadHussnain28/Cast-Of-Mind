@@ -62,10 +62,10 @@ export default function Terms() {
             <div>
               <span className="font-semibold text-ink">Support:</span>{' '}
               <a
-                href="mailto:support@castofminds.com"
+                href="mailto:contact@castofminds.com"
                 className="text-ink underline decoration-gold underline-offset-4 hover:text-ink-deep"
               >
-                support@castofminds.com
+                contact@castofminds.com
               </a>
             </div>
             <div>
@@ -170,8 +170,8 @@ export default function Terms() {
                   These Terms of Service (the &ldquo;Agreement&rdquo;) constitute a legally binding
                   contract between you (&ldquo;Client&rdquo;, &ldquo;you&rdquo;) and{' '}
                   <strong>Cast of Minds</strong> (&ldquo;Company&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;,
-                  or &ldquo;our&rdquo;), located at{' '}
-                  <em>D7, 10th St, Dhani Bakhshani Road, Karachi, Pakistan</em>.
+                  or &ldquo;our&rdquo;), registered in Pakistan and the United Kingdom (Corporate
+                  Registration No. 4220104917965), operating from Karachi, Pakistan.
                 </p>
                 <p>
                   By visiting, accessing, or registering on our platform at{' '}
@@ -266,8 +266,8 @@ export default function Terms() {
                   <strong>Credential Confidentiality:</strong> You are solely responsible for maintaining
                   the confidentiality of your login credentials, password, and session access. You must
                   notify us immediately at{' '}
-                  <a href="mailto:support@castofminds.com" className="text-ink underline decoration-gold">
-                    support@castofminds.com
+                  <a href="mailto:contact@castofminds.com" className="text-ink underline decoration-gold">
+                    contact@castofminds.com
                   </a>{' '}
                   if you suspect any unauthorized access to your account.
                 </p>
@@ -297,8 +297,7 @@ export default function Terms() {
                     <li className="flex items-start gap-2">
                       <span className="text-gold font-bold">&bull;</span>
                       <span>
-                        <strong>Four (4) Live Sessions:</strong> One scheduled session per week (50 minutes
-                        each) conducted over secure Zoom video conferencing.
+                        <strong>Four (4) Live Sessions:</strong> One scheduled session per week conducted over secure Zoom video conferencing.
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
@@ -499,7 +498,7 @@ export default function Terms() {
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-4">
                 <a
-                  href="mailto:support@castofminds.com"
+                  href="mailto:contact@castofminds.com"
                   className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-sm font-medium text-paper transition-all hover:bg-ink-deep"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -510,7 +509,7 @@ export default function Terms() {
                       d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                     />
                   </svg>
-                  Email support@castofminds.com
+                  Email contact@castofminds.com
                 </a>
                 <Link
                   to="/refund"
