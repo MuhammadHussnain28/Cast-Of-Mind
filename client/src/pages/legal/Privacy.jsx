@@ -59,10 +59,10 @@ export default function Privacy() {
             <div>
               <span className="font-semibold text-ink">Support:</span>{' '}
               <a
-                href="mailto:support@castofminds.com"
+                href="mailto:contact@castofminds.com"
                 className="text-ink underline decoration-gold underline-offset-4 hover:text-ink-deep"
               >
-                support@castofminds.com
+                contact@castofminds.com
               </a>
             </div>
             <div>
@@ -198,13 +198,14 @@ export default function Privacy() {
                 </p>
                 <p>
                   Cast of Minds acts as the <strong>Data Controller</strong> for your account and personal
-                  data, located at <em>D7, 10th St, Dhani Bakhshani Road, Karachi, Pakistan</em>. We can be
-                  reached directly regarding all data protection inquiries at{' '}
+                  data (Corporate Registration No. 4220104917965, registered in Pakistan and the United
+                  Kingdom), operating from Karachi, Pakistan. We can be reached directly regarding all
+                  data protection inquiries at{' '}
                   <a
-                    href="mailto:support@castofminds.com"
+                    href="mailto:contact@castofminds.com"
                     className="text-ink font-semibold underline decoration-gold"
                   >
-                    support@castofminds.com
+                    contact@castofminds.com
                   </a>
                   .
                 </p>
@@ -489,10 +490,10 @@ export default function Privacy() {
                   <li>
                     Request permanent deletion of your profile and login access by emailing{' '}
                     <a
-                      href="mailto:support@castofminds.com"
+                      href="mailto:contact@castofminds.com"
                       className="text-ink font-semibold underline decoration-gold"
                     >
-                      support@castofminds.com
+                      contact@castofminds.com
                     </a>
                     .
                   </li>
@@ -516,7 +517,7 @@ export default function Privacy() {
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-4">
                 <a
-                  href="mailto:support@castofminds.com"
+                  href="mailto:contact@castofminds.com"
                   className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-sm font-medium text-paper transition-all hover:bg-ink-deep"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -527,7 +528,7 @@ export default function Privacy() {
                       d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                     />
                   </svg>
-                  Email support@castofminds.com
+                  Email contact@castofminds.com
                 </a>
                 <Link
                   to="/terms"

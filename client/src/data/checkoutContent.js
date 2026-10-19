@@ -47,7 +47,7 @@ export const included = [
   {
     icon: 'sessions',
     title: 'Four sessions a month',
-    detail: 'Weekly session with your therapist, over Zoom.',
+    detail: 'Weekly video session with your therapist.',
   },
   {
     icon: 'chat',

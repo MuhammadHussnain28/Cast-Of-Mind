@@ -68,7 +68,7 @@ const REASONS = [
     num: '02',
     category: 'ACCESS',
     title: 'No Commute.',
-    body: 'Weekly 1-on-1 Zoom sessions and unlimited private chat from the quiet comfort of your home.',
+    body: 'Weekly 1-on-1 over video sessions and unlimited private chat from the quiet comfort of your home.',
     tag: 'Home Sanctuary',
     bg: 'bg-mist',
     border: 'border-white/30',

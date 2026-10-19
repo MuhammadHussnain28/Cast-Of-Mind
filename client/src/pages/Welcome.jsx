@@ -221,7 +221,7 @@ export default function Welcome() {
               </span>
             </div>
             <p className="font-body text-caption text-ink/70 truncate">
-              {therapist.therapistType || 'Licensed Therapist'} · 4 Zoom sessions available
+              {therapist.therapistType || 'Licensed Therapist'} · 4 video sessions available
             </p>
           </div>
         </div>

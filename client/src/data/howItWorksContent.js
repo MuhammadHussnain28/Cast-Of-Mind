@@ -62,7 +62,7 @@ export const phases = [
         icon: 'subscribe',
         title: 'Subscribe',
         // §2 price and inclusions; §12 hosted checkout, no raw card details.
-        body: '€200 a month. That is four therapy sessions, one a week over Zoom, and unlimited chat with your therapist in between. Payment happens on the payment provider’s own secure page.',
+        body: '€200 a month. That is four therapy sessions, one a week over Video, and unlimited chat with your therapist in between. Payment happens on the payment provider’s own secure page.',
         note: 'Your card details never reach us. Cancel any time.',
       },
       {
@@ -93,7 +93,7 @@ export const phases = [
       {
         id: 'sessions',
         icon: 'sessions',
-        title: 'You meet on Zoom, weekly',
+        title: 'You meet over Video, weekly',
         // §7.4 therapist schedules; times in the viewer's own zone; §7.1 offline.
         body: 'Your therapist schedules each session and the link appears in your chat. Times show in your own time zone, so there is no arithmetic to do, and the join button becomes active when the session starts.',
         note: 'Between sessions, if your therapist is offline your message waits. It is not lost.',

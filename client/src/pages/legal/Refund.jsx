@@ -57,10 +57,10 @@ export default function Refund() {
             <div>
               <span className="font-semibold text-ink">Support:</span>{' '}
               <a
-                href="mailto:support@castofminds.com"
+                href="mailto:contact@castofminds.com"
                 className="text-ink underline decoration-gold underline-offset-4 hover:text-ink-deep"
               >
-                support@castofminds.com
+                contact@castofminds.com
               </a>
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function Refund() {
                   using the payment method on file via our payment partner, Stripe.
                 </p>
                 <p>
-                  Each monthly billing cycle grants full platform access, including four (4) live 50-minute
+                  Each monthly billing cycle grants full platform access, including four (4) live 
                   weekly sessions via secure Zoom video, unlimited messaging with your therapist, shared
                   worksheets, and your private reflective journal.
                 </p>
@@ -313,10 +313,10 @@ export default function Refund() {
                   <strong>How to Submit a Request:</strong> If you believe your situation qualifies for an
                   exception, please contact us at{' '}
                   <a
-                    href="mailto:support@castofminds.com"
+                    href="mailto:contact@castofminds.com"
                     className="text-ink font-semibold underline decoration-gold"
                   >
-                    support@castofminds.com
+                    contact@castofminds.com
                   </a>{' '}
                   from your registered account email. Please include your full name and a clear description
                   of the issue.
@@ -349,10 +349,10 @@ export default function Refund() {
                   concerns regarding a billing deduction or the quality of your care, we warmly encourage
                   you to reach out to our administration directly at{' '}
                   <a
-                    href="mailto:support@castofminds.com"
+                    href="mailto:contact@castofminds.com"
                     className="text-ink font-semibold underline decoration-gold"
                   >
-                    support@castofminds.com
+                    contact@castofminds.com
                   </a>{' '}
                   before contacting your card provider or initiating a bank chargeback.
                 </p>
@@ -374,7 +374,7 @@ export default function Refund() {
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-4">
                 <a
-                  href="mailto:support@castofminds.com"
+                  href="mailto:contact@castofminds.com"
                   className="inline-flex items-center gap-2 rounded-xl bg-ink px-6 py-3 text-sm font-medium text-paper transition-all hover:bg-ink-deep"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -385,7 +385,7 @@ export default function Refund() {
                       d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                     />
                   </svg>
-                  Email support@castofminds.com
+                  Email contact@castofminds.com
                 </a>
                 <Link
                   to="/terms"

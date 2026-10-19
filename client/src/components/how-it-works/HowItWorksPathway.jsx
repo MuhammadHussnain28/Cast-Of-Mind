@@ -263,10 +263,10 @@ const MILESTONES = [
   {
     id: 4,
     tag: '04 · THERAPY',
-    title: 'Zoom & Chat',
+    title: 'Video Meeting & Chat',
     badge: '4 Weekly Calls',
     badgeStyle: 'bg-white/10 text-paper',
-    detail: 'Send your mandatory first message, meet on weekly 1-on-1 Zoom sessions in your timezone, and access 24/7 unlimited chat & worksheets.',
+    detail: 'Send your mandatory first message, meet on weekly 1-on-1 over video sessions in your timezone, and access 24/7 unlimited chat & worksheets.',
     surface: 'bg-ink text-paper border-gold',
   },
 ]

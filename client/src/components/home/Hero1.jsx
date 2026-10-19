@@ -69,7 +69,7 @@ const GUARANTEES = [
     icon: ShieldLockIcon,
     iconColor: 'text-sage',
     title: 'Private Sanctuary',
-    desc: 'Weekly 1-on-1 Zoom + unlimited chat.',
+    desc: 'Weekly 1-on-1 Video session + unlimited chat.',
   },
 ]
 
