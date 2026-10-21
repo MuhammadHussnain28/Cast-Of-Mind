@@ -132,6 +132,7 @@ export default function WorkingHoursGrid({ value, onChange, errors = {}, rootErr
 
                   {entry.enabled ? (
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                      {/* PREVIOUS CODE PRESERVED:
                       <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
                         <input
                           type="time"
@@ -141,6 +142,28 @@ export default function WorkingHoursGrid({ value, onChange, errors = {}, rootErr
                           className="min-h-11 w-full min-w-0 flex-1 rounded-xl border border-ink/50 bg-paper px-2 font-body text-ui tabular-nums text-ink-deep sm:w-auto sm:flex-none sm:px-3 transition-[border-color,box-shadow] duration-200 focus:border-sage focus:shadow-[0_0_0_4px_rgb(124_144_130_/_0.15)]"
                         />
                         <span aria-hidden="true" className="font-body text-caption text-ink/60">
+                          to
+                        </span>
+                        <input
+                          type="time"
+                          value={entry.end}
+                          onChange={(e) => update(day.key, { end: e.target.value })}
+                          aria-label={`${day.label} end time`}
+                          className="min-h-11 w-full min-w-0 flex-1 rounded-xl border border-ink/50 bg-paper px-2 font-body text-ui tabular-nums text-ink-deep sm:w-auto sm:flex-none sm:px-3 transition-[border-color,box-shadow] duration-200 focus:border-sage focus:shadow-[0_0_0_4px_rgb(124_144_130_/_0.15)]"
+                        />
+                      </div>
+                      */}
+
+                      {/* RESPONSIVE MOBILE FIX: stacks on narrow mobile (<640px), row on sm+ */}
+                      <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
+                        <input
+                          type="time"
+                          value={entry.start}
+                          onChange={(e) => update(day.key, { start: e.target.value })}
+                          aria-label={`${day.label} start time`}
+                          className="min-h-11 w-full min-w-0 flex-1 rounded-xl border border-ink/50 bg-paper px-2 font-body text-ui tabular-nums text-ink-deep sm:w-auto sm:flex-none sm:px-3 transition-[border-color,box-shadow] duration-200 focus:border-sage focus:shadow-[0_0_0_4px_rgb(124_144_130_/_0.15)]"
+                        />
+                        <span aria-hidden="true" className="text-center font-body text-caption text-ink/60 sm:text-left">
                           to
                         </span>
                         <input

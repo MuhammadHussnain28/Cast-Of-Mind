@@ -35,7 +35,7 @@ export function baseTemplate({ title, bodyHtml, buttonLabel, buttonUrl, footerNo
 
     // Around lines 31-34:
   const header = env.emailLogoUrl
-    ? `<img src="${env.emailLogoUrl}" width="200" alt="${BRAND.name}"
+    ? `<img src="${env.emailLogoUrl}" width="200" class="email-logo" alt="${BRAND.name}"
           style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:200px;max-width:200px;height:auto;">`
     : `<span style="font-size:24px;font-weight:600;color:${BRAND.ink};letter-spacing:0.02em;">${BRAND.name}</span>`;
 
@@ -85,6 +85,15 @@ export function baseTemplate({ title, bodyHtml, buttonLabel, buttonUrl, footerNo
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
+<style>
+  @media only screen and (max-width: 480px) {
+    .email-logo {
+      width: 140px !important;
+      max-width: 140px !important;
+      height: auto !important;
+    }
+  }
+</style>
 </head>
 <body style="margin:0;padding:0;background-color:${BRAND.mist};">
   <!-- Preheader: the grey preview line beside the subject in most inboxes.
