@@ -23,10 +23,13 @@ import { useLocation } from 'react-router-dom'
  * does not cover the heading it just scrolled to.
  */
 export default function ScrollToHash() {
-  const { hash } = useLocation()
+  const { pathname, hash } = useLocation()
 
   useEffect(() => {
-    if (!hash) return undefined
+    if (!hash) {
+      window.scrollTo(0, 0)
+      return undefined
+    }
 
     const id = decodeURIComponent(hash.slice(1))
     if (!id) return undefined
@@ -56,7 +59,7 @@ export default function ScrollToHash() {
 
     frame = requestAnimationFrame(tryScroll)
     return () => cancelAnimationFrame(frame)
-  }, [hash])
+  }, [pathname, hash])
 
   return null
 }
