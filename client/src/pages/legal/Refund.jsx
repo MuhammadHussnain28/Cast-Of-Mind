@@ -287,15 +287,6 @@ export default function Refund() {
                       with a suitable practitioner, you are entitled to a refund for the affected sessions.
                     </p>
                   </div>
-
-                  <div className="rounded-xl border border-ink/10 bg-paper p-4 shadow-xs">
-                    <h3 className="font-semibold text-ink-deep">3. Immediate Cancellation (Zero Sessions Used)</h3>
-                    <p className="mt-1 text-xs leading-relaxed text-ink/75">
-                      If you subscribe and immediately realize that the platform does not meet your needs,
-                      you may request a refund within <strong>24 hours</strong> of your initial payment,
-                      provided you have not booked or attended any live sessions.
-                    </p>
-                  </div>
                 </div>
               </div>
             </article>
@@ -322,8 +313,8 @@ export default function Refund() {
                   of the issue.
                 </p>
                 <p>
-                  <strong>14-Day Request Window:</strong> All refund requests must be received within{' '}
-                  <strong>fourteen (14) calendar days</strong> of the disputed charge date. Requests
+                  <strong>7-Day Request Window:</strong> All refund requests must be received within{' '}
+                  <strong>seven (7) calendar days</strong> of the disputed charge date. Requests
                   submitted after this period cannot be reviewed.
                 </p>
                 <p>
