@@ -204,10 +204,13 @@ export default function Terms() {
                   solely responsible for clinical decisions and the delivery of therapy.
                 </p>
                 <p>
-                  <strong>Therapist Matching & Switching:</strong> Clients are matched with therapists based
-                  on their questionnaire responses and stated clinical focus areas. If you feel that your
-                  assigned therapist is not the right fit for your personal needs, you may request a
-                  rematch through your account at any time without penalty.
+                  <strong>Therapist Matching:</strong> Clients are matched with therapists based
+                  on their questionnaire responses and clinical focus areas. If you have any concerns
+                  about your match, please contact support at{' '}
+                  <a href="mailto:contact@castofminds.com" className="text-ink underline decoration-gold">
+                    contact@castofminds.com
+                  </a>{' '}
+                  so our team can assist you.
                 </p>
                 <p>
                   <strong>Therapist Departure:</strong> If a therapist ceases to practice on Cast of Minds,

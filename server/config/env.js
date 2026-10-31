@@ -144,6 +144,7 @@ function loadEnv() {
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     isProduction,
+    cookieSameSite: (process.env.COOKIE_SAMESITE || 'lax').trim().toLowerCase(),
 
     // Resend. `emailFrom` falls back to Resend's shared test sender, which can
     // only deliver to the address the Resend account was registered with —

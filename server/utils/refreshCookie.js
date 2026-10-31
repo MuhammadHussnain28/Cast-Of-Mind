@@ -23,7 +23,8 @@ function cookieOptions() {
     // does not matter.
     //
     
-    sameSite: env.isProduction ? 'none' : 'lax' ,
+    // sameSite: env.isProduction ? 'none' : 'lax' ,
+    sameSite: env.cookieSameSite,
 
     // Scoped so the browser only ever sends this cookie to auth routes. It is
     // never attached to ordinary API calls, which shrinks where it can leak.
