@@ -162,7 +162,7 @@ export default function SubscriptionEnded({ therapist, reviewState, kept, canRes
   })
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-mist px-4 py-12 sm:py-16">
+    <div className="relative min-h-dvh overflow-y-auto bg-mist px-4 py-12 sm:py-16">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-1/2 top-24 size-[30rem] -translate-x-1/2 rounded-full bg-sage/10 blur-[130px]"

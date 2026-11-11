@@ -19,7 +19,7 @@ function cookieOptions() {
     secure: env.isProduction,
 
     // 'lax' works while the site and API share a registrable domain
-    // (castofmind.com and api.castofmind.com), and on localhost where the port
+    // (castofminds.com and api.castofminds.com), and on localhost where the port
     // does not matter.
     //
     

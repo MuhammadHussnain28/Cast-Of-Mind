@@ -2,6 +2,12 @@ node_modules/
 .env
 .env.local
 
+# Video generation output
+brag-output/
+.claude/skills/brag/
+.agents/skills/brag/
+
+
 # Build output
 dist/
 build/

@@ -3,6 +3,8 @@ import { Heading, Text } from '../components/ui'
 import ContactForm from '../components/contact/ContactForm'
 import ContactChannels from '../components/contact/ContactChannels'
 import { intro } from '../data/contactContent'
+import {useEffect} from 'react'
+
 
 export default function Contact() {
   const reduceMotion = useReducedMotion()
@@ -15,6 +17,10 @@ export default function Contact() {
           animate: { opacity: 1, y: 0 },
           transition: { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] },
         }
+
+  useEffect(()=>{
+    document.title = 'Contact & Support | Cast of Minds'
+    } , [])    
 
   return (
     <div

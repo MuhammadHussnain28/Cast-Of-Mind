@@ -47,7 +47,7 @@ import Terms from './pages/legal/Terms'
 import Refund from './pages/legal/Refund'
 import NotFound from './pages/NotFound'
 // TODO: REMOVE BEFORE LAUNCH - development-only styleguide route.
-import Styleguide from './pages/Styleguide'
+// import Styleguide from './pages/Styleguide'
 
 export default function App() {
   return (
@@ -173,8 +173,8 @@ export default function App() {
               <Route path="*" element={<AdminNotFound />} />
             </Route>
 
-            {/* TODO: REMOVE BEFORE LAUNCH - development only, no layout. */}
-            <Route path="/styleguide" element={<Styleguide />} />
+            {/* TODO: REMOVE BEFORE LAUNCH - development only, no layout.(Just Commented) */}
+            {/* <Route path="/styleguide" element={<Styleguide />} /> */}
           </Routes>
         </AuthBootstrap>
       </BrowserRouter>
