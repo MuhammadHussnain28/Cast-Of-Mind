@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <!-- TODO: favicon pending — client to supply. -->
-     <link rel="icon" type="image/png" href="./public/cast-of-mind-logo-white.png" />
+     <link rel="icon" type="image/png" href="/cast-of-mind-logo-white.png" />
     <meta name="theme-color" content="#19122B" />
     <!--
       `interactive-widget=resizes-content` tells the browser to SHRINK the
@@ -56,8 +56,47 @@
       rel="stylesheet"
     />
 
-    <title>Cast of Minds</title>
+    <title>Cast of Minds — Online Therapy & Mental Health Platform</title>
+
+    <!-- 1. Google Search Description -->
+    <meta
+      name="description"
+      content="Cast of Minds connects you with licensed, verified therapists matched to your exact needs. Confidential 1-on-1 video sessions and continuous chat support."
+    />
+
+    <!-- 2. WhatsApp, LinkedIn & Facebook Share Card -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Cast of Minds — Online Therapy & Mental Health Platform" />
+    <meta
+      property="og:description"
+      content="Confidential online therapy with verified master's and doctoral clinicians matched to your specific needs."
+    />
+    <meta property="og:image" content="/cast-of-mind-logo-white.png" />
+
+    <!-- 3. Twitter / X Share Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cast of Minds — Online Therapy & Mental Health Platform" />
+    <meta
+      name="twitter:description"
+      content="Confidential online therapy with verified clinicians matched to your specific needs."
+    />
+    <meta name="twitter:image" content="/cast-of-mind-logo-white.png" />
+
+    <!-- 4. Google Business & Platform Schema -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "MedicalOrganization",
+        "name": "Cast of Minds",
+        "url": "https://castofminds.com",
+        "logo": "https://castofminds.com/cast-of-mind-logo-white.png",
+        "description": "Online mental health and therapy platform connecting clients with verified therapists for confidential video sessions and messaging.",
+        "medicalSpecialty": "Psychiatric"
+      }
+    </script>
+
   </head>
+  
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

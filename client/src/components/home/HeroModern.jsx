@@ -132,8 +132,8 @@ export default function HeroModern() {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-sage"></span>
                 </span>
                 <span className="text-xs text-paper/85 font-medium tracking-wide">
-                  Over 100+ certified clinicians worldwide
-                </span>
+                  Certified <span className='italic mr-0.5'>&</span>&nbsp;Licensed Clinicians Worldwide
+                </span> 
               </div>
             </div>
           </motion.div>

@@ -3,6 +3,8 @@ import BrandStoryModern from '../components/about/BrandStoryModern'
 import BrandStory from '../components/about/BrandStory'
 import Founder from '../components/about/Founder'
 import TeamGrid from '../components/about/TeamGrid'
+import { useEffect } from 'react'
+
 
 /**
  * About — master spec §24.7: mission and story, brand presentation, the full
@@ -30,6 +32,11 @@ import TeamGrid from '../components/about/TeamGrid'
  * (data/aboutPlaceholders.js) and are on the pre-launch blocker list.
  */
 export default function About() {
+
+  useEffect(() => {
+    document.title = 'About Us & Our Mission | Cast of Minds'
+  }, [])
+
   return (
     <>
       <AboutHeroModern />

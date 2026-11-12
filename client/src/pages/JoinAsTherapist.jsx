@@ -4,6 +4,7 @@ import WhyPractiseHere from '../components/join/WhyPractiseHere'
 import EligibilityCard from '../components/join/EligibilityCard'
 import ApplicationForm from '../components/join/ApplicationForm'
 import { Lock } from '../components/join/JoinIcons'
+import { useEffect } from 'react'
 import { intro } from '../data/joinContent'
 
 /**
@@ -30,6 +31,11 @@ export default function JoinAsTherapist() {
           animate: { opacity: 1, y: 0 },
           transition: { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] },
         }
+
+    useEffect(()=>{
+      document.title = 'Join Our Clinical Team as a Therapist | Cast of Minds'
+    } , [])
+
 
   return (
     <div

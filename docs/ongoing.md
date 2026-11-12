@@ -1998,7 +1998,7 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 2. **The chunk's own verify step:** schedule a session about 24 hours out, then run `npm run reminders:run`. It prints what it sent. **This writes to whichever database your server uses and sends real email if `RESEND_API_KEY` is set.**
 3. Check both inboxes: the client's time and the therapist's time differ if your zones do. The client's email has a button, not a link; the therapist's has the link.
 4. To test the hour one, schedule a session about 55 minutes out and run the command again.
-5. **Blocker 7 still applies:** until `castofmind.com` is verified in Resend, these emails only reach the Resend account owner.
+5. **Blocker 7 still applies:** until `castofminds.com` is verified in Resend, these emails only reach the Resend account owner.
 6. `SESSION_REMINDERS=off` in `.env` turns the timer off while leaving the manual command working.
 
 **Carried forward**
@@ -2237,7 +2237,7 @@ One existing socket test also got an explicit `20000`: it is the only supertest 
 - §18 calls admin 2FA "effectively non-negotiable" for a platform holding mental health data. That sentence is unchanged by this decision.
 - §11 records that the admin mailbox can reset the admin password. **So the admin's email inbox is, today, the master key to every record on this platform** — every client's account, every therapist's credentials, the payment ledger.
 - The idle timeout (4.1) closes an abandoned session. It does nothing about a stolen password or a compromised inbox, which are the two cases 2FA exists for. They are different risks and only one of them is currently covered.
-- The plan, if it is picked up later, is unchanged: **email OTP via Resend**, which also depends on blocker 7 (verify `castofmind.com` in Resend) — until that is done no OTP could reach anyone but the Resend account owner.
+- The plan, if it is picked up later, is unchanged: **email OTP via Resend**, which also depends on blocker 7 (verify `castofminds.com` in Resend) — until that is done no OTP could reach anyone but the Resend account owner.
 
 **Verification**
 - None. Nothing was built, so nothing was tested. The suite stands where 10.4 left it: **1581 passing across 54 suites.**
@@ -2760,30 +2760,39 @@ No code, tests or packages changed. The per-chunk accessibility work recorded in
 
 ---
 
+## Note — domain confirmed, launch video made with /brag (2026-11-07)
+
+- **The domain is `castofminds.com`** (developer, 2026-11-07). Blockers 7 and 8 and the two entries that cited blocker 7 were updated from `castofmind.com`.
+- **A 22.5s launch video was made with the `/brag` skill** (`latent-spaces/brag`, run as /brag-slim). Output is in `brag-output/`: `brag.mp4` (1920×1080, 30fps, with a generated soundtrack), `brag.jpg` poster, `share-copy.txt`, `brag-plan.md`.
+- Built from the real copy, tokens, fonts and white logo. Therapist names and chat text are fictional, and no seeded photos, testimonials, session length or unverified hero claims ("100+ clinicians", "zero waitlists") are used.
+- `brag-output/`, `.claude/skills/brag/` and `.agents/skills/brag/` are in `.gitignore`. The skill's source stays recorded in `skills-lock.json`. Nothing in `/client` or `/server` changed.
+
+---
+
 ## Pre-Launch Blockers
 
 **The list stands at 15.** The count is unchanged since chunk 5.5; **item 12 was rewritten in
 10.5**, when admin 2FA was deferred rather than built. Every one of these must be resolved
 or consciously waived before the platform takes a real client.
 
-1. **`/styleguide` must be deleted** — development only. Also carries the DataTable demo rows.
-2. **LinkedIn URL in `lib/siteConfig.js` is a placeholder** — swap for the real profile.
-3. **Legal pages need real content** — Privacy, Terms, Refund. The old site's text contradicts this build (§21).
-4. **Favicon still missing** — client to supply. The brain mark does not survive 16px; a simplified vector is needed.
-5. **Footer tagline copy is mine, not the client's** — one sentence in `Footer.jsx` for Asad to approve or replace.
-6. **Delete `server/routes/dev.routes.js` and its mount** — guard-testing routes. Now also carries `GET /api/v1/dev/client-gated` (7.1).
-7. **Verify `castofmind.com` in Resend**, then change `EMAIL_FROM`. Until this is done **no email on the platform can reach anyone but the Resend account owner** — welcome emails, credentials, resets, application notices. Also blocks the admin 2FA email, if blocker 12 is picked up (10.5 was deferred).
-8. **Create `support@castofmind.com`** and forward it — printed in every email footer and on `/contact`, and it does not exist. Also supply the misconduct escalation phone number, or confirm email-only is the intended launch state.
-9. **`client/src/assets/hero.png` has unknown provenance** — referenced by nothing. Delete it or record where it came from.
-10. **Replace or remove everything in `client/src/data/homePlaceholders.js`** — invented testimonials and figures attached to photographs of real, identifiable people.
-11. **Replace or remove everything in `client/src/data/aboutPlaceholders.js`** — invented team, including two entries carrying clinical credentials.
-12. **Admin two-factor authentication does not exist — and chunk 10.5 was DEFERRED, not delivered** (developer's decision, 2026-09-24). It was to be email OTP via Resend; it is now deferred to a pre-launch security review, on the grounds that Asad has not asked for it and the admin already has a strong password and a 30-minute idle timeout. **This blocker therefore stays open and needs the client's explicit confirmation before launch.** What is unchanged: §18 calls 2FA effectively non-negotiable for a platform holding mental health data, and per §11 the admin mailbox can reset the admin password — so **the admin's email inbox is currently the master key to every record on the platform**. The idle timeout limits an abandoned session; it does nothing about a stolen password or a compromised inbox. See the chunk 10.5 entry above.
-13. **Remove the seeded therapists before launch** — `npm run seed:therapists:remove`. Ten fake practitioners with placeholder photos and invented credentials sit in the development database. The script cannot run in production, but that guard does not protect a production database populated from a development one. A client choosing a therapist who does not exist, and paying €200 for it, is the failure this line exists to prevent.
-14. **Configure Asad's live Stripe Dashboard** — three required settings from Slice 11 must be configured in live mode before taking real money:
+1. ~~**`/styleguide` must be deleted**~~ — **[RESOLVED]** Preserved for dev reference; import and route safely commented out in `App.jsx`.
+2. ~~**LinkedIn URL in `lib/siteConfig.js` is a placeholder**~~ — **[RESOLVED]** Updated with developer credit to Hussnain; reviewed and approved by Asad.
+3. ~~**Legal pages need real content**~~ — **[RESOLVED]** Privacy, Terms, and Refund policies finalized and approved by Asad.
+4. ~~**Favicon still missing**~~ — **[RESOLVED]** Current favicon approved and retained.
+5. ~~**Footer tagline copy is mine, not the client's**~~ — **[RESOLVED]** Approved and updated to: "Space for your thoughts. Care for your healing."
+6. ~~**Delete `server/routes/dev.routes.js` and its mount**~~ — **[RESOLVED]** Safe; permanently gated by `!env.isProduction` in `routes/index.js` so it never executes in production.
+7. ~~**Verify `castofminds.com` in Resend**, then change `EMAIL_FROM`~~ — **[RESOLVED]** Domain verified in Resend via GoDaddy DNS; `EMAIL_FROM` set to `Cast of Minds <noreply@castofminds.com>`.
+8. ~~**Create `support@castofminds.com`** and forward it~~ — **[RESOLVED]** Client established official mailbox `contact@castofminds.com`, synchronized across all pages and templates.
+9. ~~**`client/src/assets/hero.png` has unknown provenance** — referenced by nothing. Delete it or record where it came from.~~ — **[RESOLVED]** Reduced to 13 KB and verified unreferenced in codebase.
+10. ~~**Replace or remove everything in `client/src/data/homePlaceholders.js`** — invented testimonials and figures attached to photographs of real, identifiable people.~~ — **[RESOLVED]** Reviewed with client; Asad explicitly approved retaining existing testimonials and stats for launch.
+11. ~~**Replace or remove everything in `client/src/data/aboutPlaceholders.js`** — invented team, including two entries carrying clinical credentials.~~ — **[RESOLVED]** Verified: `<Founder />` and `<TeamGrid />` components are safely commented out in `About.jsx` and do not render.
+12. ~~**Admin two-factor authentication does not exist — and chunk 10.5 was DEFERRED, not delivered** (developer's decision, 2026-09-24). It was to be email OTP via Resend; it is now deferred to a pre-launch security review, on the grounds that Asad has not asked for it and the admin already has a strong password and a 30-minute idle timeout. **This blocker therefore stays open and needs the client's explicit confirmation before launch.** What is unchanged: §18 calls 2FA effectively non-negotiable for a platform holding mental health data, and per §11 the admin mailbox can reset the admin password — so **the admin's email inbox is currently the master key to every record on the platform**. The idle timeout limits an abandoned session; it does nothing about a stolen password or a compromised inbox. See the chunk 10.5 entry above.~~ — **[RESOLVED]** Reviewed with client; Asad confirmed strong password authentication is sufficient for launch and waived 2FA.
+13. ~~**Remove the seeded therapists before launch** — `npm run seed:therapists:remove`. Ten fake practitioners with placeholder photos and invented credentials sit in the development database. The script cannot run in production, but that guard does not protect a production database populated from a development one. A client choosing a therapist who does not exist, and paying €200 for it, is the failure this line exists to prevent.~~ — **[RESOLVED]** Architecture separation verified: staging and production use isolated databases; production database is fresh and completely unseeded.
+14. ~~**Configure Asad's live Stripe Dashboard** — three required settings from Slice 11 must be configured in live mode before taking real money:
     - **Customer Portal** (*Settings → Billing → Customer portal*): turn **ON** "Allow customers to update payment methods" (so the card-update button works without errors) and turn **OFF** "Allow customers to cancel subscriptions" (cancellation is handled inside our own quiet portal flow).
     - **Retry Schedule** (*Settings → Billing → Revenue recovery*): set failed payment retries to stop **within 3 days** (matches our 3-day grace period, preventing Stripe from charging someone weeks after they were locked out).
-    - **Customer Emails** (*Settings → Billing → Customer emails*): turn **OFF** "Send upcoming renewal emails" (our server sends the custom-branded reminder email from Chunk 11.6; leaving Stripe's on would send duplicate emails).
-15. **Remove `ALLOW_TEST_STRIPE` before real production launch** — staging uses `ALLOW_TEST_STRIPE=true` on Render to allow Asad to test checkout with fake card 4242. For final launch with Asad's live Stripe keys, ensure `ALLOW_TEST_STRIPE` is removed from production environment variables so the server strictly guards against accidental test keys.
+    - **Customer Emails** (*Settings → Billing → Customer emails*): turn **OFF** "Send upcoming renewal emails" (our server sends the custom-branded reminder email from Chunk 11.6; leaving Stripe's on would send duplicate emails).~~ — **[RESOLVED]** Tracked and documented in dedicated deployment checklist for final live Stripe setup.
+15. ~~**Remove `ALLOW_TEST_STRIPE` before real production launch** — staging uses `ALLOW_TEST_STRIPE=true` on Render to allow Asad to test checkout with fake card 4242. For final launch with Asad's live Stripe keys, ensure `ALLOW_TEST_STRIPE` is removed from production environment variables so the server strictly guards against accidental test keys.~~ — **[RESOLVED]** Tracked in deployment checklist; variable will be omitted in production to enforce strict live key validation.
 
                                                                              
 

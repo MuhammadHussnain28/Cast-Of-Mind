@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /portal/
+Disallow: /api/
+Disallow: /checkout
+Disallow: /welcome
+Disallow: /questionnaire
+Disallow: /matches
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /styleguide
+
+Sitemap: https://castofminds.com/sitemap.xml

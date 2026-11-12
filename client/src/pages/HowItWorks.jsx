@@ -2,6 +2,7 @@ import HowItWorksHero from '../components/how-it-works/HowItWorksHero'
 import ProcessPhase from '../components/how-it-works/ProcessPhase'
 import ClosingCta from '../components/how-it-works/ClosingCta'
 import { phases } from '../data/howItWorksContent'
+import { useEffect } from 'react'
 
 /**
  * The full seven steps, grouped into three phases (§24.7). The home page's
@@ -27,6 +28,12 @@ const START_NUMBERS = phases.reduce(
 )
 
 export default function HowItWorks() {
+
+  useEffect(()=>{
+    document.title = 'How Online Therapy Works | Cast of Minds'
+  } , [])
+
+
   return (
     <>
       <HowItWorksHero />

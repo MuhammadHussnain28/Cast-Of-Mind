@@ -45,7 +45,7 @@ export function contactMessageEmail({ name, email, subject, message }) {
     html: baseTemplate({
       title: 'New message from the website',
       bodyHtml,
-      footerNote: 'Sent from the contact form at castofmind.com.',
+      footerNote: 'Sent from the contact form at castofminds.com.',
     }),
     text: baseTextTemplate({
       title: 'New message from the website',

@@ -132,7 +132,7 @@ function loadEnv() {
   if (isProduction && !process.env.EMAIL_FROM) {
     console.error('Missing EMAIL_FROM.');
     console.error('Set it to a sender on a domain verified in Resend,');
-    console.error('for example: Cast of Mind <noreply@castofmind.com>');
+    console.error('for example: Cast of Minds <noreply@castofminds.com>');
     process.exit(1);
   }
 
