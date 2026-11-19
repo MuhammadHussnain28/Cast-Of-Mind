@@ -8,6 +8,9 @@ brag-output/
 .agents/skills/brag/
 
 
+docs/
+
+
 # Build output
 dist/
 build/
