@@ -4,6 +4,8 @@ Cast of Minds is a production-grade full-stack teletherapy platform designed for
 
 The system is built around strict clinical privacy boundaries, healthcare compliance patterns, and automated subscription lifecycle management.
 
+Complete Explanation below ⬇⬇⬇ 
+
 ---
 
 ## System Architecture & Features
