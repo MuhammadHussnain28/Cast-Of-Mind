@@ -32,7 +32,7 @@ export default function WelcomingBack({ onCheck }) {
   }, [polls, slow, onCheck])
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-mist px-4 py-12">
+    <div className="relative flex h-dvh items-center justify-center overflow-y-auto bg-mist px-4 py-12">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-1/2 top-1/3 size-[28rem] -translate-x-1/2 rounded-full bg-sage/10 blur-[130px]"
