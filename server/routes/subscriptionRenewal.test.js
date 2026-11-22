@@ -105,7 +105,7 @@ function invoiceEvent({
   from = MONTH_1_END,
   to = MONTH_2_END,
   reason = BILLING_REASON.RENEWAL,
-  amount = 20000,
+  amount = 25000,
   shape = 'dahlia',
   lines = true,
   subscription = SUB_ID,
@@ -184,7 +184,7 @@ describe('renewal — the period moves forward', () => {
     const sub = await stored();
     expect(String(sub.bookingId)).toBe(String(client.booking._id));
     expect(sub.startDate.toISOString()).toBe('2026-09-14T20:00:00.000Z');
-    expect(sub.amount).toBe(20000);
+    expect(sub.amount).toBe(25000);
   });
 
   it('works with the older invoice shape too', async () => {
@@ -315,7 +315,7 @@ describe('renewal — the ledger records every one', () => {
     rows.forEach((row) => {
       expect(String(row.subscriptionId)).toBe(String(client.subscription._id));
       expect(String(row.clientId)).toBe(String(client.user._id));
-      expect(row.amount).toBe(20000);
+      expect(row.amount).toBe(25000);
       expect(row.currency).toBe('EUR');
     });
   });
@@ -412,7 +412,7 @@ describe('renewal — money that differs from the plan', () => {
     await send(invoiceEvent({ amount: 15000 }));
 
     expect((await stored()).currentPeriodEnd.toISOString()).toBe(MONTH_2_END);
-    expect(console.warn.mock.calls.flat().join(' ')).toMatch(/paid 15000 EUR, plan 20000 EUR/);
+    expect(console.warn.mock.calls.flat().join(' ')).toMatch(/paid 15000 EUR, plan 25000 EUR/);
   });
 });
 
@@ -425,7 +425,7 @@ describe('renewal — the receipt', () => {
     const [to, details] = sendPaymentReceiptEmail.mock.calls[0];
     expect(to).toBe(client.user.email);
     expect(details.name).toBe('Asha Rao');
-    expect(details.amount).toBe('€200.00');
+    expect(details.amount).toBe('€250.00');
     // 20:00 UTC on the 14th is already the 15th in Kolkata.
     expect(details.periodFrom).toBe('15 October 2026');
     expect(details.nextPayment).toBe('15 November 2026');
@@ -455,7 +455,7 @@ describe('renewal — the receipt', () => {
   const receipt = () =>
     paymentReceiptEmail({
       name: '<b>Asha</b>',
-      amount: '€200.00',
+      amount: '€250.00',
       paidOn: '15 October 2026',
       periodFrom: '15 October 2026',
       periodTo: '15 November 2026',

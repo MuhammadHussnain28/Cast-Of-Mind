@@ -398,7 +398,7 @@ describe('reactivating before the end', () => {
     expect(sub.cancelledBy).toBeUndefined();
 
     const details = sendSubscriptionReactivatedEmail.mock.calls[0][1];
-    expect(details.amount).toBe('€200.00');
+    expect(details.amount).toBe('€250.00');
     expect(details.nextPayment).toMatch(/\(Kolkata time\)$/);
     expect((await me()).body.access).toBe('active');
   });
@@ -598,11 +598,11 @@ describe('the emails — facts, never pressure', () => {
   it('the reactivation states the next charge and how to stop it', () => {
     const { text } = templates.subscriptionReactivatedEmail({
       name: 'Asha',
-      amount: '€200.00',
+      amount: '€250.00',
       nextPayment: 'Saturday 17 October 2026 at 14:05 (Kolkata time)',
       accountUrl: 'https://castofmind.com/portal/account',
     });
-    expect(text).toContain('€200.00');
+    expect(text).toContain('€250.00');
     expect(text).toMatch(/cancel before this date/i);
     expect(text).not.toMatch(PRESSURE);
   });

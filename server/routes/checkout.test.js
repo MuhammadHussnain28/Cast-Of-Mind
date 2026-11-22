@@ -208,7 +208,7 @@ describe('POST /checkout/create-session — THE GOLDEN RULE', () => {
 });
 
 describe('POST /checkout/create-session — what we send Stripe', () => {
-  it('charges €200 a month in EUR as a subscription', async () => {
+  it('charges €250 a month in EUR as a subscription', async () => {
     const therapist = await seedTherapist();
     await request(app).post(ENDPOINT).send(body(therapist));
 
@@ -217,7 +217,7 @@ describe('POST /checkout/create-session — what we send Stripe', () => {
 
     expect(args.mode).toBe('subscription');
     expect(price.unit_amount).toBe(SUBSCRIPTION_AMOUNT_MINOR);
-    expect(price.unit_amount).toBe(20000);
+    expect(price.unit_amount).toBe(25000);
     expect(price.currency).toBe('eur');
     expect(price.recurring.interval).toBe('month');
     expect(args.line_items[0].quantity).toBe(1);
@@ -253,7 +253,7 @@ describe('POST /checkout/create-session — what we send Stripe', () => {
     await request(app).post(ENDPOINT).send(body(therapist));
 
     const [args] = createSessionMock.mock.calls[0];
-    expect(args.custom_text.submit.message).toMatch(/charged €200 automatically each month/);
+    expect(args.custom_text.submit.message).toMatch(/charged €250 automatically each month/);
     expect(args.custom_text.submit.message).toMatch(/until you cancel/);
   });
 

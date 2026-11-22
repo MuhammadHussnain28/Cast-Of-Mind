@@ -62,7 +62,7 @@ export const phases = [
         icon: 'subscribe',
         title: 'Subscribe',
         // §2 price and inclusions; §12 hosted checkout, no raw card details.
-        body: '€200 a month. That is four therapy sessions, one a week over Video, and unlimited chat with your therapist in between. Payment happens on the payment provider’s own secure page.',
+        body: '€250 a month. That is four therapy sessions, one a week over Video, and unlimited chat with your therapist in between. Payment happens on the payment provider’s own secure page.',
         note: 'Your card details never reach us. Cancel any time.',
       },
       {

@@ -228,7 +228,7 @@ describe('account creation — the happy path', () => {
     expect(await PendingCheckout.countDocuments()).toBe(0);
   });
 
-  it('stores €200 as 20000 minor units in EUR', async () => {
+  it('stores €250 as 25000 minor units in EUR', async () => {
     const { profile } = await seedTherapist();
     const draft = await seedDraft(profile._id);
 
@@ -236,7 +236,7 @@ describe('account creation — the happy path', () => {
 
     const subscription = await Subscription.findOne();
     expect(subscription.amount).toBe(SUBSCRIPTION_AMOUNT_MINOR);
-    expect(subscription.amount).toBe(20000);
+    expect(subscription.amount).toBe(25000);
     expect(subscription.currency).toBe('EUR');
   });
 

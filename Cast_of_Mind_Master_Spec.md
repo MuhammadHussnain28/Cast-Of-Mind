@@ -1,5 +1,9 @@
 # Cast of Mind — Master Project Specification
 
+> **Read this first — later decisions win (2026-11-22).** This spec was written before the build started. Some decisions changed during the project and are not all reflected here, so parts of this document may be out of date. Where this spec conflicts with a later decision recorded in `docs/ongoing.md`, the later decision wins.
+>
+> **Price change (2026-11-22):** the subscription is now **€250/month** (was €200), decided by the client. §2 and the §13 checkout notice are updated. Any other €200 left in this document is history and means €250.
+
 > **Single source of truth.** This document contains the complete product vision, architecture, feature set, business logic, and technical decisions for the Cast of Mind platform. It is written to be self-contained: any developer or AI reading this document should have full context to work on the project without additional background.
 
 **Document version:** 1.4
@@ -72,7 +76,7 @@ The platform operates on **tag-based matching**. There is a fixed master list of
 
 ### Subscription
 
-- **Price:** €200/month (euro — confirmed)
+- **Price:** €250/month (euro — raised from €200 on 2026-11-22)
 - **What it includes:** 4 therapy sessions per month (one per week) plus unlimited chat access with the assigned therapist
 - **Billing:** Monthly recurring subscription with automatic renewal
 - **Only one plan exists.** There are no weekly, 4-weekly, quarterly, or tiered options — a single monthly plan only.
@@ -1188,7 +1192,7 @@ The client must be clearly informed that their card will be charged again. This 
 
 **Show it at three points:**
 
-1. **At checkout (most important):** *"This is a monthly subscription. Your card will be charged €200 automatically each month until you cancel."*
+1. **At checkout (most important):** *"This is a monthly subscription. Your card will be charged €250 automatically each month until you cancel."*
 2. **In the portal** (Subscription & Account section, always visible): *"Next payment: [date]. To stop it, cancel before this date."*
 3. **Reminder email a few days before each renewal:** *"Your subscription renews on [date]. No action needed to continue; cancel anytime before then."*
 

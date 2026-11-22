@@ -24,7 +24,7 @@ Complete Explanation below ⬇⬇⬇ (Understand it )
 * Real-time read receipts, typing status, unread notification badges, and optimistic UI message reconciliation.
 
 ### 4. Subscription & Billing Lifecycle (Stripe Webhooks)
-* Automated recurring monthly billing (€200/mo) integrated via Stripe Webhooks (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`).
+* Automated recurring monthly billing (€250/mo) integrated via Stripe Webhooks (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`).
 * **Automated Grace Period & Recovery:** 3-day grace period on payment failure before access restrictions apply.
 * **Quiet Resubscription Workflow:** Lapsed clients retain full historical records (messages, worksheets, journal counts) and can reactivate with their original therapist in one click.
 

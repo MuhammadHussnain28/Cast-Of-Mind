@@ -45,9 +45,9 @@ describe('Subscription — creation and defaults', () => {
 
   // Pins the euros-or-cents decision. If this ever reads 200, every money figure
   // on the admin dashboard is out by a factor of 100 and nothing else fails.
-  it('prices €200/month as 20000 minor units', () => {
-    expect(SUBSCRIPTION_AMOUNT_MINOR).toBe(20000);
-    expect(Subscription.schema.path('amount').defaultValue).toBe(20000);
+  it('prices €250/month as 25000 minor units', () => {
+    expect(SUBSCRIPTION_AMOUNT_MINOR).toBe(25000);
+    expect(Subscription.schema.path('amount').defaultValue).toBe(25000);
   });
 
   it('pins the collection name the admin dashboard reads raw', () => {

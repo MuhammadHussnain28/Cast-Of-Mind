@@ -63,7 +63,7 @@ export const ACTIONS = Object.freeze({
   // The trap worth naming out loud: the login and the billing are separate
   // things, and deactivating only touches the first.
   deactivateWarning:
-    'This does not stop the billing. Their card is still charged €200 a month until the subscription is cancelled as well.',
+    'This does not stop the billing. Their card is still charged €250 a month until the subscription is cancelled as well.',
   reactivateTitle: (name) => `Reactivate ${name}?`,
   reactivateBody: 'They will be able to sign in again, and pick up exactly where they left off.',
 

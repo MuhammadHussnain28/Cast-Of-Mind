@@ -44,7 +44,7 @@ export default function WelcomingBack({ onCheck }) {
           <motion.span
             className="absolute inset-0 rounded-full bg-sage/20"
             animate={reduce || slow ? undefined : { scale: [1, 1.18, 1], opacity: [0.7, 0.35, 0.7] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}   
           />
           <span className="absolute inset-3 rounded-full border-2 border-sage-deep bg-paper" />
         </div>
@@ -87,3 +87,4 @@ export default function WelcomingBack({ onCheck }) {
     </div>
   )
 }
+

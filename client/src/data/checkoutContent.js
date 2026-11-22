@@ -18,7 +18,7 @@ export const checkout = {
   whoHeading: 'You will be working with',
   whoNote: 'You can message them as soon as your account is open.',
 
-  price: '€200',
+  price: '€250',
   priceUnit: 'per month',
 
   includedHeading: "What's included",
@@ -78,7 +78,7 @@ export const included = [
 export const renewal = {
   heading: 'This renews every month',
   sentence:
-    'This is a monthly subscription. Your card will be charged €200 automatically each month until you cancel.',
+    'This is a monthly subscription. Your card will be charged €250 automatically each month until you cancel.',
   cadenceCaption: 'Every month, until you cancel.',
   todayLabel: 'Today',
   cancelNote: 'You can cancel any time from your portal. Cancelling stops the next payment.',

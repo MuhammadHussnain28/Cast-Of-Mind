@@ -22,7 +22,7 @@ export const CHECKOUT_SESSION_TTL_HOURS = 24;
 // three places it must appear. This is the copy shown on Stripe's own page,
 // which is the last screen before a card is charged.
 export const RENEWAL_DISCLOSURE =
-  'This is a monthly subscription. Your card will be charged €200 automatically ' +
+  'This is a monthly subscription. Your card will be charged €250 automatically ' +
   'each month until you cancel. You can cancel any time from your portal.';
 
 // Shown as the product name on Stripe's hosted page and on the card statement
@@ -41,7 +41,7 @@ export const CHECKOUT_PRODUCT_DESCRIPTION =
  * platform "this address is a patient of ours" is the sensitive part.
  *
  * Refusing here rather than at the webhook is deliberate — the alternative is
- * taking €200 from someone who then cannot be given an account.
+ * taking €250 from someone who then cannot be given an account.
  */
 export const EMAIL_IN_USE_MESSAGE =
   'An account already exists for this email address. Please sign in, or use ' +

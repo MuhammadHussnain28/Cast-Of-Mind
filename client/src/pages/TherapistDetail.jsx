@@ -217,7 +217,7 @@ export default function TherapistDetail() {
           {/* The choice, kept in view while reading. */}
           <aside className="lg:sticky lg:top-24 lg:self-start">
             <div className="rounded-2xl border border-ink/12 bg-mist p-6">
-              <p className="font-body text-subsection font-medium text-ink">€200 / month</p>
+              <p className="font-body text-subsection font-medium text-ink">€250 / month</p>
               <Text size="caption" tone="muted" className="mt-2">
                 Four sessions a month and unlimited chat.
               </Text>
