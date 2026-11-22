@@ -254,7 +254,7 @@ const MILESTONES = [
   {
     id: 3,
     tag: '03 · SUBSCRIBE',
-    title: 'Flat €200 Plan',
+    title: 'Flat €250 Plan',
     badge: 'Cancel Anytime',
     badgeStyle: 'bg-gold/30 text-ink font-bold',
     detail: 'One transparent monthly plan. Secure hosted checkout, with your login credentials automatically emailed to you instantly.',

@@ -194,7 +194,7 @@ export default function Hero() {
           {/* Subtle Video Footer Indicator */}
           <div className="mt-3 flex items-center justify-between px-2 text-[11px] text-paper/40 font-mono">
             <span>● 1-on-1 Remote Sanctuary</span>
-            <span>€200 / Month Flat</span>
+            <span>€250 / Month Flat</span>
           </div>
         </motion.div>
 

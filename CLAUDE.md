@@ -1,6 +1,8 @@
 # Cast of Mind
 
-Online therapy platform. Clients complete an intake questionnaire, are matched to therapists by specialty tags, subscribe at €200/month, and work with their therapist in a private portal — chat, worksheets, journal, and Zoom sessions.
+> **Read this first — later decisions win (2026-11-22).** The master spec was written before the build started. Some decisions changed during the project, so parts of the master spec and the split docs may be out of date. Where they conflict, the later decision recorded in `docs/ongoing.md` wins.
+
+Online therapy platform. Clients complete an intake questionnaire, are matched to therapists by specialty tags, subscribe at €250/month, and work with their therapist in a private portal — chat, worksheets, journal, and Zoom sessions.
 
 **Three roles, one login page:** client, therapist, admin. The backend reads `role` and redirects.
 
@@ -52,7 +54,7 @@ npm run lint
 | `docs/ongoing.md` | Progress log. You update this. Carries the standing decisions, the Slice 6 summary, Slice 7 in full, and the 13 pre-launch blockers. |
 | `docs/archive/ongoing-slices-0-6.md` | The raw, unedited build log for Slices 0–6, moved out 2026-09-16. History, not instruction — read it for the full reasoning behind an extracted decision. |
 
-`Cast_of_Mind_Master_Spec.md` is the complete source of truth. If a split file and the master spec disagree, **the master spec wins**.
+`Cast_of_Mind_Master_Spec.md` is the complete source of truth for the original plan. If a split file and the master spec disagree, **the master spec wins** — but a later decision recorded in `docs/ongoing.md` wins over both.
 
 ---
 
@@ -79,7 +81,7 @@ These are non-negotiable and apply everywhere.
 - Account creation happens on **webhook confirmation**, never on browser redirect.
 - Webhooks are idempotent — check `platformEventId` before processing.
 - All times stored in **UTC**, displayed in each viewer's IANA timezone. Never store local times.
-- Currency is **EUR**. €200/month, 4 sessions, no carry-over.
+- Currency is **EUR**. €250/month (raised from €200 on 2026-11-22), 4 sessions, no carry-over.
 
 **Matching**
 

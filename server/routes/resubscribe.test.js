@@ -310,7 +310,7 @@ describe('starting a re-subscribe — no questionnaire, the same booking', () =>
     });
     expect(params.line_items[0].price_data).toMatchObject({
       currency: 'eur',
-      unit_amount: 20000,
+      unit_amount: 25000,
       recurring: { interval: 'month' },
     });
     expect(params.custom_text.submit.message).toMatch(/charged/i);
@@ -393,7 +393,7 @@ describe('the webhook — a new subscription on the SAME booking', () => {
       sessionsRemaining: 4,
       platformSubscriptionId: NEW_SUB,
       platformCustomerId: CUSTOMER,
-      amount: 20000,
+      amount: 25000,
     });
 
     const me = (await as('get', '/api/v1/client/me')).body;
@@ -417,7 +417,7 @@ describe('the webhook — a new subscription on the SAME booking', () => {
     const [to, details] = sendWelcomeBackEmail.mock.calls[0];
     expect(to).toBe(world.email);
     expect(details.therapistName).toBe('Dr. Maya Iversen');
-    expect(details.amount).toBe('€200.00');
+    expect(details.amount).toBe('€250.00');
     expect(details.nextPayment).toMatch(/\(Dublin time\)$/);
   });
 
@@ -505,7 +505,7 @@ describe('the welcome-back email', () => {
     const { text, html } = welcomeBackEmail({
       name: '<b>Aoife</b>',
       therapistName: 'Dr. Maya Iversen',
-      amount: '€200.00',
+      amount: '€250.00',
       nextPayment: 'Friday 23 October 2026 at 10:00 (Dublin time)',
       portalUrl: 'https://castofmind.com/portal',
     });

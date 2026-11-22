@@ -192,7 +192,7 @@ export default function Welcome() {
           </Text>
         </div>
         <span className="rounded-full border border-sage/25 bg-sage/10 px-3 py-1 font-body text-[11px] font-semibold uppercase tracking-wide text-sage-deep shrink-0">
-          Active · €200/mo
+          Active · €250/mo
         </span>
       </div>
 

@@ -43,17 +43,17 @@ export const PAYMENT_PLATFORM = Object.freeze({
 
 export const PAYMENT_PLATFORM_VALUES = Object.freeze(Object.values(PAYMENT_PLATFORM));
 
-// §2: EUR, one plan, €200/month.
+// §2: EUR, one plan, €250/month (raised from €200 on 2026-11-22).
 export const BILLING_CURRENCY = 'EUR';
 
 /**
- * MONEY IS STORED IN MINOR UNITS — CENTS. €200.00 is 20000, never 200.
+ * MONEY IS STORED IN MINOR UNITS — CENTS. €250.00 is 25000, never 200.
  *
  * Decided 2026-09-07, closing the open item chunk 4.4 recorded: §10.6 types
  * `amount` as a bare Number and never says which unit.
  *
  * Three reasons, and the second is the one that decided it:
- *  1. Stripe speaks cents. The webhook hands us 20000, so nothing converts
+ *  1. Stripe speaks cents. The webhook hands us 25000, so nothing converts
  *     between the platform and our ledger, and a conversion is where a x100 bug
  *     lives.
  *  2. `paymentEvents.amount` must match Stripe exactly, because it is the
@@ -66,7 +66,7 @@ export const BILLING_CURRENCY = 'EUR';
  * `client/src/lib/dashboardFormat.js` does this for the admin dashboard, and
  * `formatMinorUnits` below does it for server-rendered email.
  */
-export const SUBSCRIPTION_AMOUNT_MINOR = 20000;
+export const SUBSCRIPTION_AMOUNT_MINOR = 25000;
 
 export const MINOR_UNITS_PER_MAJOR = 100;
 

@@ -190,7 +190,7 @@ export const processSteps = [
     title: 'Subscribe and get your login',
     // §12: the account is created on webhook confirmation, then credentials are
     // emailed. "Once payment clears" is the honest phrasing of that.
-    body: '€200 a month. Your account is created once the payment clears, and your login arrives by email.',
+    body: '€250 a month. Your account is created once the payment clears, and your login arrives by email.',
   },
   {
     id: 'step-4',
@@ -227,7 +227,7 @@ export const comparisonRows = [
       'Charged per session. The rate varies by city and by practitioner, and each session is billed separately.',
     // §2: €200/month, one plan, 4 sessions + unlimited chat.
     castOfMind:
-      '€200 a month, the same wherever you live. Four sessions and unlimited chat in between.',
+      '€250 a month, the same wherever you live. Four sessions and unlimited chat in between.',
   },
   {
     id: 'access',
@@ -277,7 +277,7 @@ export const faqItems = [
     question: 'How much is it, and what am I paying for?',
     // §2 and §13.
     answer:
-      '€200 a month. There is one plan and no tiers. It covers four therapy sessions one a week, over video and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
+      '€250 a month. There is one plan and no tiers. It covers four therapy sessions one a week, over video and unlimited chat with your therapist in between. Unused sessions do not roll over into the next month, which we would rather you know now than discover later.',
   },
   {
     id: 'faq-privacy',

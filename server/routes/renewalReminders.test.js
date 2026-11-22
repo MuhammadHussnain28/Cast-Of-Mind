@@ -202,7 +202,7 @@ describe('the renewal reminder — its words', () => {
     const [to, details] = sendRenewalReminderEmail.mock.calls[0];
 
     expect(to).toBe(world.email);
-    expect(details.amount).toBe('€200.00');
+    expect(details.amount).toBe('€250.00');
     const expected = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     }).format(world.subscription.nextBillingDate);
@@ -221,7 +221,7 @@ describe('the renewal reminder — its words', () => {
     const { text, html } = renewalReminderEmail({
       name: '<b>Asha</b>',
       renewsOn: 'Tuesday 14 October 2026',
-      amount: '€200.00',
+      amount: '€250.00',
       accountUrl: 'https://castofmind.com/portal/account',
     });
     const sentence = 'Your subscription renews on Tuesday 14 October 2026. No action needed to continue; cancel anytime before then.';

@@ -334,7 +334,7 @@ export default function Services1() {
             <Heading level={2} id="plan-heading" size="section" tone="inverse">
               One plan.
             </Heading>
-            <p className="mt-6 font-display text-section text-gold">€200 a month</p>
+            <p className="mt-6 font-display text-section text-gold">€250 a month</p>
             <Text size="ui" className="mt-6 max-w-measure text-paper/75">
               {subscriptionCaveat}
             </Text>

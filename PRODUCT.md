@@ -30,7 +30,7 @@ Connect clients to therapists matched on specialty, then hold the working relati
 
 ## Operating Context
 
-- Subscription: **€200/month**, one plan only. Includes 4 Zoom sessions per month plus unlimited chat. Sessions do not carry over.
+- Subscription: **€250/month**, one plan only. Includes 4 Zoom sessions per month plus unlimited chat. Sessions do not carry over.
 - Sessions are **therapist-scheduled**; clients view and join, never book or reschedule in-app.
 - All times stored UTC, displayed in each viewer's IANA timezone.
 - Worksheets are file upload/download — filled in off-platform on the client's own device.
